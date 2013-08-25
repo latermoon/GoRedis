@@ -63,10 +63,18 @@ func (session *Session) ReplyBulk(bulk interface{}) (err error) {
 	}
 	buf := bytes.Buffer{}
 	buf.WriteString("$")
-	b := []byte(bulk.(string))
-	buf.WriteString(strconv.Itoa(len(b)))
-	buf.WriteString(CRLF)
-	buf.Write(b)
+	switch bulk.(type) {
+	case []byte:
+		b := bulk.([]byte)
+		buf.WriteString(strconv.Itoa(len(b)))
+		buf.WriteString(CRLF)
+		buf.Write(b)
+	default:
+		b := []byte(bulk.(string))
+		buf.WriteString(strconv.Itoa(len(b)))
+		buf.WriteString(CRLF)
+		buf.Write(b)
+	}
 	buf.WriteString(CRLF)
 	buf.WriteTo(session.conn)
 	return
@@ -96,6 +104,13 @@ func (session *Session) ReplyMultiBulks(bulks []interface{}) (err error) {
 		case string:
 			buf.WriteString("$")
 			b := []byte(bulk.(string))
+			buf.WriteString(strconv.Itoa(len(b)))
+			buf.WriteString(CRLF)
+			buf.Write(b)
+			buf.WriteString(CRLF)
+		case []byte:
+			buf.WriteString("$")
+			b := bulk.([]byte)
 			buf.WriteString(strconv.Itoa(len(b)))
 			buf.WriteString(CRLF)
 			buf.Write(b)
