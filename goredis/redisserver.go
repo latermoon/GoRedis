@@ -6,7 +6,7 @@ package goredis
 
 import (
 	"bufio"
-	"fmt"
+	"github.com/op/go-logging"
 	"net"
 	"strconv"
 	"strings"
@@ -17,6 +17,8 @@ const (
 	LF   = '\n'
 	CRLF = "\r\n"
 )
+
+var logger = logging.MustGetLogger("goredis")
 
 // ==============================
 // RedisServer只实现最基本的Redis协议
@@ -42,13 +44,16 @@ func NewRedisServer() (server RedisServer, err error) {
 	return
 }
 
+func (server *SimpleRedisServer) Init() {
+	server.handlers = make(map[string](func(session *Session, cmd *Command) (err error)))
+	return
+}
+
 /**
  * 开始监听主机端口
  * @param host "localhost:6379"
  */
 func (server *SimpleRedisServer) Listen(host string) {
-	fmt.Println("[goredis] listen:", host)
-
 	listener, e1 := net.Listen("tcp", host)
 	if e1 != nil {
 		panic(e1)
@@ -57,10 +62,10 @@ func (server *SimpleRedisServer) Listen(host string) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("[goredis] accepted error", err)
+			logger.Warning("[goredis] accepted error %s", err)
 			continue
 		}
-		fmt.Println("[goredis] connection accepted from", conn.RemoteAddr())
+		logger.Info("[goredis] connection accepted from %s", conn.RemoteAddr())
 		session := newSession(conn)
 		go server.handleConnection(session)
 	}
@@ -80,7 +85,7 @@ func (server *SimpleRedisServer) handleConnection(session *Session) {
 	for {
 		cmd, e1 := readCommand(reader)
 		if e1 != nil {
-			fmt.Println("[goredis] end connection", e1, session.conn.RemoteAddr())
+			logger.Info("[goredis] end connection %s %s", e1, session.conn.RemoteAddr())
 			session.Close()
 			return
 		}
@@ -88,7 +93,7 @@ func (server *SimpleRedisServer) handleConnection(session *Session) {
 		if ok {
 			e2 := fn(session, cmd)
 			if e2 != nil {
-				fmt.Println("e2:", e2)
+				logger.Warning("[goredis] e2: %s", e2)
 			}
 		}
 	}
