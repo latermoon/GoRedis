@@ -9,7 +9,10 @@ import (
 
 // ==============================
 // Session维护一个net.Conn连接，代表一个客户端会话
-// 提供各种标准的Reply方法
+// 提供各种标准的Reply方法, Status/Error/Integer/Bulk/MultiBulk
+// 在性能损耗允许范围内，可以整合成一个接口
+// session.Reply(IntegerReply(10))
+// session.Reply(StatusReply("OK"))
 // ==============================
 type Session struct {
 	conn net.Conn

@@ -1,5 +1,5 @@
 // ==============================
-// BaseServer实例
+// RedisServer实例
 // 实现最原始的Handle来处理请求
 // ==============================
 package main
@@ -35,6 +35,12 @@ func main() {
 		kvCache[key] = value
 		<-chanSet
 		session.ReplyStatus("OK")
+		return
+	})
+
+	server.On("PING", func(session *goredis.Session, cmd *goredis.Command) (err error) {
+		err = nil
+		session.ReplyStatus("PONG")
 		return
 	})
 

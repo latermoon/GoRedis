@@ -23,6 +23,34 @@ var logger = logging.MustGetLogger("goredis")
 // ==============================
 // RedisServer只实现最基本的Redis协议
 // 提供On接口处理传入的各种指令，使用session返回数据
+/*
+	server, _ := goredis.NewRedisServer()
+
+	// KeyValue
+	kvCache := make(map[string]interface{})
+	// Set操作的写锁
+	chanSet := make(chan int, 1)
+
+	server.On("GET", func(session *goredis.Session, cmd *goredis.Command) (err error) {
+		err = nil
+		key, _ := cmd.StringAtIndex(1)
+		value := kvCache[key]
+		session.ReplyBulk(value)
+		return
+	})
+
+	server.On("SET", func(session *goredis.Session, cmd *goredis.Command) (err error) {
+		key, _ := cmd.StringAtIndex(1)
+		value, _ := cmd.StringAtIndex(2)
+		chanSet <- 0
+		kvCache[key] = value
+		<-chanSet
+		session.ReplyStatus("OK")
+		return
+	})
+
+	server.Listen(":8002")
+*/
 // ==============================
 type RedisServer interface {
 	Listen(host string)
@@ -89,6 +117,7 @@ func (server *SimpleRedisServer) handleConnection(session *Session) {
 			session.Close()
 			return
 		}
+		// 取出处理函数
 		fn, ok := server.handlers[strings.ToUpper(cmd.Name())]
 		if ok {
 			e2 := fn(session, cmd)
@@ -100,7 +129,8 @@ func (server *SimpleRedisServer) handleConnection(session *Session) {
 }
 
 /*
-// 从客户端连接获取指令 (太多err判断了)
+// 从客户端连接获取指令
+// (下面读取过程，线上应用前需要增加错误校验，数据大小限制)
 *<number of arguments> CR LF
 $<number of bytes of argument 1> CR LF
 <argument data> CR LF

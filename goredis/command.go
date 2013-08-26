@@ -8,6 +8,10 @@ import (
 
 // ==============================
 // 代表一条客户端指令
+// 对于 SET name Latermoon
+// cmd.StringAtIndex(0) == cmd.Name() == "SET"
+// cmd.StringAtIndex(1) == "name"
+// cmd.StringAtIndex(2) == "Latermoon"
 // ==============================
 type Command struct {
 	name interface{}
