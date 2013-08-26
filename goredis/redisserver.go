@@ -6,7 +6,7 @@ package goredis
 
 import (
 	"bufio"
-	"github.com/op/go-logging"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -90,10 +90,10 @@ func (server *SimpleRedisServer) Listen(host string) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			logger.Warning("[goredis] accepted error %s", err)
+			fmt.Println("[goredis] accepted error", err)
 			continue
 		}
-		logger.Info("[goredis] connection accepted from %s", conn.RemoteAddr())
+		fmt.Println("[goredis] connection accepted from", conn.RemoteAddr())
 		session := newSession(conn)
 		go server.handleConnection(session)
 	}
@@ -113,7 +113,7 @@ func (server *SimpleRedisServer) handleConnection(session *Session) {
 	for {
 		cmd, e1 := readCommand(reader)
 		if e1 != nil {
-			logger.Info("[goredis] end connection %s %s", e1, session.conn.RemoteAddr())
+			fmt.Println("[goredis] end connection", e1, session.conn.RemoteAddr())
 			session.Close()
 			return
 		}
@@ -122,7 +122,7 @@ func (server *SimpleRedisServer) handleConnection(session *Session) {
 		if ok {
 			e2 := fn(session, cmd)
 			if e2 != nil {
-				logger.Warning("[goredis] e2: %s", e2)
+				fmt.Println("[goredis] e2:", e2)
 			}
 		}
 	}

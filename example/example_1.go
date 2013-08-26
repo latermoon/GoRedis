@@ -1,13 +1,16 @@
 // ==============================
 // RedisServer实例
 // 实现最原始的Handle来处理请求
+// 安装方式：
+// 配置$GOPATH后
+// go get github.com/latermoon/GoRedis/goredis
+// import "github.com/latermoon/GoRedis/goredis"
 // ==============================
 package main
 
 import (
-	"github.com/latermoon/GoRedis/goredis"
-	//"container/list"
 	"fmt"
+	"github.com/latermoon/GoRedis/goredis"
 )
 
 func main() {
