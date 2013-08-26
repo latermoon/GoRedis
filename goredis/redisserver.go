@@ -18,8 +18,6 @@ const (
 	CRLF = "\r\n"
 )
 
-var logger = logging.MustGetLogger("goredis")
-
 // ==============================
 // RedisServer只实现最基本的Redis协议
 // 提供On接口处理传入的各种指令，使用session返回数据
