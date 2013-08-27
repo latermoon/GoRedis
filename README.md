@@ -5,12 +5,12 @@ GoRedis
 
 vi ~/.profile 
 
-export GOPATH=/User/lptmoon/Downloads/go/gopath/
+		export GOPATH=/User/lptmoon/Downloads/go/gopath/
 
 Install:
 
-go get github.com/latermoon/GoRedis/goredis
+		go get github.com/latermoon/GoRedis/goredis
 
 Update:
 
-go get -u github.com/latermoon/GoRedis/goredis
+		go get -u github.com/latermoon/GoRedis/goredis
