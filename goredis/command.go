@@ -41,9 +41,8 @@ func (cmd *Command) StringAtIndex(index int) (value string) {
 
 func (cmd *Command) String() string {
 	buf := bytes.Buffer{}
-	argCount := len(cmd.Args)
-	for i := 0; i < argCount; i++ {
-		buf.Write(cmd.Args[i])
+	for _, arg := range cmd.Args {
+		buf.Write(arg)
 		buf.WriteString(" ")
 	}
 	return buf.String()
