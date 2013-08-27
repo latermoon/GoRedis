@@ -10,7 +10,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/latermoon/GoRedis/goredis"
+	//"github.com/latermoon/GoRedis/goredis"
+	"../goredis"
 )
 
 func main() {
@@ -23,33 +24,30 @@ func main() {
 	// Set操作的写锁
 	chanSet := make(chan int, 1)
 
-	server.On("GET", func(session *goredis.Session, cmd *goredis.Command) (err error) {
-		err = nil
-		key, _ := cmd.StringAtIndex(1)
+	server.On("GET", func(cmd *goredis.Command) (reply *goredis.Reply) {
+		key := cmd.StringAtIndex(1)
 		value := kvCache[key]
-		session.ReplyBulk(value)
+		reply = goredis.BulkReply(value)
 		return
 	})
 
-	server.On("SET", func(session *goredis.Session, cmd *goredis.Command) (err error) {
-		key, _ := cmd.StringAtIndex(1)
-		value, _ := cmd.StringAtIndex(2)
+	server.On("SET", func(cmd *goredis.Command) (reply *goredis.Reply) {
+		key := cmd.StringAtIndex(1)
+		value := cmd.StringAtIndex(2)
 		chanSet <- 0
 		kvCache[key] = value
 		<-chanSet
-		session.ReplyStatus("OK")
+		reply = goredis.StatusReply("OK")
 		return
 	})
 
-	server.On("PING", func(session *goredis.Session, cmd *goredis.Command) (err error) {
-		err = nil
-		session.ReplyStatus("PONG")
+	server.On("PING", func(cmd *goredis.Command) (reply *goredis.Reply) {
+		reply = goredis.StatusReply("PONG")
 		return
 	})
 
-	server.On("INFO", func(session *goredis.Session, cmd *goredis.Command) (err error) {
-		err = nil
-		session.ReplyBulk("GoRedis 0.1 by latermoon\n")
+	server.On("INFO", func(cmd *goredis.Command) (reply *goredis.Reply) {
+		reply = goredis.BulkReply("GoRedis 0.1 by latermoon\n")
 		return
 	})
 
