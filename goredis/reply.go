@@ -11,6 +11,7 @@ type Reply struct {
 
 type ReplyType int
 
+// 响应的种类
 const (
 	ReplyTypeStatus = iota
 	ReplyTypeError

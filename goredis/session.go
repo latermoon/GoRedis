@@ -21,6 +21,7 @@ type Session struct {
 	reader *bufio.Reader
 }
 
+// 创建Session
 func newSession(conn net.Conn) (s *Session) {
 	s = &Session{}
 	s.conn = conn

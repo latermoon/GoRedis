@@ -18,7 +18,7 @@ import (
 func main() {
 	fmt.Println("GoRedis 0.1 by latermoon")
 
-	server, _ := goredis.NewRedisServer()
+	server := goredis.NewRedisServer()
 
 	// KeyValue
 	kvCache := make(map[string]interface{})
@@ -53,5 +53,6 @@ func main() {
 	})
 
 	// 开始监听端口
+	fmt.Println("Listen :8002")
 	server.Listen(":8002")
 }

@@ -23,23 +23,15 @@ const (
 
 */
 // ==============================
-type RedisServer interface {
-	Listen(host string)
-	On(commandName string, fn func(cmd *Command) (reply *Reply))
-}
-
-// Implemented
-type SimpleRedisServer struct {
+type RedisServer struct {
 	// 存放指令处理函数
 	handlers map[string](func(cmd *Command) (reply *Reply))
 }
 
 // 创建服务实例
-func NewRedisServer() (server RedisServer, err error) {
-	simpleServer := &SimpleRedisServer{}
-	err = nil
-	simpleServer.handlers = make(map[string](func(cmd *Command) (reply *Reply)))
-	server = simpleServer
+func NewRedisServer() (server *RedisServer) {
+	server = &RedisServer{}
+	server.handlers = make(map[string](func(cmd *Command) (reply *Reply)))
 	return
 }
 
@@ -47,7 +39,7 @@ func NewRedisServer() (server RedisServer, err error) {
  * 开始监听主机端口
  * @param host "localhost:6379"
  */
-func (server *SimpleRedisServer) Listen(host string) {
+func (server *RedisServer) Listen(host string) {
 	listener, e1 := net.Listen("tcp", host)
 	if e1 != nil {
 		panic(e1)
@@ -60,19 +52,21 @@ func (server *SimpleRedisServer) Listen(host string) {
 			continue
 		}
 		fmt.Println("[goredis] connection accepted from", conn.RemoteAddr())
+
 		session := newSession(conn)
+
 		go server.handleConnection(session)
 	}
 }
 
 // 添加指令处理函数
-func (server *SimpleRedisServer) On(commandName string, fn func(cmd *Command) (reply *Reply)) {
+func (server *RedisServer) On(commandName string, handler func(cmd *Command) (reply *Reply)) {
 	name := strings.ToUpper(commandName)
-	server.handlers[name] = fn
+	server.handlers[name] = handler
 }
 
 // 处理一个客户端连接
-func (server *SimpleRedisServer) handleConnection(session *Session) {
+func (server *RedisServer) handleConnection(session *Session) {
 	// 不断从一个连接中获取命令，并处理，返回
 	for {
 		cmd, e1 := session.ReadCommand()
@@ -81,6 +75,7 @@ func (server *SimpleRedisServer) handleConnection(session *Session) {
 			session.Close()
 			return
 		}
+
 		// 取出处理函数
 		handler, exists := server.handlers[strings.ToUpper(cmd.Name())]
 		if exists {
