@@ -3,19 +3,19 @@ GoRedis
 
 ### RedisServer Implemented by Go
 
-vi ~/.profile 
+#### vi ~/.profile 
 
 		export GOPATH=/User/lptmoon/Downloads/go/gopath/
 
-Install:
+#### Install:
 
 		go get github.com/latermoon/GoRedis/goredis
 
-Update:
+#### Update:
 
 		go get -u github.com/latermoon/GoRedis/goredis
 
-Demo:
+#### Demo:
 
 	server := goredis.NewRedisServer()
 
