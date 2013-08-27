@@ -3,8 +3,9 @@
 // 实现最原始的Handle来处理请求
 // 安装方式：
 // 配置$GOPATH后
-// go get github.com/latermoon/GoRedis/goredis
-// import "github.com/latermoon/GoRedis/goredis"
+// install: go get github.com/latermoon/GoRedis/goredis
+// update: go get -u github.com/latermoon/GoRedis/goredis
+// user: import "github.com/latermoon/GoRedis/goredis"
 // ==============================
 package main
 

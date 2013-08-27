@@ -11,8 +11,8 @@ import (
 
 // ==============================
 // Session维护一个net.Conn连接，代表一个客户端会话
-// 提供各种标准的Reply方法, Status/Error/Integer/Bulk/MultiBulk
-// 在性能损耗允许范围内，可以整合成一个接口
+// 提供各种标准的Reply方法, Status/Error/Integer/Bulk/MultiBulks
+// cmd := session.ReadCommand()
 // session.Reply(IntegerReply(10))
 // session.Reply(StatusReply("OK"))
 // ==============================
@@ -38,7 +38,7 @@ $<number of bytes of argument 1> CR LF
 $<number of bytes of argument N> CR LF
 <argument data> CR LF
 */
-func (s *Session) readCommand() (cmd *Command, err error) {
+func (s *Session) ReadCommand() (cmd *Command, err error) {
 	reader := s.reader
 
 	cmd = &Command{}

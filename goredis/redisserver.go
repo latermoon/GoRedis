@@ -75,7 +75,7 @@ func (server *SimpleRedisServer) On(commandName string, fn func(cmd *Command) (r
 func (server *SimpleRedisServer) handleConnection(session *Session) {
 	// 不断从一个连接中获取命令，并处理，返回
 	for {
-		cmd, e1 := session.readCommand()
+		cmd, e1 := session.ReadCommand()
 		if e1 != nil {
 			fmt.Println("[goredis] end connection", e1, session.conn.RemoteAddr())
 			session.Close()
