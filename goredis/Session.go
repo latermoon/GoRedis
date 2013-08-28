@@ -54,12 +54,12 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 		err = errors.New("Illegal * ...")
 		return
 	}
-	line, err = reader.ReadBytes(CR)
+	line, err = lightReadBytes(reader, CR)
 	if err != nil {
 		return
 	}
 	// number of arguments
-	argCount, _ := strconv.Atoi(string(line[:len(line)-1]))
+	argCount, _ := strconv.Atoi(string(line))
 	c, err = reader.ReadByte()
 	if err != nil {
 		return
@@ -78,11 +78,13 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 			err = errors.New("Illegal $ ...")
 			return
 		}
-		line, err = reader.ReadBytes(CR)
+		//line, err = reader.ReadBytes(CR)
+		line, err = lightReadBytes(reader, CR)
 		if err != nil {
 			return
 		}
-		argSize, _ := strconv.Atoi(string(line[:len(line)-1]))
+		//argSize, _ := strconv.Atoi(string(line[:len(line)-1]))
+		argSize, _ := strconv.Atoi(string(line))
 		c, err = reader.ReadByte()
 		if err != nil {
 			return
