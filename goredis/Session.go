@@ -44,42 +44,76 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 
 	cmd = &Command{}
 	err = nil
-
+	var c byte
+	var line []byte
 	// Read ( *<number of arguments> CR LF )
-	_, err = reader.ReadBytes('*')
-	if err != nil { // EOF
+	c, err = reader.ReadByte()
+	if err != nil { // io.EOF
+		return
+	} else if c != '*' {
+		err = errors.New("Illegal * ...")
 		return
 	}
-	line, e1 := reader.ReadBytes(CR)
-	if e1 != nil {
-		err = e1
+	line, err = reader.ReadBytes(CR)
+	if err != nil {
 		return
 	}
 	// number of arguments
 	argCount, _ := strconv.Atoi(string(line[:len(line)-1]))
-	_, err = reader.ReadBytes(LF)
+	c, err = reader.ReadByte()
 	if err != nil {
+		return
+	} else if c != LF {
+		err = errors.New("Illegal LF ...")
 		return
 	}
 
 	cmd.Args = make([][]byte, argCount)
 	for i := 0; i < argCount; i++ {
 		// Read ( $<number of bytes of argument 1> CR LF )
-		_, _ = reader.ReadBytes('$')
-		line, e2 := reader.ReadBytes(CR)
-		if e2 != nil {
-			err = e2
+		c, err = reader.ReadByte()
+		if err != nil {
+			return
+		} else if c != '$' {
+			err = errors.New("Illegal $ ...")
+			return
+		}
+		line, err = reader.ReadBytes(CR)
+		if err != nil {
 			return
 		}
 		argSize, _ := strconv.Atoi(string(line[:len(line)-1]))
-		_, err = reader.ReadBytes(LF)
+		c, err = reader.ReadByte()
+		if err != nil {
+			return
+		} else if c != LF {
+			err = errors.New("Illegal LF ...")
+			return
+		}
 
 		// Read ( <argument data> CR LF )
 		cmd.Args[i] = make([]byte, argSize)
-		_, err = reader.Read(cmd.Args[i])
-		_, err = reader.ReadBytes(CR)
-		_, err = reader.ReadBytes(LF)
+		// 这里要注意是否填充完整
+		var n int
+		n, err = reader.Read(cmd.Args[i])
 		if err != nil {
+			return
+		} else if n != argSize {
+			err = errors.New("Broken Pipe")
+		}
+
+		c, err = reader.ReadByte()
+		if err != nil {
+			return
+		} else if c != CR {
+			err = errors.New("Illegal CR ...")
+			return
+		}
+		c, err = reader.ReadByte()
+		if err != nil {
+			return
+		} else if c != LF {
+			err = errors.New("Illegal LF ...")
 			return
 		}
 	}
