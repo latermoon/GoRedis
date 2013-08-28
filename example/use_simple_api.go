@@ -14,12 +14,12 @@ func main() {
 	// Set操作的写锁
 	chanSet := make(chan int, 1)
 
-	server.OnGet = func(key string) (value interface{}) {
+	server.OnGET = func(key string) (value interface{}) {
 		value = kvCache[key]
 		return
 	}
 
-	server.OnSet = func(key string, value string) (err error) {
+	server.OnSET = func(key string, value string) (err error) {
 		err = nil
 		chanSet <- 0
 		kvCache[key] = value
@@ -27,5 +27,5 @@ func main() {
 		return
 	}
 
-	server.Listen(":8003")
+	server.Listen(":8002")
 }
