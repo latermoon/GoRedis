@@ -2,9 +2,14 @@ package goredis
 
 import ()
 
+// ==============================
+// SimpleRedisServer提供面向业务指令的RedisServer接口，而隐藏传输层
+// 这是一个接口非常多的类，需要考虑分隔到多个文件
+// 要增加接口，从下面添加成员函数，然后在NewSimpleRedisServer()里添加绑定过程
+// ==============================
 type SimpleRedisServer struct {
 	// Keys
-	OnDEL    func(key string) (count int)     // Integer reply: The number of keys that were removed.
+	OnDEL    func(keys ...string) (count int) // Integer reply: The number of keys that were removed.
 	OnEXISTS func(key string) (exists int)    // Integer reply, 1 if the key exists.
 	OnTYPE   func(key string) (status string) // Status code reply: type of key, or none when key does not exist.
 	// Strings
@@ -72,6 +77,40 @@ func NewSimpleRedisServer() (server *SimpleRedisServer) {
 		}
 		return
 	})
+
+	server.innerServer.On("DEL", func(cmd *Command) (reply *Reply) {
+		keyCount := cmd.ArgCount() - 1
+		keys := make([]string, keyCount)
+		for i := 0; i < keyCount; i++ {
+			keys[i] = cmd.StringAtIndex(i + 1)
+		}
+		count := server.OnDEL(keys...)
+		reply = IntegerReply(count)
+		return
+	})
+
+	server.innerServer.On("MGET", func(cmd *Command) (reply *Reply) {
+		bkeys := cmd.Args[1:]
+		bulks := server.OnMGET(byteToStrings(bkeys)...)
+		reply = MultiBulksReply(bulks)
+		return
+	})
+
+	server.innerServer.On("RPUSH", func(cmd *Command) (reply *Reply) {
+		key := cmd.StringAtIndex(1)
+		values := []string{}
+		length := server.OnRPUSH(key, values...)
+		reply = IntegerReply(length)
+		return
+	})
+
+	server.innerServer.On("LPOP", func(cmd *Command) (reply *Reply) {
+		key := cmd.StringAtIndex(1)
+		value := server.OnLPOP(key)
+		reply = BulkReply(value)
+		return
+	})
+
 	return
 }
 

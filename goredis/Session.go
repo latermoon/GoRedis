@@ -1,4 +1,3 @@
-// http://redis.io/topics/protocol
 package goredis
 
 import (
@@ -15,6 +14,7 @@ import (
 // cmd := session.ReadCommand()
 // session.Reply(IntegerReply(10))
 // session.Reply(StatusReply("OK"))
+// 协议参考：http://redis.io/topics/protocol
 // ==============================
 type Session struct {
 	conn   net.Conn
@@ -64,7 +64,7 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 	if err != nil {
 		return
 	} else if c != LF {
-		err = errors.New("Illegal LF ...")
+		err = errors.New("Illegal LF 1 ...")
 		return
 	}
 
@@ -78,18 +78,16 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 			err = errors.New("Illegal $ ...")
 			return
 		}
-		//line, err = reader.ReadBytes(CR)
 		line, err = lightReadBytes(reader, CR)
 		if err != nil {
 			return
 		}
-		//argSize, _ := strconv.Atoi(string(line[:len(line)-1]))
 		argSize, _ := strconv.Atoi(string(line))
 		c, err = reader.ReadByte()
 		if err != nil {
 			return
 		} else if c != LF {
-			err = errors.New("Illegal LF ...")
+			err = errors.New("Illegal LF 2 ...")
 			return
 		}
 
@@ -115,7 +113,7 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 		if err != nil {
 			return
 		} else if c != LF {
-			err = errors.New("Illegal LF ...")
+			err = errors.New("Illegal LF 3 ...")
 			return
 		}
 	}

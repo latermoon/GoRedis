@@ -22,6 +22,10 @@ func (cmd *Command) Name() string {
 	return string(cmd.Args[0])
 }
 
+func (cmd *Command) ArgCount() int {
+	return len(cmd.Args)
+}
+
 // 获取指定索引的参数
 func (cmd *Command) ArgAtIndex(index int) (data []byte) {
 	if index >= len(cmd.Args) {

@@ -20,7 +20,38 @@ const (
 // RedisServer只实现最基本的Redis协议
 // 提供On接口处理传入的各种指令，使用session返回数据
 /*
+	server := goredis.NewRedisServer()
 
+	// KeyValue
+	kvCache := make(map[string]interface{})
+	// Set操作的写锁
+	chanSet := make(chan int, 1)
+
+	server.On("GET", func(cmd *goredis.Command) (reply *goredis.Reply) {
+		key := cmd.StringAtIndex(1)
+		value := kvCache[key]
+		reply = goredis.BulkReply(value)
+		return
+	})
+
+	server.On("SET", func(cmd *goredis.Command) (reply *goredis.Reply) {
+		key := cmd.StringAtIndex(1)
+		value := cmd.StringAtIndex(2)
+		chanSet <- 0
+		kvCache[key] = value
+		<-chanSet
+		reply = goredis.StatusReply("OK")
+		return
+	})
+
+	server.On("INFO", func(cmd *goredis.Command) (reply *goredis.Reply) {
+		reply = goredis.BulkReply("GoRedis 0.1 by latermoon\n")
+		return
+	})
+
+	// 开始监听端口
+	fmt.Println("Listen :8002")
+	server.Listen(":8002")
 */
 // ==============================
 type RedisServer struct {
@@ -70,6 +101,9 @@ func (server *RedisServer) handleConnection(session *Session) {
 	// 不断从一个连接中获取命令，并处理，返回
 	for {
 		cmd, e1 := session.ReadCommand()
+		// 常见的error是:
+		// 1) io.EOF
+		// 2) read tcp 127.0.0.1:51863: connection reset by peer
 		if e1 != nil {
 			fmt.Println("[goredis] end connection", e1, session.conn.RemoteAddr())
 			session.Close()

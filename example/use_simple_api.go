@@ -3,9 +3,11 @@ package main
 import (
 	//"github.com/latermoon/GoRedis/goredis"
 	"../goredis"
+	"fmt"
 )
 
 func main() {
+	fmt.Println("GoRedis 0.1 by latermoon")
 
 	server := goredis.NewSimpleRedisServer()
 
@@ -27,5 +29,24 @@ func main() {
 		return
 	}
 
+	server.OnDEL = func(keys ...string) (count int) {
+		chanSet <- 0
+		for _, key := range keys {
+			delete(kvCache, key)
+		}
+		<-chanSet
+		count = len(keys)
+		return
+	}
+
+	server.OnMGET = func(keys ...string) (bulks []interface{}) {
+		bulks = make([]interface{}, len(keys))
+		for i, key := range keys {
+			bulks[i], _ = kvCache[key]
+		}
+		return
+	}
+
+	fmt.Println("Listen :8002")
 	server.Listen(":8002")
 }
