@@ -1,3 +1,6 @@
+// 客户端指令Request
+// @author Latermoon
+// @since 2013-08-27
 package goredis
 
 import (
