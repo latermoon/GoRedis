@@ -11,12 +11,14 @@ package main
 
 import (
 	"fmt"
-	//"github.com/latermoon/GoRedis/goredis"
+	//"github.com/latermoon/GoRedis/goredis" // 线上环境应该使用这个
 	"../goredis"
+	"runtime"
 )
 
 func main() {
 	fmt.Println("GoRedis 0.1 by latermoon")
+	runtime.GOMAXPROCS(2)
 
 	server := goredis.NewRedisServer()
 
@@ -53,6 +55,6 @@ func main() {
 	})
 
 	// 开始监听端口
-	fmt.Println("Listen :8002")
+	fmt.Println("Listen 8002")
 	server.Listen(":8002")
 }
