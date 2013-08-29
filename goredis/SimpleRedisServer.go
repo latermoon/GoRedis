@@ -79,19 +79,15 @@ func NewSimpleRedisServer() (server *SimpleRedisServer) {
 	})
 
 	server.innerServer.On("DEL", func(cmd *Command) (reply *Reply) {
-		keyCount := cmd.ArgCount() - 1
-		keys := make([]string, keyCount)
-		for i := 0; i < keyCount; i++ {
-			keys[i] = cmd.StringAtIndex(i + 1)
-		}
+		keys := byteToStrings(cmd.Args[1:])
 		count := server.OnDEL(keys...)
 		reply = IntegerReply(count)
 		return
 	})
 
 	server.innerServer.On("MGET", func(cmd *Command) (reply *Reply) {
-		bkeys := cmd.Args[1:]
-		bulks := server.OnMGET(byteToStrings(bkeys)...)
+		keys := byteToStrings(cmd.Args[1:])
+		bulks := server.OnMGET(keys...)
 		reply = MultiBulksReply(bulks)
 		return
 	})
@@ -108,6 +104,14 @@ func NewSimpleRedisServer() (server *SimpleRedisServer) {
 		key := cmd.StringAtIndex(1)
 		value := server.OnLPOP(key)
 		reply = BulkReply(value)
+		return
+	})
+
+	server.innerServer.On("EVAL", func(cmd *Command) (reply *Reply) {
+		script := cmd.StringAtIndex(1) //func(script string, numkeys int, keykeyvalval ...string) (reply *Reply)
+		numkeys := 0
+		keykeyvalval := []string{}
+		reply = server.OnEVAL(script, numkeys, keykeyvalval...)
 		return
 	})
 

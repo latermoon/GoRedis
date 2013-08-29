@@ -2,7 +2,7 @@ package goredis
 
 import (
 	"bytes"
-	"fmt"
+	"strconv"
 )
 
 // ==============================
@@ -16,30 +16,19 @@ type Command struct {
 	Args [][]byte
 }
 
-// 指令的文本
-// 客户端传入的数据，第一个参数就是指令，第二个参数开始是指令数据
+// 指令名称
+// cmd.StringAtIndex(0) == cmd.Name() == "SET"
 func (cmd *Command) Name() string {
 	return string(cmd.Args[0])
 }
 
-func (cmd *Command) ArgCount() int {
-	return len(cmd.Args)
-}
-
-// 获取指定索引的参数
-func (cmd *Command) ArgAtIndex(index int) (data []byte) {
-	if index >= len(cmd.Args) {
-		panic(fmt.Sprintf("Index Out of Bounds : %d/%d", index, len(cmd.Args)))
-		return
-	}
-	data = cmd.Args[index]
-	return
-}
-
 // 参数按字符串返回
-func (cmd *Command) StringAtIndex(index int) (value string) {
-	data := cmd.ArgAtIndex(index)
-	value = string(data)
+func (cmd *Command) StringAtIndex(i int) string {
+	return string(cmd.Args[i])
+}
+
+func (cmd *Command) IntAtIndex(i int) (j int) {
+	j, _ = strconv.Atoi(cmd.StringAtIndex(i))
 	return
 }
 

@@ -13,11 +13,12 @@ import (
 	"fmt"
 	//"github.com/latermoon/GoRedis/goredis"
 	"../goredis"
+	//"runtime"
 )
 
 func main() {
 	fmt.Println("GoRedis 0.1 by latermoon")
-
+	//runtime.GOMAXPROCS(1)
 	server := goredis.NewRedisServer()
 
 	// KeyValue

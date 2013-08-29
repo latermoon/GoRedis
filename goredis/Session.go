@@ -47,21 +47,18 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 	var c byte
 	var line []byte
 	// Read ( *<number of arguments> CR LF )
-	c, err = reader.ReadByte()
-	if err != nil { // io.EOF
+	if c, err = reader.ReadByte(); err != nil { // io.EOF
 		return
 	} else if c != '*' {
 		err = errors.New("Illegal * ...")
 		return
 	}
-	line, err = lightReadBytes(reader, CR)
-	if err != nil {
+	if line, err = lightReadBytes(reader, CR); err != nil {
 		return
 	}
 	// number of arguments
 	argCount, _ := strconv.Atoi(string(line))
-	c, err = reader.ReadByte()
-	if err != nil {
+	if c, err = reader.ReadByte(); err != nil {
 		return
 	} else if c != LF {
 		err = errors.New("Illegal LF 1 ...")
@@ -71,20 +68,18 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 	cmd.Args = make([][]byte, argCount)
 	for i := 0; i < argCount; i++ {
 		// Read ( $<number of bytes of argument 1> CR LF )
-		c, err = reader.ReadByte()
-		if err != nil {
+		if c, err = reader.ReadByte(); err != nil {
 			return
 		} else if c != '$' {
 			err = errors.New("Illegal $ ...")
 			return
 		}
-		line, err = lightReadBytes(reader, CR)
-		if err != nil {
+
+		if line, err = lightReadBytes(reader, CR); err != nil {
 			return
 		}
 		argSize, _ := strconv.Atoi(string(line))
-		c, err = reader.ReadByte()
-		if err != nil {
+		if c, err = reader.ReadByte(); err != nil {
 			return
 		} else if c != LF {
 			err = errors.New("Illegal LF 2 ...")
@@ -95,22 +90,20 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 		cmd.Args[i] = make([]byte, argSize)
 		// 这里要注意是否填充完整
 		var n int
-		n, err = reader.Read(cmd.Args[i])
-		if err != nil {
+		if n, err = reader.Read(cmd.Args[i]); err != nil {
 			return
 		} else if n != argSize {
 			err = errors.New("Broken Pipe")
 		}
 
-		c, err = reader.ReadByte()
-		if err != nil {
+		if c, err = reader.ReadByte(); err != nil {
 			return
 		} else if c != CR {
 			err = errors.New("Illegal CR ...")
 			return
 		}
-		c, err = reader.ReadByte()
-		if err != nil {
+
+		if c, err = reader.ReadByte(); err != nil {
 			return
 		} else if c != LF {
 			err = errors.New("Illegal LF 3 ...")
@@ -135,7 +128,7 @@ func (s *Session) Reply(reply *Reply) (err error) {
 	case ReplyTypeMultiBulks:
 		err = s.replyMultiBulks(reply.Value.([]interface{}))
 	default:
-		err = errors.New("Bad ReplyType")
+		err = errors.New("Illegal ReplyType: " + strconv.Itoa(int(reply.Type)))
 		panic(err)
 	}
 	return
