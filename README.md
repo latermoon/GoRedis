@@ -3,7 +3,7 @@ GoRedis
 
 ### RedisServer Implemented by Go
 #### 说明
-	1、本项目用于研究目的，累积出一套基于Redis的数据架构方案
+	1、用于研究目的，围绕Redis衍生出的数据处理
 
 #### 开发中
 	MongoStorage 实现Redis Get/Set 存储到MongoDB
@@ -17,13 +17,13 @@ GoRedis
 
 #### Install:
 
-		go get github.com/latermoon/GoRedis/goredis
+	go get github.com/latermoon/GoRedis/goredis
 
 #### Update:
 
-		go get -u github.com/latermoon/GoRedis/goredis
+	go get -u github.com/latermoon/GoRedis/goredis
 
-#### Demo:
+#### RedisServer Demo:
 
 	server := goredis.NewRedisServer()
 
@@ -46,11 +46,6 @@ GoRedis
 		kvCache[key] = value
 		<-chanSet
 		reply = goredis.StatusReply("OK")
-		return
-	})
-
-	server.On("PING", func(cmd *goredis.Command) (reply *goredis.Reply) {
-		reply = goredis.StatusReply("PONG")
 		return
 	})
 
