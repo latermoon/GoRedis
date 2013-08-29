@@ -1,6 +1,5 @@
 package storage
 
-// 要使用mgo，必须安装bzr才能执行go get，不建议本机安装，太多垃圾软件了
 import (
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
