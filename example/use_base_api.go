@@ -13,21 +13,13 @@ import (
 	"fmt"
 	//"github.com/latermoon/GoRedis/goredis" // 线上环境应该使用这个
 	"../goredis"
-<<<<<<< HEAD
-	//"runtime"
-=======
 	"runtime"
->>>>>>> 905bfbf1288c429a31af840de6ddcb04b7f217ca
 )
 
 func main() {
 	fmt.Println("GoRedis 0.1 by latermoon")
-<<<<<<< HEAD
-	//runtime.GOMAXPROCS(1)
-=======
 	runtime.GOMAXPROCS(2)
 
->>>>>>> 905bfbf1288c429a31af840de6ddcb04b7f217ca
 	server := goredis.NewRedisServer()
 
 	// KeyValue

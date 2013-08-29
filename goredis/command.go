@@ -5,7 +5,7 @@ package goredis
 
 import (
 	"bytes"
-	"strconv"
+	//"strconv"
 )
 
 // ==============================
@@ -28,11 +28,6 @@ func (cmd *Command) Name() string {
 // 参数按字符串返回
 func (cmd *Command) StringAtIndex(i int) string {
 	return string(cmd.Args[i])
-}
-
-func (cmd *Command) IntAtIndex(i int) (j int) {
-	j, _ = strconv.Atoi(cmd.StringAtIndex(i))
-	return
 }
 
 func (cmd *Command) String() string {
