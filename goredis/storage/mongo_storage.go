@@ -21,6 +21,9 @@ func (m *MongoStorage) Connect(url string) (err error) {
 	m.session, err = mgo.Dial(url)
 	if err == nil {
 		m.kvColl = m.session.DB("goredis").C("kv")
+		// 确保一个名为key的唯一索引
+		idx := mgo.Index{Key: []string{"key"}, Unique: true}
+		m.kvColl.EnsureIndex(idx)
 	}
 	return
 }
