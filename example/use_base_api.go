@@ -13,7 +13,6 @@ import (
 	"fmt"
 	//"github.com/latermoon/GoRedis/goredis"
 	"../goredis"
-	_ "../goredis/api"
 )
 
 func main() {
