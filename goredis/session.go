@@ -39,9 +39,7 @@ $<number of bytes of argument 1> CR LF
 $<number of bytes of argument N> CR LF
 <argument data> CR LF
 */
-func (s *Session) ReadCommand() (cmd *Command, err error) {
-	reader := s.reader
-
+func ReadCommand(reader *bufio.Reader) (cmd *Command, err error) {
 	cmd = &Command{}
 	err = nil
 	var c byte
@@ -99,7 +97,7 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 		if c, err = reader.ReadByte(); err != nil {
 			return
 		} else if c != CR {
-			err = errors.New("Illegal CR ...")
+			err = errors.New("Illegal CR ..." + strconv.Itoa(n) + " " + string(c))
 			return
 		}
 

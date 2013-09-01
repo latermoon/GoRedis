@@ -3,6 +3,7 @@ package main
 import (
 	"../goredis/rdb"
 	//"../goredis/rdb/crc64"
+	"../goredis"
 	"bufio"
 	"fmt"
 	"net"
@@ -53,7 +54,8 @@ func (p *decoder) Zadd(key []byte, score float64, member []byte) {
 }
 
 func main() {
-	sync("latermoon.tj.momo.com:6388")
+	//sync("latermoon.tj.momo.com:6388")
+	sync("10.80.100.193:6348")
 }
 
 func sync(host string) {
@@ -71,22 +73,22 @@ func sync(host string) {
 	if e2 != nil {
 		panic(e2)
 	}
+	reader.ReadBytes('*')
+	reader.UnreadByte()
 
 	for {
-		c, err := reader.ReadByte()
-		if err != nil {
-			panic(err)
+		b, e4 := reader.ReadBytes('\n')
+		if e4 != nil {
+			panic(e4)
 		}
-		if c >= ' ' && c < 127 {
-			fmt.Print(string(c))
-		} else if c == '\r' {
-			fmt.Print("\\r")
-		} else if c == '\n' {
-			fmt.Println("\\n")
-		} else {
-			//fmt.Printf("[%02X]", c)
-			fmt.Printf("[%d]", c)
+		fmt.Print(string(b))
+		fmt.Println("------------------------")
+		continue
+		cmd, e3 := goredis.ReadCommand(reader)
+		if e3 != nil {
+			panic(e3)
 		}
+		fmt.Println(string(cmd.Args[0]) + " " + string(cmd.Args[1]))
 	}
 
 }

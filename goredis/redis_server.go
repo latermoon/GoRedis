@@ -100,7 +100,7 @@ func (server *RedisServer) On(commandName string, handler func(cmd *Command) (re
 func (server *RedisServer) handleConnection(session *Session) {
 	// 不断从一个连接中获取命令，并处理，返回
 	for {
-		cmd, e1 := session.ReadCommand()
+		cmd, e1 := ReadCommand(session.reader)
 		// 常见的error是:
 		// 1) io.EOF
 		// 2) read tcp 127.0.0.1:51863: connection reset by peer
