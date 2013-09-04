@@ -62,8 +62,12 @@ type RedisServer struct {
 // 创建服务实例
 func NewRedisServer() (server *RedisServer) {
 	server = &RedisServer{}
-	server.handlers = make(map[string](func(cmd *Command) (reply *Reply)))
+	server.init()
 	return
+}
+
+func (server *RedisServer) init() {
+	server.handlers = make(map[string](func(cmd *Command) (reply *Reply)))
 }
 
 /**
