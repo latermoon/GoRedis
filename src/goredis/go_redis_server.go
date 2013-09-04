@@ -14,12 +14,13 @@ type RedisStorages struct {
 // 主Server
 type GoRedisServer struct {
 	RedisServer
-	Storages RedisStorages
+	Storages *RedisStorages
 }
 
 func NewGoRedisServer() (server *GoRedisServer) {
 	server = &GoRedisServer{}
 	server.init()
+	server.Storages = &RedisStorages{}
 	server.Storages.StringStorage = storage.NewMemoryStringStorage()
 	return
 }
