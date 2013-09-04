@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 )
@@ -245,4 +246,8 @@ func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 // Close conn
 func (s *Session) Close() error {
 	return s.conn.Close()
+}
+
+func (s *Session) String() string {
+	return fmt.Sprintf("<Session:%s>", s.conn.RemoteAddr().String())
 }

@@ -2,31 +2,30 @@ package storage
 
 import ()
 
-// BufferedStorage
+// BufferedStringStorage
 // 对更新操作进行buffer
-// 例子：一般mongodb的set操作5k/s，用bufferSize=100，可以变为1w/s，
 // 如果bufferSize大于瞬间要操作的指令数，可以达到cache版本的10w/s
-type BufferedStorage struct {
-	storage   Storage
-	cache     map[string]string
+type BufferedStringStorage struct {
+	storage   StringStorage
+	cache     map[string]interface{}
 	cacheChan chan int // lock
 	asyncChan chan int // 异步队列
 }
 
 /**
- * @param storage 要包装起来的storage，比如MongoStorage
+ * @param storage 要包装起来的storage
  * @param bufferSize 队列长度，设为1时没有buffer效果，同步写入
  */
-func NewBufferedStorage(storage Storage, bufferSize uint) (bs *BufferedStorage) {
-	bs = &BufferedStorage{}
+func NewBufferedStringStorage(storage StringStorage, bufferSize uint) (bs *BufferedStringStorage) {
+	bs = &BufferedStringStorage{}
 	bs.storage = storage
-	bs.cache = make(map[string]string)
+	bs.cache = make(map[string]interface{})
 	bs.cacheChan = make(chan int, 1)
 	bs.asyncChan = make(chan int, bufferSize)
 	return
 }
 
-func (bs *BufferedStorage) Set(key string, value string) (err error) {
+func (bs *BufferedStringStorage) Set(key string, value string) (err error) {
 	// 写入内存
 	bs.cacheChan <- 1
 	bs.cache[key] = value
@@ -41,7 +40,7 @@ func (bs *BufferedStorage) Set(key string, value string) (err error) {
 	return
 }
 
-func (bs *BufferedStorage) Get(key string) (value string, err error) {
+func (bs *BufferedStringStorage) Get(key string) (value interface{}, err error) {
 	var exists bool
 	// 从内存读取
 	value, exists = bs.cache[key]

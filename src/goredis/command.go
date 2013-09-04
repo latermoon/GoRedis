@@ -16,7 +16,12 @@ import (
 // cmd.StringAtIndex(2) == "Latermoon"
 // ==============================
 type Command struct {
-	Args [][]byte
+	Args    [][]byte
+	session *Session
+}
+
+func (cmd *Command) Session() *Session {
+	return cmd.session
 }
 
 // 指令名称

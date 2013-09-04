@@ -113,7 +113,8 @@ func (server *RedisServer) handleConnection(session *Session) {
 			session.Close()
 			return
 		}
-
+		// 初始化
+		cmd.session = session
 		// 取出处理函数
 		handler, exists := server.handlers[strings.ToUpper(cmd.Name())]
 		if exists {

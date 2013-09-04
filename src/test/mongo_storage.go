@@ -1,38 +1,47 @@
-package main
+package storage
 
 import (
-	"../goredis"
-	"../goredis/storage"
-	"fmt"
-	"runtime"
+	"labix.org/v2/mgo"
+	"labix.org/v2/mgo/bson"
 )
 
-func main() {
-	fmt.Println("GoRedis 0.1 by latermoon")
-	runtime.GOMAXPROCS(2)
+// MongoStorage
+// 使用MongoDB来存储Redis数据
+type MongoStorage struct {
+	session *mgo.Session
+	kvColl  *mgo.Collection
+}
 
-	server := goredis.NewSimpleRedisServer()
+func NewMongoStorage() (mongo *MongoStorage) {
+	mongo = &MongoStorage{}
+	return
+}
 
-	mgs := storage.NewMongoStorage()
-	if e1 := mgs.Connect("mongodb://172.16.9.14:27017/goredis"); e1 != nil {
-		panic(e1)
+func (m *MongoStorage) Connect(url string) (err error) {
+	m.session, err = mgo.Dial(url)
+	if err == nil {
+		m.kvColl = m.session.DB("goredis").C("kv")
+		// 确保一个名为key的唯一索引
+		idx := mgo.Index{Key: []string{"key"}, Unique: true}
+		m.kvColl.EnsureIndex(idx)
 	}
-	defer mgs.Close()
+	return
+}
 
-	// 将MongoDB存储buffer起来提高性能，一般mongo的set操作5k/2，用bufferSize=100，可以变为1w/s，
-	// 如果bufferSize大于瞬间要操作的指令数，可以达到cache版本的10w/s
-	storage := storage.NewBufferedStorage(mgs, 100)
+func (m *MongoStorage) Close() {
+	m.session.Close()
+}
 
-	server.OnSET = func(key string, value string) (err error) {
-		err = storage.Set(key, value)
-		return
+func (m *MongoStorage) Set(key string, value string) (err error) {
+	_, err = m.kvColl.Upsert(bson.M{"key": key}, bson.M{"key": key, "val": value, "uptime": bson.Now()})
+	return
+}
+
+func (m *MongoStorage) Get(key string) (value string, err error) {
+	row := bson.M{}
+	err = m.kvColl.Find(bson.M{"key": key}).One(&row)
+	if err == nil {
+		value = row["val"].(string)
 	}
-
-	server.OnGET = func(key string) (value interface{}) {
-		value, _ = storage.Get(key)
-		return
-	}
-
-	fmt.Println("Listen 8002")
-	server.Listen(":8002")
+	return
 }
