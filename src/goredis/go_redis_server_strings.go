@@ -1,37 +1,28 @@
 package goredis
 
-func (server *GoRedisServer) initStrings() {
+import ()
 
-	server.On("GET", func(cmd *Command) (reply *Reply) {
-		key := cmd.StringAtIndex(1)
-		value := server.OnGET(key)
-		reply = BulkReply(value)
-		return
-	})
+func (server *GoRedisServer) OnGET(cmd *Command, key string) (val interface{}, err error) {
+	val, err = server.Storages.StringStorage.Get(key)
+	return
+}
 
-	server.On("SET", func(cmd *Command) (reply *Reply) {
-		key := cmd.StringAtIndex(1)
-		value := cmd.StringAtIndex(2)
-		err := server.OnSET(key, value)
-		if err != nil {
-			reply = ErrorReply(err.Error())
-		} else {
-			reply = StatusReply("OK")
-		}
-		return
-	})
+func (server *GoRedisServer) OnSET(cmd *Command, key string, val string) (err error) {
+	err = server.Storages.StringStorage.Set(key, val)
+	return
+}
 
-	server.On("MGET", func(cmd *Command) (reply *Reply) {
-		keys := byteToStrings(cmd.Args[1:])
-		values := server.OnMGET(keys...)
-		reply = MultiBulksReply(values)
-		return
-	})
+func (server *GoRedisServer) OnMGET(cmd *Command, keys ...string) (values []interface{}, err error) {
+	values, err = server.Storages.StringStorage.MGet(keys...)
+	return
+}
 
-	server.On("DEL", func(cmd *Command) (reply *Reply) {
-		keys := byteToStrings(cmd.Args[1:])
-		count := server.OnDEL(keys...)
-		reply = IntegerReply(count)
-		return
-	})
+func (server *GoRedisServer) OnMSET(cmd *Command, keyvals ...string) (err error) {
+	err = server.Storages.StringStorage.MSet(keyvals...)
+	return
+}
+
+func (server *GoRedisServer) OnDEL(cmd *Command, keys ...string) (count int, err error) {
+	count, err = server.Storages.StringStorage.Del(keys...)
+	return
 }

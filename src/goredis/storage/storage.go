@@ -1,10 +1,36 @@
 package storage
 
+// 数据类型
+type KeyType int
+
+const (
+	KeyTypeUnknown = iota
+	KeyTypeString
+	KeyTypeHash
+	KeyTypeList
+	KeyTypeSet
+	KeyTypeSortedSet
+)
+
+// 存储支持
+type RedisStorages struct {
+	KeyTypeStorage KeyTypeStorage
+	StringStorage  StringStorage
+	HashStorage    HashStorage
+	ListStorage    ListStorage
+	SetStorage     SetStorage
+}
+
+type KeyTypeStorage interface {
+	GetType(key string) (keytype int, err error)
+	SetType(key string, keytype int) (err error)
+}
+
 type StringStorage interface {
 	Get(key string) (value interface{}, err error)
 	Set(key string, value string) (err error)
 	MGet(keys ...string) (values []interface{}, err error)
-	MSet(keyVals ...string) (err error)
+	MSet(keyvals ...string) (err error)
 	Del(keys ...string) (n int, err error)
 }
 
