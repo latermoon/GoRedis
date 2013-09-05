@@ -579,7 +579,7 @@ func (d *decode) checkHeader() error {
 	if err != nil {
 		return err
 	}
-
+	fmt.Println("header", string(header))
 	if !bytes.Equal(header[:5], []byte("REDIS")) {
 		return fmt.Errorf("rdb: invalid file format")
 	}

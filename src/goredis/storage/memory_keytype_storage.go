@@ -16,7 +16,7 @@ func NewMemoryKeyTypeStorage() (storage *MemoryKeyTypeStorage) {
 	return
 }
 
-func (s *MemoryKeyTypeStorage) GetType(key string) (keytype KeyType, err error) {
+func (s *MemoryKeyTypeStorage) GetType(key string) (keytype KeyType) {
 	var exists bool
 	keytype, exists = s.caches[key]
 	if !exists {
@@ -26,15 +26,13 @@ func (s *MemoryKeyTypeStorage) GetType(key string) (keytype KeyType, err error) 
 }
 
 func (s *MemoryKeyTypeStorage) SetType(key string, keytype KeyType) (err error) {
-	tp, e1 := s.GetType(key)
-	if e1 != nil {
-		err = e1
-		return
-	}
+	s.lockChan <- 1
+	tp := s.GetType(key)
 	if tp == KeyTypeUnknown {
 		s.caches[key] = keytype
 	} else if tp != keytype {
 		err = errors.New("Different from the former")
 	}
+	<-s.lockChan
 	return
 }

@@ -66,3 +66,17 @@ func (server *GoRedisServer) initForStrings() {
 		return
 	})
 }
+
+func (server *GoRedisServer) initForSlaveOf() {
+	server.On("SLAVEOF", func(cmd *Command) (reply *Reply) {
+		host := cmd.StringAtIndex(1)
+		port := cmd.StringAtIndex(2)
+		err := server.OnSlaveOf(cmd, host, port)
+		if err != nil {
+			reply = ErrorReply(err.Error())
+		} else {
+			reply = StatusReply("OK")
+		}
+		return
+	})
+}

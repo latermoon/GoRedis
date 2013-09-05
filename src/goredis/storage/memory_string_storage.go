@@ -1,9 +1,5 @@
 package storage
 
-import (
-	"fmt"
-)
-
 // 基于内存的StringStorage
 type MemoryStringStorage struct {
 	kvCache map[string]interface{}
@@ -31,7 +27,6 @@ func (s *MemoryStringStorage) Set(key string, value string) (err error) {
 
 func (s *MemoryStringStorage) MGet(keys ...string) (values []interface{}, err error) {
 	values = make([]interface{}, len(keys))
-	fmt.Println("MGET", values)
 	for i, key := range keys {
 		values[i] = s.kvCache[key]
 	}

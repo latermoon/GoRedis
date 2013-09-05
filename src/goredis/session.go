@@ -91,14 +91,16 @@ func ReadCommand(reader *bufio.Reader) (cmd *Command, err error) {
 		var n int
 		if n, err = reader.Read(cmd.Args[i]); err != nil {
 			return
-		} else if n != argSize {
+		}
+		if n != argSize {
 			err = errors.New("Broken Pipe")
 		}
 
 		if c, err = reader.ReadByte(); err != nil {
 			return
 		} else if c != CR {
-			err = errors.New("Illegal CR ..." + strconv.Itoa(n) + " " + string(c))
+			fmt.Println("cmd.Args", byteToStrings(cmd.Args))
+			err = errors.New("Illegal CR ..." + strconv.Itoa(n) + "/" + strconv.Itoa(argSize) + " " + string(c))
 			return
 		}
 
