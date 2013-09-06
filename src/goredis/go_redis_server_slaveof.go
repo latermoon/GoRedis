@@ -47,7 +47,7 @@ func (server *GoRedisServer) slaveOf(conn net.Conn) {
 			fmt.Println("ReadCommand error", e3.Error())
 			return
 		}
-		fmt.Println(cmd.String())
+		fmt.Println(byteToStrings(cmd.Args[:2]))
 	}
 }
 
@@ -82,7 +82,7 @@ func (p *decoder) StartList(key []byte, length, expiry int64) {
 }
 
 func (p *decoder) Rpush(key, value []byte) {
-	fmt.Printf("db=%d %q[%d] -> %q\n", p.db, key, p.i, value)
+	fmt.Printf("db=%d %q[%d] ->\n", p.db, key, p.i)
 	p.i++
 }
 

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 )
@@ -87,20 +88,28 @@ func ReadCommand(reader *bufio.Reader) (cmd *Command, err error) {
 
 		// Read ( <argument data> CR LF )
 		cmd.Args[i] = make([]byte, argSize)
-		// 这里要注意是否填充完整
 		var n int
-		if n, err = reader.Read(cmd.Args[i]); err != nil {
+		n, err = reader.Read(cmd.Args[i])
+		if err == io.EOF {
 			return
 		}
-		if n != argSize {
-			err = errors.New("Broken Pipe")
+		// 如果网络较慢，会出现一次读不完，剩下的逐个读取
+		if n < argSize {
+			//fmt.Printf("%d < argSize %d\n", n, argSize)
+			var c byte
+			for j := n; j < argSize; j++ {
+				c, err = reader.ReadByte()
+				if err != nil {
+					return
+				}
+				cmd.Args[i][j] = c
+			}
 		}
 
 		if c, err = reader.ReadByte(); err != nil {
 			return
 		} else if c != CR {
-			fmt.Println("cmd.Args", byteToStrings(cmd.Args))
-			err = errors.New("Illegal CR ..." + strconv.Itoa(n) + "/" + strconv.Itoa(argSize) + " " + string(c))
+			err = errors.New("Illegal CR ..." + strconv.Itoa(argSize) + " " + string(c))
 			return
 		}
 
