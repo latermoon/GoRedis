@@ -36,7 +36,13 @@ type RedisServer struct {
 	methodCache map[string]reflect.Value
 }
 
-func (server *RedisServer) SetHanlder(handler CommandHandler) {
+func NewRedisServer(handler CommandHandler) (server *RedisServer) {
+	server = &RedisServer{}
+	server.SetHandler(handler)
+	return
+}
+
+func (server *RedisServer) SetHandler(handler CommandHandler) {
 	server.handler = handler
 }
 
@@ -59,7 +65,7 @@ func (server *RedisServer) Listen(host string) {
 	// init
 	server.methodCache = make(map[string]reflect.Value)
 	if server.handler == nil {
-		server.SetHanlder(server)
+		server.SetHandler(server)
 	}
 
 	// run loop

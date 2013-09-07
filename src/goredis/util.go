@@ -28,13 +28,3 @@ func lightReadBytes(reader *bufio.Reader, delim byte) (line []byte, err error) {
 	}
 	return
 }
-
-// 将字节数组转换为字符串数组
-// (不确定这个功能是否有系统函数)
-func byteToStrings(bs [][]byte) (strs []string) {
-	strs = make([]string, len(bs))
-	for i, b := range bs {
-		strs[i] = string(b)
-	}
-	return
-}

@@ -12,7 +12,7 @@ type GoRedisServer struct {
 
 func NewGoRedisServer() (server *GoRedisServer) {
 	server = &GoRedisServer{}
-	server.SetHanlder(server)
+	server.SetHandler(server)
 	server.Storages = storage.RedisStorages{}
 	server.Storages.StringStorage = storage.NewMemoryStringStorage()
 	server.Storages.KeyTypeStorage = storage.NewMemoryKeyTypeStorage()
