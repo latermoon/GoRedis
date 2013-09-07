@@ -10,6 +10,7 @@ import (
 type GoRedisServer struct {
 	CommandHandler
 	RedisServer
+	// 存储支持
 	Storages storage.RedisStorages
 }
 
@@ -20,6 +21,7 @@ func NewGoRedisServer() (server *GoRedisServer) {
 	server.Storages.StringStorage = storage.NewMemoryStringStorage()
 	server.Storages.KeyTypeStorage = storage.NewMemoryKeyTypeStorage()
 	server.Storages.ListStorage = storage.NewMemoryListStorage()
+	server.Storages.HashStorage = storage.NewMemoryHashStorage()
 	return
 }
 

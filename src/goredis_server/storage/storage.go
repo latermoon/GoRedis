@@ -36,9 +36,12 @@ type StringStorage interface {
 }
 
 type HashStorage interface {
-	HGet(key string, field string) (value string, err error)
+	HGet(key string, field string) (value interface{}, err error)
 	HSet(key string, field string, value string) (result int, err error)
-	HGetAll(key string) (values []interface{}, err error)
+	HGetAll(key string) (keyvals []interface{}, err error)
+	HMGet(key string, fields ...string) (values []interface{}, err error)
+	HMSet(key string, keyvals ...string) (err error)
+	HLen(key string) (length int, err error)
 	HDel(key string, fields ...string) (n int, err error)
 	Del(keys ...string) (n int, err error)
 }

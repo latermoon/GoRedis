@@ -14,8 +14,15 @@ func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 		case storage.KeyTypeString:
 			n, _ := server.Storages.StringStorage.Del([]string{key}...)
 			count += n
+		case storage.KeyTypeList:
+			n, _ := server.Storages.ListStorage.Del([]string{key}...)
+			count += n
+		case storage.KeyTypeHash:
+			n, _ := server.Storages.HashStorage.Del([]string{key}...)
+			count += n
 		default:
 		}
+		server.Storages.KeyTypeStorage.DelType(key)
 	}
 	reply = IntegerReply(count)
 	return

@@ -5,6 +5,7 @@ import (
 )
 
 type MemoryKeyTypeStorage struct {
+	KeyTypeStorage
 	caches   map[string]KeyType
 	lockChan chan int
 }
