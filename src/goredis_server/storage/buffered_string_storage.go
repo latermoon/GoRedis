@@ -1,6 +1,8 @@
 package storage
 
-import ()
+import (
+	"sync"
+)
 
 // BufferedStringStorage
 // 对更新操作进行buffer
@@ -8,7 +10,7 @@ import ()
 type BufferedStringStorage struct {
 	storage   StringStorage
 	cache     map[string]interface{}
-	cacheChan chan int // lock
+	mutex     *sync.Mutex
 	asyncChan chan int // 异步队列
 }
 
@@ -20,16 +22,16 @@ func NewBufferedStringStorage(storage StringStorage, bufferSize uint) (bs *Buffe
 	bs = &BufferedStringStorage{}
 	bs.storage = storage
 	bs.cache = make(map[string]interface{})
-	bs.cacheChan = make(chan int, 1)
+	bs.mutex = &sync.Mutex{}
 	bs.asyncChan = make(chan int, bufferSize)
 	return
 }
 
 func (bs *BufferedStringStorage) Set(key string, value string) (err error) {
 	// 写入内存
-	bs.cacheChan <- 1
+	bs.mutex.Lock()
 	bs.cache[key] = value
-	<-bs.cacheChan
+	bs.mutex.Unlock()
 
 	// 异步处理, 容量限制
 	bs.asyncChan <- 1
@@ -47,9 +49,9 @@ func (bs *BufferedStringStorage) Get(key string) (value interface{}, err error) 
 	if !exists {
 		// 不存在时从底层读取
 		value, err = bs.storage.Get(key)
-		bs.cacheChan <- 1
+		bs.mutex.Lock()
 		bs.cache[key] = value
-		<-bs.cacheChan
+		bs.mutex.Unlock()
 	}
 	return
 }
