@@ -5,8 +5,15 @@ GoRedis
 #### 说明
 	1、围绕Redis协议衍生出的数据处理框架
 
+#### 已实现
+	1、核心RedisServer协议层(src/goredis，5个文件)，提供高性能简易API（src/main/simple_server.go，GET/SET 10w+/s）
+	2、面向应用的GoRedisServer（src/goredis_server），提供内存String/List/Hash操作
+	3、GoRedisServer作为原生Redis的从库
+
 #### 开发中
-	SlaveOf 和 Sync 实现和原生Redis之间的主从同步机制
+	1、SlaveOf和Sync指令，和原生Redis之间的主从同步
+	2、双主模式GoRedisServer
+	3、MultiSlaveOf，一个GoRedisServer作为n个原生Redis的从库，汇总备份数据到第三方存储（MongoDB/MySQL/HBase）
 
 #### vi ~/.profile 
 
