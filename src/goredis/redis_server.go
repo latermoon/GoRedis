@@ -18,7 +18,7 @@ const (
 	CRLF = "\r\n"
 )
 
-// 命名处理接口
+// 命令处理接口
 type CommandHandler interface {
 	On(name string, cmd *Command) (reply *Reply)
 	// 如果存在"On+大写NAME"格式的函数，会被优先调用，而不调用On(name, cmd)函数
