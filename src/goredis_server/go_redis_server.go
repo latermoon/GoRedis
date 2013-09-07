@@ -2,7 +2,8 @@ package goredis_server
 
 import (
 	"./storage"
-	. "github.com/latermoon/GoRedis/src/goredis"
+	//. "github.com/latermoon/GoRedis/src/goredis"
+	. "../goredis"
 )
 
 // GoRedisServer
@@ -18,6 +19,7 @@ func NewGoRedisServer() (server *GoRedisServer) {
 	server.Storages = storage.RedisStorages{}
 	server.Storages.StringStorage = storage.NewMemoryStringStorage()
 	server.Storages.KeyTypeStorage = storage.NewMemoryKeyTypeStorage()
+	server.Storages.ListStorage = storage.NewMemoryListStorage()
 	return
 }
 

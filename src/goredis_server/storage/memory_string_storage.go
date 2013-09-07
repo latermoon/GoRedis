@@ -2,6 +2,7 @@ package storage
 
 // 基于内存的StringStorage
 type MemoryStringStorage struct {
+	StringStorage
 	kvCache map[string]interface{}
 	kvLock  chan int
 }

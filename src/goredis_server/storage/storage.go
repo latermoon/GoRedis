@@ -43,11 +43,12 @@ type HashStorage interface {
 }
 
 type ListStorage interface {
-	LPop(key string) (value string, err error)
-	LPush(key string, value string) (n int, err error)
-	RPop(key string) (value string, err error)
-	RPush(key string, value string) (n int, err error)
+	LPop(key string) (value interface{}, err error)
+	LPush(key string, values ...string) (n int, err error)
+	RPop(key string) (value interface{}, err error)
+	RPush(key string, values ...string) (n int, err error)
 	LRange(key string, start int, end int) (values []interface{}, err error)
+	LIndex(key string, index int) (value interface{}, err error)
 	LLen(key string) (length int, err error)
 	Del(keys ...string) (n int, err error)
 }

@@ -1,7 +1,8 @@
 package goredis_server
 
 import (
-	. "github.com/latermoon/GoRedis/src/goredis"
+	//. "github.com/latermoon/GoRedis/src/goredis"
+	. "../goredis"
 	"strings"
 )
 
@@ -24,6 +25,8 @@ func (server *GoRedisServer) OnCONFIG(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) configGet(cmd *Command) (reply *Reply) {
+	name := cmd.StringAtIndex(2)
+	reply = BulkReply(name)
 	return
 }
 

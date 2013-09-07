@@ -4,7 +4,8 @@ import (
 	"./rdb"
 	"bufio"
 	"fmt"
-	. "github.com/latermoon/GoRedis/src/goredis"
+	//. "github.com/latermoon/GoRedis/src/goredis"
+	. "../goredis"
 	//"github.com/garyburd/redigo/redis"
 	"net"
 )
