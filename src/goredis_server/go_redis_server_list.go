@@ -3,6 +3,7 @@ package goredis_server
 import (
 	//. "github.com/latermoon/GoRedis/src/goredis"
 	. "../goredis"
+	"./storage"
 	"strconv"
 )
 
@@ -34,6 +35,7 @@ func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	values := cmd.StringArgs()[2:]
 	n, err := server.Storages.ListStorage.RPush(key, values...)
+	server.Storages.KeyTypeStorage.SetType(key, storage.KeyTypeList)
 	reply = ReplySwitch(err, IntegerReply(n))
 	return
 }
@@ -41,6 +43,9 @@ func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	value, err := server.Storages.ListStorage.LPop(key)
+	if value == nil {
+		server.Storages.KeyTypeStorage.DelType(key)
+	}
 	reply = ReplySwitch(err, BulkReply(value))
 	return
 }
@@ -49,6 +54,7 @@ func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	values := cmd.StringArgs()[2:]
 	n, err := server.Storages.ListStorage.LPush(key, values...)
+	server.Storages.KeyTypeStorage.SetType(key, storage.KeyTypeList)
 	reply = ReplySwitch(err, IntegerReply(n))
 	return
 }
@@ -56,6 +62,9 @@ func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	value, err := server.Storages.ListStorage.RPop(key)
+	if value == nil {
+		server.Storages.KeyTypeStorage.DelType(key)
+	}
 	reply = ReplySwitch(err, BulkReply(value))
 	return
 }

@@ -24,6 +24,7 @@ type RedisStorages struct {
 type KeyTypeStorage interface {
 	GetType(key string) (keytype KeyType)
 	SetType(key string, keytype KeyType) (err error)
+	DelType(key string) (keytype KeyType)
 }
 
 type StringStorage interface {

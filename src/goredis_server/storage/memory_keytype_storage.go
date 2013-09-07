@@ -36,3 +36,16 @@ func (s *MemoryKeyTypeStorage) SetType(key string, keytype KeyType) (err error) 
 	<-s.lockChan
 	return
 }
+
+func (s *MemoryKeyTypeStorage) DelType(key string) (keytype KeyType) {
+	s.lockChan <- 1
+	var exists bool
+	keytype, exists = s.caches[key]
+	if exists {
+		delete(s.caches, key)
+	} else {
+		keytype = KeyTypeUnknown
+	}
+	<-s.lockChan
+	return
+}

@@ -13,6 +13,7 @@ func NewMemoryListStorage() (storage *MemoryListStorage) {
 	return
 }
 
+// 获取指定key的列表，不存在时自动创建
 func (l *MemoryListStorage) listByKey(key string) (sl *SafeList) {
 	l.kvLock <- 1
 	var exists bool

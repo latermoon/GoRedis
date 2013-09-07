@@ -4,7 +4,7 @@ import (
 	"container/list"
 )
 
-// 线程安全的List，并提供满足Redis List的函数
+// 线程安全的List，提供满足Redis List的函数
 type SafeList struct {
 	innerList *list.List
 	lock      chan int
@@ -81,8 +81,12 @@ func (sl *SafeList) Index(index int) (value interface{}) {
 	return
 }
 
+// 枚举实现，超大列表下性能不佳，并且lock住其它操作
 func (sl *SafeList) Range(start int, end int) (values []interface{}) {
 	sl.lock <- 1
+	defer func() {
+		<-sl.lock
+	}()
 	length := sl.innerList.Len()
 	if start >= length || end < start {
 		values = make([]interface{}, 0)
@@ -105,6 +109,5 @@ func (sl *SafeList) Range(start int, end int) (values []interface{}) {
 			break
 		}
 	}
-	<-sl.lock
 	return
 }
