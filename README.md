@@ -3,13 +3,10 @@ GoRedis
 
 ### RedisServer Implemented by Go
 #### 说明
-	1、用于研究目的，围绕Redis衍生出的数据处理
+	1、围绕Redis协议衍生出的数据处理框架
 
 #### 开发中
-	MongoStorage 实现Redis Get/Set 存储到MongoDB
-	MultiSlaveOf 实现一个GoRedis作为n个Redis的从库，使用例子：作为10个Profile的从库，结合相应Storage实现海量冷存储
-	HBaseStorage 待实现，慢速海量存储
-	MySQLStorage 待实现，慢速海量存储
+	SlaveOf 和 Sync 实现和原生Redis之间的主从同步机制
 
 #### vi ~/.profile 
 
@@ -17,42 +14,72 @@ GoRedis
 
 #### Install:
 
-	go get github.com/latermoon/GoRedis/goredis
+	go get github.com/latermoon/GoRedis/src/goredis
 
 #### Update:
 
-	go get -u github.com/latermoon/GoRedis/goredis
+	go get -u github.com/latermoon/GoRedis/src/goredis
 
 #### RedisServer Demo:
 
-	server := goredis.NewRedisServer()
+	package main
 
-	// KeyValue
-	kvCache := make(map[string]interface{})
-	// Set操作的写锁
-	chanSet := make(chan int, 1)
+	import (
+		"fmt"
+		. "github.com/latermoon/GoRedis/src/goredis"
+		"runtime"
+	)
 
-	server.On("GET", func(cmd *goredis.Command) (reply *goredis.Reply) {
-		key := cmd.StringAtIndex(1)
-		value := kvCache[key]
-		reply = goredis.BulkReply(value)
+	// ==============================
+	// 简单的Redis服务器处理类
+	// ==============================
+	type SimpleServerHandler struct {
+		CommandHandler
+		kvCache map[string]interface{} // KeyValue
+		kvLock  chan int               // Set操作的写锁
+	}
+
+	func NewSimpleServerHandler() (handler *SimpleServerHandler) {
+		handler = &SimpleServerHandler{}
+		handler.kvCache = make(map[string]interface{})
+		handler.kvLock = make(chan int, 1)
 		return
-	})
+	}
 
-	server.On("SET", func(cmd *goredis.Command) (reply *goredis.Reply) {
+	func (s *SimpleServerHandler) On(name string, cmd *Command) (reply *Reply) {
+		reply = ErrorReply("Not Supported: " + cmd.String())
+		return
+	}
+
+	func (s *SimpleServerHandler) OnGET(cmd *Command) (reply *Reply) {
+		key := cmd.StringAtIndex(1)
+		value := s.kvCache[key]
+		reply = BulkReply(value)
+		return
+	}
+
+	func (s *SimpleServerHandler) OnSET(cmd *Command) (reply *Reply) {
 		key := cmd.StringAtIndex(1)
 		value := cmd.StringAtIndex(2)
-		chanSet <- 0
-		kvCache[key] = value
-		<-chanSet
-		reply = goredis.StatusReply("OK")
+		s.kvLock <- 0
+		s.kvCache[key] = value
+		<-s.kvLock
+		reply = StatusReply("OK")
 		return
-	})
+	}
 
-	server.On("INFO", func(cmd *goredis.Command) (reply *goredis.Reply) {
-		reply = goredis.BulkReply("GoRedis 0.1 by latermoon\n")
+	func (s *SimpleServerHandler) OnINFO(cmd *Command) (reply *Reply) {
+		lines := "Powerby GoRedis" + "\n"
+		lines += "SimpleRedisServer" + "\n"
+		lines += "Support GET/SET/INFO" + "\n"
+		reply = BulkReply(lines)
 		return
-	})
+	}
 
-	// 开始监听端口
-	server.Listen(":8002")
+	func main() {
+		runtime.GOMAXPROCS(2)
+		fmt.Println("SimpleServer start, listen 1603 ...")
+		server := NewRedisServer(NewSimpleServerHandler())
+		server.Listen(":1603")
+	}
+

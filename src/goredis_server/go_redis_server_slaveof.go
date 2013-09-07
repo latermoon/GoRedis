@@ -1,10 +1,10 @@
 package goredis_server
 
 import (
-	. "../goredis"
 	"./rdb"
 	"bufio"
 	"fmt"
+	. "github.com/latermoon/GoRedis/src/goredis"
 	//"github.com/garyburd/redigo/redis"
 	"net"
 )

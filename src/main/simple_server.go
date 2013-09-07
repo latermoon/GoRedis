@@ -1,14 +1,25 @@
 package main
 
 import (
-	. "../goredis"
 	"fmt"
+	. "github.com/latermoon/GoRedis/src/goredis"
 	"runtime"
 )
 
-// 简单的Redis服务器处理函数
+// ==============================
+// 简单的Redis服务器处理类
+// ==============================
 type SimpleServerHandler struct {
 	CommandHandler
+	kvCache map[string]interface{} // KeyValue
+	kvLock  chan int               // Set操作的写锁
+}
+
+func NewSimpleServerHandler() (handler *SimpleServerHandler) {
+	handler = &SimpleServerHandler{}
+	handler.kvCache = make(map[string]interface{})
+	handler.kvLock = make(chan int, 1)
+	return
 }
 
 func (s *SimpleServerHandler) On(name string, cmd *Command) (reply *Reply) {
@@ -18,14 +29,18 @@ func (s *SimpleServerHandler) On(name string, cmd *Command) (reply *Reply) {
 
 func (s *SimpleServerHandler) OnGET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	reply = BulkReply("value of " + key)
+	value := s.kvCache[key]
+	reply = BulkReply(value)
 	return
 }
 
 func (s *SimpleServerHandler) OnSET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	val := cmd.StringAtIndex(2)
-	reply = StatusReply("OK, " + key + "=" + val)
+	value := cmd.StringAtIndex(2)
+	s.kvLock <- 0
+	s.kvCache[key] = value
+	<-s.kvLock
+	reply = StatusReply("OK")
 	return
 }
 
@@ -40,6 +55,6 @@ func (s *SimpleServerHandler) OnINFO(cmd *Command) (reply *Reply) {
 func main() {
 	runtime.GOMAXPROCS(2)
 	fmt.Println("SimpleServer start, listen 1603 ...")
-	server := NewRedisServer(&SimpleServerHandler{})
+	server := NewRedisServer(NewSimpleServerHandler())
 	server.Listen(":1603")
 }
