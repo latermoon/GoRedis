@@ -1,7 +1,5 @@
 package goredis
 
-import ()
-
 // ==============================
 // SimpleRedisServer提供面向业务指令的RedisServer接口，而隐藏传输层
 // 这是一个接口非常多的类，需要考虑分隔到多个文件
@@ -50,74 +48,4 @@ type SimpleRedisServer struct {
 	// Server
 	OnINFO func(section string) (lines string) // Bulk reply: as a collection of text lines.
 	OnSYNC func(s *Session)
-	// 使用GoRedis实现
-	innerServer *RedisServer
-}
-
-func NewSimpleRedisServer() (server *SimpleRedisServer) {
-	server = &SimpleRedisServer{}
-
-	server.innerServer = NewRedisServer()
-
-	server.innerServer.On("GET", func(cmd *Command) (reply *Reply) {
-		key := cmd.StringAtIndex(1)
-		value := server.OnGET(key)
-		reply = BulkReply(value)
-		return
-	})
-
-	server.innerServer.On("SET", func(cmd *Command) (reply *Reply) {
-		key := cmd.StringAtIndex(1)
-		value := cmd.StringAtIndex(2)
-		err := server.OnSET(key, value)
-		if err != nil {
-			reply = ErrorReply(err.Error())
-		} else {
-			reply = StatusReply("OK")
-		}
-		return
-	})
-
-	server.innerServer.On("DEL", func(cmd *Command) (reply *Reply) {
-		keys := byteToStrings(cmd.Args[1:])
-		count := server.OnDEL(keys...)
-		reply = IntegerReply(count)
-		return
-	})
-
-	server.innerServer.On("MGET", func(cmd *Command) (reply *Reply) {
-		keys := byteToStrings(cmd.Args[1:])
-		bulks := server.OnMGET(keys...)
-		reply = MultiBulksReply(bulks)
-		return
-	})
-
-	server.innerServer.On("RPUSH", func(cmd *Command) (reply *Reply) {
-		key := cmd.StringAtIndex(1)
-		values := []string{}
-		length := server.OnRPUSH(key, values...)
-		reply = IntegerReply(length)
-		return
-	})
-
-	server.innerServer.On("LPOP", func(cmd *Command) (reply *Reply) {
-		key := cmd.StringAtIndex(1)
-		value := server.OnLPOP(key)
-		reply = BulkReply(value)
-		return
-	})
-
-	server.innerServer.On("EVAL", func(cmd *Command) (reply *Reply) {
-		script := cmd.StringAtIndex(1) //func(script string, numkeys int, keykeyvalval ...string) (reply *Reply)
-		numkeys := 0
-		keykeyvalval := []string{}
-		reply = server.OnEVAL(script, numkeys, keykeyvalval...)
-		return
-	})
-
-	return
-}
-
-func (s *SimpleRedisServer) Listen(host string) {
-	s.innerServer.Listen(host)
 }

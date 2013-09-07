@@ -4,8 +4,9 @@ import (
 	"./storage"
 )
 
-func (server *GoRedisServer) OnDEL(cmd *Command, keys ...string) (count int, err error) {
-	count = 0
+func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
+	keys := cmd.StringArgs()[1:]
+	count := 0
 	for _, key := range keys {
 		switch server.Storages.KeyTypeStorage.GetType(key) {
 		case storage.KeyTypeString:
@@ -14,5 +15,6 @@ func (server *GoRedisServer) OnDEL(cmd *Command, keys ...string) (count int, err
 		default:
 		}
 	}
+	reply = IntegerReply(count)
 	return
 }

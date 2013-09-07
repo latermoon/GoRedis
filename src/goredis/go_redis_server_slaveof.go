@@ -19,11 +19,16 @@ func (server *GoRedisServer) OnSlaveOf(cmd *Command, host string, port string) (
 	return
 }
 
+func (server *GoRedisServer) OnSYNC(cmd *Command) (err error) {
+
+	return
+}
+
 func (server *GoRedisServer) slaveOf(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	conn.Write([]byte("SYNC\r\n"))
 
-	// skip $rdbsize
+	// skip $size
 	_, _ = reader.ReadBytes('\n')
 	// rdb data
 	e2 := rdb.Decode(reader, &decoder{})
@@ -31,23 +36,18 @@ func (server *GoRedisServer) slaveOf(conn net.Conn) {
 		fmt.Println("Decode error", e2.Error())
 		return
 	}
+	// find next command start
 	reader.ReadBytes('*')
+	// step back
 	reader.UnreadByte()
 
 	for {
-		// b, e4 := reader.ReadBytes('\n')
-		// if e4 != nil {
-		// 	panic(e4)
-		// }
-		// fmt.Print(string(b))
-		// fmt.Println("------------------------")
-		// continue
 		cmd, e3 := ReadCommand(reader)
 		if e3 != nil {
 			fmt.Println("ReadCommand error", e3.Error())
 			return
 		}
-		fmt.Println(byteToStrings(cmd.Args[:2]))
+		fmt.Println(cmd.StringArgs()[:2])
 	}
 }
 

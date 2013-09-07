@@ -21,6 +21,18 @@ const (
 )
 
 /**
+ * 返回错误Reply或正确Reply（精简判断语句）
+ * @param err 如果err != nil，返回ErrorReply，否则返回提供的正确Reply
+ */
+func ReplySwitch(err error, successReply *Reply) *Reply {
+	if err != nil {
+		return ErrorReply(err)
+	} else {
+		return successReply
+	}
+}
+
+/**
  * @param status 绝大部分情况下status="OK"
  */
 func StatusReply(status string) (r *Reply) {
@@ -33,10 +45,17 @@ func StatusReply(status string) (r *Reply) {
 /**
  * @param errmsg 返回具体的错误信息
  */
-func ErrorReply(errmsg string) (r *Reply) {
+func ErrorReply(err interface{}) (r *Reply) {
 	r = &Reply{}
 	r.Type = ReplyTypeError
-	r.Value = errmsg
+	switch err.(type) {
+	case string:
+		r.Value = err.(string)
+	case error:
+		r.Value = err.(error).Error()
+	default:
+		panic("Bad err val")
+	}
 	return
 }
 

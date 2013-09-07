@@ -35,6 +35,15 @@ func (cmd *Command) StringAtIndex(i int) string {
 	return string(cmd.Args[i])
 }
 
+// 返回全部参数的字符串形式
+func (cmd *Command) StringArgs() (strs []string) {
+	strs = make([]string, len(cmd.Args))
+	for i, b := range cmd.Args {
+		strs[i] = string(b)
+	}
+	return
+}
+
 func (cmd *Command) String() string {
 	buf := bytes.Buffer{}
 	for _, arg := range cmd.Args {

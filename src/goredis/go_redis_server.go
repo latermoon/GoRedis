@@ -21,7 +21,10 @@ func NewGoRedisServer() (server *GoRedisServer) {
 
 func (server *GoRedisServer) Init() {
 	server.RedisServer.Init()
-	server.initForKeys()
-	server.initForStrings()
-	server.initForSlaveOf()
+	server.SetHanlder(server)
+}
+
+func (server *GoRedisServer) OnPETER(cmd *Command) (reply *Reply) {
+	reply = StatusReply("Hello, Peter")
+	return
 }
