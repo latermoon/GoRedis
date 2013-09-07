@@ -28,14 +28,6 @@ func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	return
 }
 
-/*
-	KeyTypeUnknown
-	KeyTypeString
-	KeyTypeHash
-	KeyTypeList
-	KeyTypeSet
-	KeyTypeSortedSet
-*/
 func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	keytype := server.Storages.KeyTypeStorage.GetType(key)
