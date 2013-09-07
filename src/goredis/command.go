@@ -1,11 +1,10 @@
-// 客户端指令Request
-// @author Latermoon
+// 客户端指令
+// @author latermoon
 // @since 2013-08-27
 package goredis
 
 import (
 	"bytes"
-	//"strconv"
 )
 
 // ==============================

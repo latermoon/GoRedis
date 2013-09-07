@@ -1,35 +1,45 @@
 package main
 
 import (
-	"../goredis"
+	. "../goredis"
 	"fmt"
 	"runtime"
 )
 
 // 简单的Redis服务器处理函数
 type SimpleServerHandler struct {
-	goredis.CommandHandler
+	CommandHandler
 }
 
-func (s *SimpleServerHandler) On(name string, cmd *goredis.Command) (reply *goredis.Reply) {
-	reply = goredis.ErrorReply("Not Supported:" + name)
+func (s *SimpleServerHandler) On(name string, cmd *Command) (reply *Reply) {
+	reply = ErrorReply("Not Supported: " + cmd.String())
 	return
 }
 
-func (s *SimpleServerHandler) OnGET(cmd *goredis.Command) (reply *goredis.Reply) {
+func (s *SimpleServerHandler) OnGET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	reply = goredis.BulkReply(key)
+	reply = BulkReply("value of " + key)
 	return
 }
 
-func (s *SimpleServerHandler) OnSET(cmd *goredis.Command) (reply *goredis.Reply) {
-	reply = goredis.StatusReply("OK")
+func (s *SimpleServerHandler) OnSET(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	val := cmd.StringAtIndex(2)
+	reply = StatusReply("OK, " + key + "=" + val)
+	return
+}
+
+func (s *SimpleServerHandler) OnINFO(cmd *Command) (reply *Reply) {
+	lines := "Powerby GoRedis" + "\n"
+	lines += "SimpleRedisServer" + "\n"
+	lines += "Support GET/SET/INFO" + "\n"
+	reply = BulkReply(lines)
 	return
 }
 
 func main() {
 	runtime.GOMAXPROCS(2)
 	fmt.Println("SimpleServer start, listen 1603 ...")
-	server := goredis.NewRedisServer(&SimpleServerHandler{})
+	server := NewRedisServer(&SimpleServerHandler{})
 	server.Listen(":1603")
 }

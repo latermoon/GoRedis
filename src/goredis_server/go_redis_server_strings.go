@@ -1,10 +1,12 @@
-package goredis
+package goredis_server
 
 import (
+	. "../goredis"
 	"./storage"
 )
 
 func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
+	// [TODO] 严谨的情况下应该校验参数数量，这里大部分都不校验是为了简化代码，panic后会断开client connection
 	key := cmd.StringAtIndex(1)
 	val, err := server.Storages.StringStorage.Get(key)
 	reply = ReplySwitch(err, BulkReply(val))

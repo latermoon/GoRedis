@@ -1,6 +1,7 @@
 // Go版RedisServer
 // @author latermoon
 // @since 2013-08-14
+// @last 2013-09-07
 
 package goredis
 
@@ -21,8 +22,17 @@ const (
 type CommandHandler interface {
 	On(name string, cmd *Command) (reply *Reply)
 	// 如果存在"On+大写NAME"格式的函数，会被优先调用，而不调用On(name, cmd)函数
-	// OnGET(cmd *Command) (reply *Reply)
 	// OnXXXX(cmd *Command) (reply *Reply)
+	// OnGET(cmd *Command) (reply *Reply)
+}
+
+// 一个空的默认命令处理对象
+type emptyCommandHandler struct {
+	CommandHandler
+}
+
+func (s *emptyCommandHandler) On(name string, cmd *Command) (reply *Reply) {
+	return ErrorReply("Not Supported: " + cmd.String())
 }
 
 // ==============================
@@ -46,12 +56,6 @@ func (server *RedisServer) SetHandler(handler CommandHandler) {
 	server.handler = handler
 }
 
-// Implement CommandHandler
-func (server *RedisServer) On(name string, cmd *Command) (reply *Reply) {
-	reply = ErrorReply("Not Supported: " + name)
-	return
-}
-
 /**
  * 开始监听主机端口
  * @param host "localhost:6379"
@@ -65,7 +69,7 @@ func (server *RedisServer) Listen(host string) {
 	// init
 	server.methodCache = make(map[string]reflect.Value)
 	if server.handler == nil {
-		server.SetHandler(server)
+		server.SetHandler(&emptyCommandHandler{})
 	}
 
 	// run loop

@@ -1,6 +1,7 @@
-package goredis
+package goredis_server
 
 import (
+	. "../goredis"
 	"./rdb"
 	"bufio"
 	"fmt"
