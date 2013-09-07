@@ -17,8 +17,12 @@ const (
 	CRLF = "\r\n"
 )
 
+// 命名处理接口
 type CommandHandler interface {
 	On(name string, cmd *Command) (reply *Reply)
+	// 如果存在"On+大写NAME"格式的函数，会被优先调用，而不调用On(name, cmd)函数
+	// OnGET(cmd *Command) (reply *Reply)
+	// OnXXXX(cmd *Command) (reply *Reply)
 }
 
 // ==============================
@@ -28,25 +32,15 @@ type CommandHandler interface {
 type RedisServer struct {
 	// 指定的处理程序
 	handler CommandHandler
-	// 缓存处理函数
+	// 缓存处理函数，减少relect次数
 	methodCache map[string]reflect.Value
-}
-
-// 创建服务实例
-func NewRedisServer() (server *RedisServer) {
-	server = &RedisServer{}
-	server.Init()
-	return
-}
-
-func (server *RedisServer) Init() {
-	server.methodCache = make(map[string]reflect.Value)
 }
 
 func (server *RedisServer) SetHanlder(handler CommandHandler) {
 	server.handler = handler
 }
 
+// Implement CommandHandler
 func (server *RedisServer) On(name string, cmd *Command) (reply *Reply) {
 	reply = ErrorReply("Not Supported: " + name)
 	return
@@ -62,6 +56,13 @@ func (server *RedisServer) Listen(host string) {
 		panic(e1)
 	}
 
+	// init
+	server.methodCache = make(map[string]reflect.Value)
+	if server.handler == nil {
+		server.SetHanlder(server)
+	}
+
+	// run loop
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -69,23 +70,27 @@ func (server *RedisServer) Listen(host string) {
 			continue
 		}
 		fmt.Println("[goredis] connection accepted from", conn.RemoteAddr())
-		// gogogo
+		// go
 		go server.handleConnection(newSession(conn))
 	}
 }
 
 // 处理一个客户端连接
 func (server *RedisServer) handleConnection(session *Session) {
-	// 不断从一个连接中获取命令，并处理，返回
+	// 异常处理
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(fmt.Sprintf("%s %s", session.conn.RemoteAddr(), err))
+			session.Close()
+		}
+	}()
 	for {
 		cmd, e1 := ReadCommand(session.reader)
 		// 常见的error是:
 		// 1) io.EOF
 		// 2) read tcp 127.0.0.1:51863: connection reset by peer
 		if e1 != nil {
-			fmt.Println("[goredis] end connection", e1, session.conn.RemoteAddr())
-			session.Close()
-			return
+			panic(fmt.Sprintf("end connection %s", e1))
 		}
 		// 初始化
 		cmd.session = session
@@ -96,7 +101,9 @@ func (server *RedisServer) handleConnection(session *Session) {
 			method = reflect.ValueOf(server.handler).MethodByName("On" + cmdName)
 			server.methodCache[cmdName] = method
 		}
+
 		if method.IsValid() {
+			// method = OnXXX(cmd *Command) (reply *Reply)
 			callResult := method.Call([]reflect.Value{reflect.ValueOf(cmd)})
 			reply := callResult[0].Interface().(*Reply)
 			session.Reply(reply)

@@ -12,16 +12,11 @@ type GoRedisServer struct {
 
 func NewGoRedisServer() (server *GoRedisServer) {
 	server = &GoRedisServer{}
-	server.Init()
+	server.SetHanlder(server)
 	server.Storages = storage.RedisStorages{}
 	server.Storages.StringStorage = storage.NewMemoryStringStorage()
 	server.Storages.KeyTypeStorage = storage.NewMemoryKeyTypeStorage()
 	return
-}
-
-func (server *GoRedisServer) Init() {
-	server.RedisServer.Init()
-	server.SetHanlder(server)
 }
 
 func (server *GoRedisServer) OnPETER(cmd *Command) (reply *Reply) {
