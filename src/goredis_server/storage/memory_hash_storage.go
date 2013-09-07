@@ -1,15 +1,19 @@
 package storage
 
+import (
+	"sync"
+)
+
 // 内存结构
 type MapItem struct {
-	Lock chan int
-	Map  map[string]interface{}
+	Map   map[string]interface{}
+	Mutex *sync.Mutex
 }
 
 func NewMapItem() (m *MapItem) {
 	m = &MapItem{}
-	m.Lock = make(chan int, 1)
 	m.Map = make(map[string]interface{})
+	m.Mutex = &sync.Mutex{}
 	return
 }
 
@@ -17,33 +21,33 @@ func NewMapItem() (m *MapItem) {
 type MemoryHashStorage struct {
 	HashStorage
 	kvCache map[string]*MapItem
-	kvLock  chan int
+	mutex   *sync.Mutex
 }
 
 func NewMemoryHashStorage() (storage *MemoryHashStorage) {
 	storage = &MemoryHashStorage{}
 	storage.kvCache = make(map[string]*MapItem)
-	storage.kvLock = make(chan int, 1)
+	storage.mutex = &sync.Mutex{}
 	return
 }
 
 func (s *MemoryHashStorage) mapByKey(key string) (m *MapItem) {
-	s.kvLock <- 1
+	s.mutex.Lock()
 	var exists bool
 	m, exists = s.kvCache[key]
 	if !exists {
 		m = NewMapItem()
 		s.kvCache[key] = m
 	}
-	<-s.kvLock
+	s.mutex.Unlock()
 	return
 }
 
 func (s *MemoryHashStorage) HGet(key string, field string) (value interface{}, err error) {
 	m := s.mapByKey(key)
-	m.Lock <- 1
+	m.Mutex.Lock()
 	value, _ = m.Map[field]
-	<-m.Lock
+	m.Mutex.Unlock()
 	return
 }
 
@@ -53,7 +57,7 @@ func (s *MemoryHashStorage) HGet(key string, field string) (value interface{}, e
 // 0 if field already exists in the hash and the value was updated.
 func (s *MemoryHashStorage) HSet(key string, field string, value string) (result int, err error) {
 	m := s.mapByKey(key)
-	m.Lock <- 1
+	m.Mutex.Lock()
 	_, exists := m.Map[field]
 	m.Map[field] = value
 	if !exists {
@@ -61,27 +65,27 @@ func (s *MemoryHashStorage) HSet(key string, field string, value string) (result
 	} else {
 		result = 0
 	}
-	<-m.Lock
+	m.Mutex.Unlock()
 	return
 }
 
 // http://redis.io/commands/hgetall
 func (s *MemoryHashStorage) HGetAll(key string) (keyvals []interface{}, err error) {
 	m := s.mapByKey(key)
-	m.Lock <- 1
+	m.Mutex.Lock()
 	length := len(m.Map)
 	keyvals = make([]interface{}, 0, length*2) // len(keys)+len(vals)
 	for k, v := range m.Map {
 		keyvals = append(keyvals, k)
 		keyvals = append(keyvals, v)
 	}
-	<-m.Lock
+	m.Mutex.Unlock()
 	return
 }
 
 func (s *MemoryHashStorage) HDel(key string, fields ...string) (n int, err error) {
 	m := s.mapByKey(key)
-	m.Lock <- 1
+	m.Mutex.Lock()
 	n = 0
 	for _, field := range fields {
 		_, exists := m.Map[field]
@@ -90,44 +94,44 @@ func (s *MemoryHashStorage) HDel(key string, fields ...string) (n int, err error
 			delete(m.Map, field)
 		}
 	}
-	<-m.Lock
+	m.Mutex.Unlock()
 	return
 }
 
 func (s *MemoryHashStorage) HMGet(key string, fields ...string) (values []interface{}, err error) {
 	m := s.mapByKey(key)
-	m.Lock <- 1
+	m.Mutex.Lock()
 	values = make([]interface{}, len(fields))
 	for i, field := range fields {
 		values[i], _ = m.Map[field]
 	}
-	<-m.Lock
+	m.Mutex.Unlock()
 	return
 }
 
 func (s *MemoryHashStorage) HMSet(key string, keyvals ...string) (err error) {
 	m := s.mapByKey(key)
-	m.Lock <- 1
+	m.Mutex.Lock()
 	count := len(keyvals)
 	for i := 0; i < count; i += 2 {
 		k := keyvals[i]
 		v := keyvals[i+1]
 		m.Map[k] = v
 	}
-	<-m.Lock
+	m.Mutex.Unlock()
 	return
 }
 
 func (s *MemoryHashStorage) HLen(key string) (length int, err error) {
 	m := s.mapByKey(key)
-	m.Lock <- 1
+	m.Mutex.Lock()
 	length = len(m.Map)
-	<-m.Lock
+	m.Mutex.Unlock()
 	return
 }
 
 func (s *MemoryHashStorage) Del(keys ...string) (n int, err error) {
-	s.kvLock <- 1
+	s.mutex.Lock()
 	n = 0
 	for _, key := range keys {
 		_, exists := s.kvCache[key]
@@ -136,6 +140,6 @@ func (s *MemoryHashStorage) Del(keys ...string) (n int, err error) {
 			delete(s.kvCache, key)
 		}
 	}
-	<-s.kvLock
+	s.mutex.Unlock()
 	return
 }

@@ -52,7 +52,6 @@ func (s *Session) Reply(reply *Reply) (err error) {
 
 // Status reply
 func (s *Session) replyStatus(status string) (err error) {
-	err = nil
 	buf := bytes.Buffer{}
 	buf.WriteString("+")
 	buf.WriteString(status)
@@ -63,7 +62,6 @@ func (s *Session) replyStatus(status string) (err error) {
 
 // Error reply
 func (s *Session) replyError(errmsg string) (err error) {
-	err = nil
 	buf := bytes.Buffer{}
 	buf.WriteString("-")
 	buf.WriteString(errmsg)
@@ -74,7 +72,6 @@ func (s *Session) replyError(errmsg string) (err error) {
 
 // Integer reply
 func (s *Session) replyInteger(i int) (err error) {
-	err = nil
 	buf := bytes.Buffer{}
 	buf.WriteString(":")
 	buf.WriteString(strconv.Itoa(i))
@@ -85,7 +82,6 @@ func (s *Session) replyInteger(i int) (err error) {
 
 // Bulk Reply
 func (s *Session) replyBulk(bulk interface{}) (err error) {
-	err = nil
 	// NULL Bulk Reply
 	if bulk == nil {
 		s.conn.Write([]byte("$-1\r\n"))
@@ -112,7 +108,6 @@ func (s *Session) replyBulk(bulk interface{}) (err error) {
 
 // Multi-bulk replies
 func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
-	err = nil
 	// Null Multi Bulk Reply
 	if bulks == nil {
 		s.conn.Write([]byte("*-1\r\n"))

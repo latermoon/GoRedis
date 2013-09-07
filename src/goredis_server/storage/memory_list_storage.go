@@ -1,28 +1,32 @@
 package storage
 
+import (
+	"sync"
+)
+
 type MemoryListStorage struct {
 	ListStorage
 	kvCache map[string]*SafeList
-	kvLock  chan int
+	mutex   *sync.Mutex
 }
 
 func NewMemoryListStorage() (storage *MemoryListStorage) {
 	storage = &MemoryListStorage{}
 	storage.kvCache = make(map[string]*SafeList)
-	storage.kvLock = make(chan int, 1)
+	storage.mutex = &sync.Mutex{}
 	return
 }
 
 // 获取指定key的列表，不存在时自动创建
 func (l *MemoryListStorage) listByKey(key string) (sl *SafeList) {
-	l.kvLock <- 1
+	l.mutex.Lock()
 	var exists bool
 	sl, exists = l.kvCache[key]
 	if !exists {
 		sl = NewSafeList()
 		l.kvCache[key] = sl
 	}
-	<-l.kvLock
+	l.mutex.Unlock()
 	return
 }
 
@@ -68,7 +72,7 @@ func (l *MemoryListStorage) LLen(key string) (length int, err error) {
 }
 
 func (l *MemoryListStorage) Del(keys ...string) (n int, err error) {
-	l.kvLock <- 1
+	l.mutex.Lock()
 	n = 0
 	for _, key := range keys {
 		_, exists := l.kvCache[key]
@@ -77,6 +81,6 @@ func (l *MemoryListStorage) Del(keys ...string) (n int, err error) {
 			n++
 		}
 	}
-	<-l.kvLock
+	l.mutex.Unlock()
 	return
 }

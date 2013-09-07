@@ -2,18 +2,19 @@ package storage
 
 import (
 	"errors"
+	"sync"
 )
 
 type MemoryKeyTypeStorage struct {
 	KeyTypeStorage
-	caches   map[string]KeyType
-	lockChan chan int
+	caches map[string]KeyType
+	mutex  *sync.Mutex
 }
 
 func NewMemoryKeyTypeStorage() (storage *MemoryKeyTypeStorage) {
 	storage = &MemoryKeyTypeStorage{}
 	storage.caches = make(map[string]KeyType)
-	storage.lockChan = make(chan int, 1)
+	storage.mutex = &sync.Mutex{}
 	return
 }
 
@@ -27,19 +28,19 @@ func (s *MemoryKeyTypeStorage) GetType(key string) (keytype KeyType) {
 }
 
 func (s *MemoryKeyTypeStorage) SetType(key string, keytype KeyType) (err error) {
-	s.lockChan <- 1
+	s.mutex.Lock()
 	tp := s.GetType(key)
 	if tp == KeyTypeUnknown {
 		s.caches[key] = keytype
 	} else if tp != keytype {
 		err = errors.New("Different from the former")
 	}
-	<-s.lockChan
+	s.mutex.Unlock()
 	return
 }
 
 func (s *MemoryKeyTypeStorage) DelType(key string) (keytype KeyType) {
-	s.lockChan <- 1
+	s.mutex.Lock()
 	var exists bool
 	keytype, exists = s.caches[key]
 	if exists {
@@ -47,6 +48,6 @@ func (s *MemoryKeyTypeStorage) DelType(key string) (keytype KeyType) {
 	} else {
 		keytype = KeyTypeUnknown
 	}
-	<-s.lockChan
+	s.mutex.Unlock()
 	return
 }
