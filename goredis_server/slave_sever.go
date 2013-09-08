@@ -1,8 +1,7 @@
 package goredis_server
 
 import (
-	//. "github.com/latermoon/GoRedis/src/goredis"
-	. "../goredis"
+	. "github.com/latermoon/GoRedis/goredis"
 	"net"
 )
 

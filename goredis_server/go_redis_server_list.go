@@ -1,9 +1,8 @@
 package goredis_server
 
 import (
-	//. "github.com/latermoon/GoRedis/src/goredis"
-	. "../goredis"
 	"./storage"
+	. "github.com/latermoon/GoRedis/goredis"
 	"strconv"
 )
 

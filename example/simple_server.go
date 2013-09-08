@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	. "github.com/latermoon/GoRedis/src/goredis"
+	. "github.com/latermoon/GoRedis/goredis"
 	"runtime"
 )
 
