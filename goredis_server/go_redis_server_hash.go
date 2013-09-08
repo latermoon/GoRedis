@@ -1,8 +1,8 @@
 package goredis_server
 
 import (
+	"./storage"
 	. "github.com/latermoon/GoRedis/goredis"
-	"github.com/latermoon/GoRedis/goredis_server/storage"
 )
 
 func (server *GoRedisServer) OnHGET(cmd *Command) (reply *Reply) {
