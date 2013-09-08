@@ -1,3 +1,6 @@
+// Copyright (c) 2013, Latermoon <lptmoon@gmail.com>
+// All rights reserved.
+//
 // 客户端指令
 // @author latermoon
 // @since 2013-08-27
@@ -9,7 +12,7 @@ import (
 
 // ==============================
 // 代表一条客户端指令
-// 对于 SET name Latermoon
+// SET name Latermoon
 // cmd.StringAtIndex(0) == cmd.Name() == "SET"
 // cmd.StringAtIndex(1) == "name"
 // cmd.StringAtIndex(2) == "Latermoon"

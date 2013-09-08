@@ -1,3 +1,6 @@
+// Copyright (c) 2013, Latermoon <lptmoon@gmail.com>
+// All rights reserved.
+//
 // Go版RedisServer
 // @author latermoon
 // @since 2013-08-14

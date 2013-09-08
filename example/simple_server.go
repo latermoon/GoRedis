@@ -4,6 +4,7 @@ import (
 	"fmt"
 	. "github.com/latermoon/GoRedis/goredis"
 	"runtime"
+	"sync"
 )
 
 // ==============================
@@ -12,13 +13,13 @@ import (
 type SimpleServerHandler struct {
 	CommandHandler
 	kvCache map[string]interface{} // KeyValue
-	kvLock  chan int               // Set操作的写锁
+	kvMutex *sync.Mutex            // Set操作的写锁
 }
 
 func NewSimpleServerHandler() (handler *SimpleServerHandler) {
 	handler = &SimpleServerHandler{}
 	handler.kvCache = make(map[string]interface{})
-	handler.kvLock = make(chan int, 1)
+	handler.kvMutex = &sync.Mutex{}
 	return
 }
 
@@ -37,9 +38,9 @@ func (s *SimpleServerHandler) OnGET(cmd *Command) (reply *Reply) {
 func (s *SimpleServerHandler) OnSET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	value := cmd.StringAtIndex(2)
-	s.kvLock <- 0
+	s.kvMutex.Lock()
 	s.kvCache[key] = value
-	<-s.kvLock
+	s.kvMutex.Unlock()
 	reply = StatusReply("OK")
 	return
 }
