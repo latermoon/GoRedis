@@ -1,8 +1,9 @@
 package main
 
 import (
-	"../goredis_server"
+	//"../goredis_server"
 	"fmt"
+	"github.com/latermoon/GoRedis/goredis_server"
 	"runtime"
 )
 
