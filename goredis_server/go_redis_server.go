@@ -21,7 +21,8 @@ func NewGoRedisServer() (server *GoRedisServer) {
 	// default storages
 	server.Storages = storage.RedisStorages{}
 	server.Storages.KeyTypeStorage = storage.NewMemoryKeyTypeStorage()
-	server.Storages.StringStorage = storage.NewMemoryStringStorage()
+	server.Storages.StringStorage, _ = storage.NewLevelDBStringStorage("/tmp/goredis.ldb")
+	//server.Storages.StringStorage = storage.NewMemoryStringStorage()
 	server.Storages.ListStorage = storage.NewMemoryListStorage()
 	server.Storages.HashStorage = storage.NewMemoryHashStorage()
 	return
