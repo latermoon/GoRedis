@@ -21,11 +21,11 @@ GoRedis
 
 #### Install:
 
-	go get github.com/latermoon/GoRedis/src/goredis
+	go get github.com/latermoon/GoRedis/goredis
 
 #### Update:
 
-	go get -u github.com/latermoon/GoRedis/src/goredis
+	go get -u github.com/latermoon/GoRedis/goredis
 
 #### RedisServer Demo:
 
@@ -33,7 +33,7 @@ GoRedis
 
 	import (
 		"fmt"
-		. "github.com/latermoon/GoRedis/src/goredis"
+		. "github.com/latermoon/GoRedis/goredis"
 		"runtime"
 	)
 
