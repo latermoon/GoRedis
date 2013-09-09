@@ -78,7 +78,6 @@ GoRedis
 	func (s *SimpleServerHandler) OnINFO(cmd *Command) (reply *Reply) {
 		lines := "Powerby GoRedis" + "\n"
 		lines += "SimpleRedisServer" + "\n"
-		lines += "Support GET/SET/INFO" + "\n"
 		reply = BulkReply(lines)
 		return
 	}
