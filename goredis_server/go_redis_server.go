@@ -2,6 +2,7 @@ package goredis_server
 
 import (
 	"./storage"
+	"container/list"
 	. "github.com/latermoon/GoRedis/goredis"
 )
 
@@ -11,6 +12,8 @@ type GoRedisServer struct {
 	RedisServer
 	// 存储支持
 	Storages storage.RedisStorages
+	// 从库
+	Slaves *list.List
 }
 
 func NewGoRedisServer() (server *GoRedisServer) {
@@ -19,11 +22,14 @@ func NewGoRedisServer() (server *GoRedisServer) {
 	server.SetHandler(server)
 	// default storages
 	server.Storages = storage.RedisStorages{}
+	leveldbStorage, _ := storage.NewLevelDBStorage("/tmp/goredis.ldb")
 	server.Storages.KeyTypeStorage = storage.NewMemoryKeyTypeStorage()
-	server.Storages.StringStorage, _ = storage.NewLevelDBStringStorage("/tmp/goredis.ldb")
-	//server.Storages.StringStorage = storage.NewMemoryStringStorage()
+	server.Storages.StringStorage = leveldbStorage
 	server.Storages.ListStorage = storage.NewMemoryListStorage()
 	server.Storages.HashStorage = storage.NewMemoryHashStorage()
+	// slave
+	server.Slaves = list.New()
+
 	return
 }
 

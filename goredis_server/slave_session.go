@@ -5,10 +5,11 @@ import (
 	"net"
 )
 
-type SlaveServer struct {
+// 从库会话
+type SlaveSession struct {
 	conn net.Conn
 }
 
-func (s *SlaveServer) Push(cmd *Command) {
+func (s *SlaveSession) Push(cmd *Command) {
 
 }
