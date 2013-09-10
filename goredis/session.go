@@ -158,6 +158,10 @@ func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 	return
 }
 
+func (s *Session) Connection() net.Conn {
+	return s.conn
+}
+
 // Close conn
 func (s *Session) Close() error {
 	return s.conn.Close()
