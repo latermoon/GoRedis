@@ -10,7 +10,7 @@ import (
 )
 
 func (server *GoRedisServer) OnSYNC(cmd *Command) (err error) {
-	server.addSlave(cmd.Session())
+	server.addSlave(cmd.Session().Connection())
 	return
 }
 
