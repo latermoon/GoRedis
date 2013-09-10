@@ -9,7 +9,18 @@ import (
 	"net"
 )
 
-func (server *GoRedisServer) OnSlaveOf(cmd *Command, host string, port string) (err error) {
+func (server *GoRedisServer) OnSYNC(cmd *Command) (err error) {
+	server.addSlave(cmd.Session())
+	return
+}
+
+func (server *GoRedisServer) addSlave(conn net.Conn) {
+	slave := &SlaveSession{}
+	slave.conn = conn
+	server.Slaves.PushFront(slave)
+}
+
+func (server *GoRedisServer) OnSLAVEOF(cmd *Command, host string, port string) (err error) {
 	var conn net.Conn
 	conn, err = net.Dial("tcp", host+":"+port)
 	if err != nil {
@@ -17,11 +28,6 @@ func (server *GoRedisServer) OnSlaveOf(cmd *Command, host string, port string) (
 	}
 	fmt.Println("SlaveOf", host, port, "...")
 	go server.slaveOf(conn)
-	return
-}
-
-func (server *GoRedisServer) OnSYNC(cmd *Command) (err error) {
-
 	return
 }
 
