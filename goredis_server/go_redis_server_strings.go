@@ -1,8 +1,8 @@
 package goredis_server
 
 import (
+	. "../goredis"
 	"./storage"
-	. "github.com/latermoon/GoRedis/goredis"
 )
 
 func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
@@ -13,7 +13,7 @@ func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnSET2(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	val := cmd.StringAtIndex(2)
 	server.Storages.KeyTypeStorage.SetType(key, storage.KeyTypeString)

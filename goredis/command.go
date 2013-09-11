@@ -8,6 +8,7 @@ package goredis
 
 import (
 	"bytes"
+	"strconv"
 )
 
 // ==============================
@@ -19,7 +20,7 @@ import (
 // ==============================
 type Command struct {
 	Args    [][]byte
-	session *Session
+	session *Session // 需要重构
 }
 
 func (cmd *Command) Session() *Session {
@@ -44,6 +45,31 @@ func (cmd *Command) StringArgs() (strs []string) {
 		strs[i] = string(b)
 	}
 	return
+}
+
+// Redis协议的Command数据
+/*
+*<number of arguments> CR LF
+$<number of bytes of argument 1> CR LF
+<argument data> CR LF
+...
+$<number of bytes of argument N> CR LF
+<argument data> CR LF
+*/
+func (cmd *Command) Bytes() []byte {
+	buf := bytes.Buffer{}
+	buf.WriteString("*")
+	argCount := len(cmd.Args)
+	buf.WriteString(strconv.Itoa(argCount)) //<number of arguments>
+	buf.WriteString(CRLF)
+	for i := 0; i < argCount; i++ {
+		buf.WriteString("$")
+		buf.WriteString(strconv.Itoa(len(cmd.Args[i]))) //<number of bytes of argument i>
+		buf.WriteString(CRLF)
+		buf.Write(cmd.Args[i]) //<argument data>
+		buf.WriteString(CRLF)
+	}
+	return buf.Bytes()
 }
 
 func (cmd *Command) String() string {

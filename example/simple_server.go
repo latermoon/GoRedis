@@ -1,8 +1,9 @@
 package main
 
 import (
+	. "../goredis"
+	"flag"
 	"fmt"
-	. "github.com/latermoon/GoRedis/goredis"
 	"runtime"
 	"sync"
 )
@@ -55,7 +56,15 @@ func (s *SimpleServerHandler) OnINFO(cmd *Command) (reply *Reply) {
 
 func main() {
 	runtime.GOMAXPROCS(2)
-	fmt.Println("SimpleServer start, listen 1603 ...")
+	//flag
+	portPtr := flag.Int("p", 1601, "Server port")
+	flag.Parse()
+	fmt.Printf("SimpleServer start, listen %d ...\r\n", *portPtr)
+
+	cmd := &Command{}
+	cmd.Args = [][]byte{[]byte("SYNC"), []byte("7b0a1520")}
+	fmt.Println(cmd.String())
+
 	server := NewRedisServer(NewSimpleServerHandler())
-	server.Listen(":1603")
+	server.Listen(fmt.Sprintf(":%d", *portPtr))
 }

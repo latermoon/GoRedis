@@ -1,60 +1,90 @@
 package goredis_server
 
 import (
+	. "../goredis"
 	"./rdb"
 	"bufio"
 	"fmt"
-	. "github.com/latermoon/GoRedis/goredis"
 	//"github.com/garyburd/redigo/redis"
 	"net"
 )
 
-func (server *GoRedisServer) OnSYNC(cmd *Command) (err error) {
-	server.addSlave(cmd.Session().Connection())
-	return
+// SYNC SLAVE_UID 7cc0745b-66de-46d7-b155-321998c7c20e
+func (server *GoRedisServer) OnSYNC(cmd *Command) (reply *Reply) {
+	fmt.Println("[OnSYNC]", cmd.String())
+
+	// 填充配置
+	syncInfo := make(map[string]string)
+	for i := 1; i < len(cmd.Args); i += 2 {
+		syncInfo[cmd.StringAtIndex(i)] = cmd.StringAtIndex(i + 1)
+	}
+	uid, exists := syncInfo["SLAVE_UID"]
+	if !exists {
+		uid = ""
+	}
+	// 加入管理
+	slave := NewSlaveServer(cmd.Session().Connection(), uid)
+	server.slaveMgr.Add(slave)
+
+	// update info
+	server.ReplicationInfo.IsMaster = true
+
+	return StatusReply("OK")
 }
 
-func (server *GoRedisServer) addSlave(conn net.Conn) {
-	slave := &SlaveSession{}
-	slave.conn = conn
-	server.Slaves.PushFront(slave)
-}
+func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
+	if server.ReplicationInfo.IsSlave {
+		reply = ErrorReply("already slaveof " + server.ReplicationInfo.MasterHost + ":" + server.ReplicationInfo.MasterPort)
+		return
+	}
 
-func (server *GoRedisServer) OnSLAVEOF(cmd *Command, host string, port string) (err error) {
-	var conn net.Conn
-	conn, err = net.Dial("tcp", host+":"+port)
+	// connect master
+	host := cmd.StringAtIndex(1)
+	port := cmd.StringAtIndex(2)
+	conn, err := net.Dial("tcp", host+":"+port)
+	reply = ReplySwitch(err, StatusReply("OK"))
 	if err != nil {
 		return
 	}
-	fmt.Println("SlaveOf", host, port, "...")
+
+	// update info
+	server.ReplicationInfo.IsSlave = true
+	server.ReplicationInfo.MasterHost = host
+	server.ReplicationInfo.MasterPort = port
+
 	go server.slaveOf(conn)
 	return
 }
 
 func (server *GoRedisServer) slaveOf(conn net.Conn) {
 	reader := bufio.NewReader(conn)
-	conn.Write([]byte("SYNC\r\n"))
 
-	// skip $size
-	_, _ = reader.ReadBytes('\n')
-	// rdb data
-	e2 := rdb.Decode(reader, &decoder{})
-	if e2 != nil {
-		fmt.Println("Decode error", e2.Error())
-		return
-	}
+	syncCmd := &Command{}
+	syncCmd.Args = [][]byte{[]byte("SYNC"), []byte("SLAVE_UID"), []byte(server.UID())}
+	conn.Write(syncCmd.Bytes())
+
+	/*
+		// skip $size
+		_, _ = reader.ReadBytes('\n')
+		// rdb data
+		e2 := rdb.Decode(reader, &decoder{})
+		if e2 != nil {
+			fmt.Println("Decode error", e2.Error())
+			return
+		}
+
+	*/
 	// find next command start
 	reader.ReadBytes('*')
 	// step back
 	reader.UnreadByte()
-
 	for {
 		cmd, e3 := ReadCommand(reader)
 		if e3 != nil {
 			fmt.Println("ReadCommand error", e3.Error())
 			return
 		}
-		fmt.Println(cmd.StringArgs()[:2])
+		fmt.Println("RECV:", cmd.String())
 	}
 }
 

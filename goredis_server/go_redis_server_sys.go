@@ -1,7 +1,7 @@
 package goredis_server
 
 import (
-	. "github.com/latermoon/GoRedis/goredis"
+	. "../goredis"
 )
 
 func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
