@@ -23,8 +23,12 @@ func (server *GoRedisServer) OnSYNC(cmd *Command) (reply *Reply) {
 		uid = ""
 	}
 	// 加入管理
-	slave := NewSlaveServer(uid)
-	server.slaveMgr.Add(slave)
+	slave := server.slaveMgr.Slave(uid)
+	if slave == nil {
+		slave = NewSlaveServer(uid)
+		server.slaveMgr.Add(slave)
+	}
+	slave.BindConnection(cmd.Session().Connection())
 
 	// update info
 	server.ReplicationInfo.IsMaster = true

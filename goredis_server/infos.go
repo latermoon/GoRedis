@@ -4,7 +4,8 @@ package goredis_server
 type LinkStatus int
 
 const (
-	LinkStatusPending = iota
+	LinkStatusInit = iota
+	LinkStatusPending
 	LinkStatusDown
 	LinkStatusUp
 )

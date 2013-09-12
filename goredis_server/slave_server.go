@@ -9,22 +9,17 @@ import (
 	"sync"
 )
 
-// 当前状态
-type SLStatus int
-
-const (
-	SLStatusConnected = iota
-	SLStatusDisconnected
-)
-
 type SlaveServer struct {
-	conn            net.Conn
-	linkStatus      LinkStatus
-	UID             string
-	useLevelDb      bool
+	conn       net.Conn
+	linkStatus LinkStatus
+	UID        string
+
 	commandchan     chan interface{} // 顺序处理发送队列
+	chan1           chan int
 	writeMutex      *sync.Mutex
 	shouldStopWrite bool
+
+	useLevelDb bool
 	// leveldb
 	db *leveldb.DB
 	ro *opt.ReadOptions
@@ -33,20 +28,21 @@ type SlaveServer struct {
 
 func NewSlaveServer(uid string) (server *SlaveServer) {
 	server = &SlaveServer{}
-	server.linkStatus = LinkStatusDown
+	server.linkStatus = LinkStatusInit
 	server.UID = uid
 	server.useLevelDb = len(uid) > 0
 	server.commandchan = make(chan interface{}, 100000) // 缓冲区
+	server.chan1 = make(chan int)
 	server.writeMutex = &sync.Mutex{}
-	server.writeMutex.Lock() // 一开始锁住chan的写操作
 	// leveldb
 	if server.useLevelDb {
 		server.ro = &opt.ReadOptions{}
 		server.wo = &opt.WriteOptions{}
 		dbpath := "/tmp/Slave_" + server.UID + ".ldb"
-		server.db, err = leveldb.OpenFile(dbpath, &opt.Options{Flag: opt.OFCreateIfMissing})
-		if err != nil {
-			fmt.Println("slave db error", err)
+		var e1 error
+		server.db, e1 = leveldb.OpenFile(dbpath, &opt.Options{Flag: opt.OFCreateIfMissing})
+		if e1 != nil {
+			fmt.Println("slave db error", e1)
 			server.useLevelDb = false
 		}
 	}
@@ -55,12 +51,24 @@ func NewSlaveServer(uid string) (server *SlaveServer) {
 
 func (s *SlaveServer) runloop() {
 	for {
-		s.writeMutex.Lock()
-		s.writeMutex.Unlock()
+		if s.linkStatus == LinkStatusPending {
+			fmt.Println("Pending exit runloop")
+			return
+		}
+
+		if s.shouldStopWrite {
+			fmt.Println("shouldStopWrite")
+			s.shouldStopWrite = false
+			return
+		}
+
 		v := <-s.commandchan
-		if s.linkStatus == LinkStatusUp {
+		switch s.linkStatus {
+		case LinkStatusUp:
 			err := s.writeToSlave(v)
 			if err != nil {
+				s.db.Close()
+				s.db = nil
 				s.linkStatus = LinkStatusDown
 				if s.useLevelDb {
 					s.writeToLocal(v)
@@ -68,28 +76,33 @@ func (s *SlaveServer) runloop() {
 					// 抛错，中断Slave Connection，撤销实例
 				}
 			}
-		} else if s.linkStatus == LinkStatusDown {
+		case LinkStatusDown:
 			err := s.writeToLocal(v)
 			if err != nil {
 				panic("fail to write slave ldb")
 			}
 		}
+
 	}
 }
 
 // 队列中的数据只有两个写入方向，一个是远程从库
 func (s *SlaveServer) writeToSlave(v interface{}) (err error) {
+	fmt.Println("writeToSlave...")
+	_, err = s.conn.Write(v.([]byte))
 	return
 }
 
 // 另一个是本地LevelDB
 func (s *SlaveServer) writeToLocal(v interface{}) (err error) {
+	fmt.Println("writeToLocal...")
 	return
 }
 
 // 向远程发送本地更新数据
 func (s *SlaveServer) sendLocalChanges() (err error) {
-	// 停止chan写入
+	fmt.Println("sendLocalChanges")
+	return
 }
 
 func (s *SlaveServer) Send(bs []byte) (err error) {
@@ -104,12 +117,35 @@ func (s *SlaveServer) SendCommand(cmd *Command) (err error) {
 
 func (s *SlaveServer) BindConnection(conn net.Conn) {
 	s.conn = conn
-	// 绑定连接的时候，如果有绑定本地数据库，就发送出去
-	if s.useLevelDb {
-		s.sendLocalChanges()
+	if s.linkStatus == LinkStatusInit {
+		s.linkStatus = LinkStatusPending
+		go func() {
+			fmt.Println("Pending...")
+			// 绑定连接的时候，如果有绑定本地数据库，就发送出去
+			if s.useLevelDb {
+				s.sendLocalChanges()
+			}
+			s.linkStatus = LinkStatusUp
+			// 发送完毕后开始消化
+			go s.runloop()
+		}()
+	} else if s.linkStatus == LinkStatusDown {
+		s.shouldStopWrite = true
+		go func() {
+			fmt.Println("Stoping...")
+			go func() {
+				fmt.Println("Pending 2...")
+				// 绑定连接的时候，如果有绑定本地数据库，就发送出去
+				if s.useLevelDb {
+					s.sendLocalChanges()
+				}
+				s.linkStatus = LinkStatusUp
+				// 发送完毕后开始消化
+				go s.runloop()
+			}()
+		}()
 	}
-	// 发送完毕后开始消化
-	go server.runloop()
+
 }
 
 func (s *SlaveServer) Connection() net.Conn {
