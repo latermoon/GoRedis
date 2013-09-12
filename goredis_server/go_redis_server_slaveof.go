@@ -23,7 +23,7 @@ func (server *GoRedisServer) OnSYNC(cmd *Command) (reply *Reply) {
 		uid = ""
 	}
 	// 加入管理
-	slave := NewSlaveServer(cmd.Session().Connection(), uid)
+	slave := NewSlaveServer(uid)
 	server.slaveMgr.Add(slave)
 
 	// update info

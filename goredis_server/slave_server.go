@@ -2,6 +2,9 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"fmt"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 	"net"
 	"sync"
 )
@@ -17,37 +20,53 @@ const (
 type SlaveServer struct {
 	conn            net.Conn
 	linkStatus      LinkStatus
-	status          string
 	UID             string
-	statusChange    chan LinkStatus  // 状态改变
+	useLevelDb      bool
 	commandchan     chan interface{} // 顺序处理发送队列
-	chanMutex       *sync.Mutex
+	writeMutex      *sync.Mutex
 	shouldStopWrite bool
+	// leveldb
+	db *leveldb.DB
+	ro *opt.ReadOptions
+	wo *opt.WriteOptions
 }
 
-func NewSlaveServer(conn net.Conn, uid string) (server *SlaveServer) {
+func NewSlaveServer(uid string) (server *SlaveServer) {
 	server = &SlaveServer{}
-	server.conn = conn
 	server.linkStatus = LinkStatusDown
 	server.UID = uid
-	server.statusChange = make(chan LinkStatus)
-	server.commandchan = make(chan interface{}, 1000000) // 缓冲区
-	server.chanMutex = &sync.Mutex{}
-	server.chanMutex.Lock() // 一开始锁住chan的写操作
-	go server.runloop()
+	server.useLevelDb = len(uid) > 0
+	server.commandchan = make(chan interface{}, 100000) // 缓冲区
+	server.writeMutex = &sync.Mutex{}
+	server.writeMutex.Lock() // 一开始锁住chan的写操作
+	// leveldb
+	if server.useLevelDb {
+		server.ro = &opt.ReadOptions{}
+		server.wo = &opt.WriteOptions{}
+		dbpath := "/tmp/Slave_" + server.UID + ".ldb"
+		server.db, err = leveldb.OpenFile(dbpath, &opt.Options{Flag: opt.OFCreateIfMissing})
+		if err != nil {
+			fmt.Println("slave db error", err)
+			server.useLevelDb = false
+		}
+	}
 	return
 }
 
 func (s *SlaveServer) runloop() {
 	for {
-		s.chanMutex.Lock()
-		s.chanMutex.Unlock()
+		s.writeMutex.Lock()
+		s.writeMutex.Unlock()
 		v := <-s.commandchan
 		if s.linkStatus == LinkStatusUp {
 			err := s.writeToSlave(v)
 			if err != nil {
 				s.linkStatus = LinkStatusDown
-				s.writeToLocal(v)
+				if s.useLevelDb {
+					s.writeToLocal(v)
+				} else {
+					// 抛错，中断Slave Connection，撤销实例
+				}
 			}
 		} else if s.linkStatus == LinkStatusDown {
 			err := s.writeToLocal(v)
@@ -69,7 +88,7 @@ func (s *SlaveServer) writeToLocal(v interface{}) (err error) {
 }
 
 // 向远程发送本地更新数据
-func (s *SlaveServer) sendLocalChanges() {
+func (s *SlaveServer) sendLocalChanges() (err error) {
 	// 停止chan写入
 }
 
@@ -85,7 +104,12 @@ func (s *SlaveServer) SendCommand(cmd *Command) (err error) {
 
 func (s *SlaveServer) BindConnection(conn net.Conn) {
 	s.conn = conn
-	s.chanMutex.Lock()
+	// 绑定连接的时候，如果有绑定本地数据库，就发送出去
+	if s.useLevelDb {
+		s.sendLocalChanges()
+	}
+	// 发送完毕后开始消化
+	go server.runloop()
 }
 
 func (s *SlaveServer) Connection() net.Conn {
