@@ -9,6 +9,20 @@ import (
 	"sync"
 )
 
+/*
+new slave
+& do nothing
+
+if ldb: set conn: nil
+	writeToldb yes
+set conn: net.Conn
+	wait stopWrite
+	send ldb
+		err:continue writeToldb
+	writeToSlave
+		err:continue writeToldb
+
+*/
 type SlaveServer struct {
 	conn       net.Conn
 	linkStatus LinkStatus
