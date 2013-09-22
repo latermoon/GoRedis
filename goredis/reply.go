@@ -3,6 +3,11 @@
 //
 package goredis
 
+import (
+	"bytes"
+	"fmt"
+)
+
 // ==============================
 // 封装一个返回给客户端的Response
 // 对于每种Redis响应，都有一个对应的构造函数
@@ -22,6 +27,49 @@ const (
 	ReplyTypeBulk
 	ReplyTypeMultiBulks
 )
+
+func (r *Reply) String() string {
+	buf := bytes.Buffer{}
+	buf.WriteString("<")
+	switch r.Type {
+	case ReplyTypeStatus:
+		buf.WriteString("StatusReply:")
+		switch r.Value.(type) {
+		case string:
+			buf.WriteString(r.Value.(string))
+		case []byte:
+			buf.Write(r.Value.([]byte))
+		default:
+			buf.WriteString(fmt.Sprintf("Size(%d)", len(r.Value.([]byte))))
+		}
+	case ReplyTypeError:
+		buf.WriteString("ErrorReply:")
+		switch r.Value.(type) {
+		case string:
+			buf.WriteString(r.Value.(string))
+		case []byte:
+			buf.Write(r.Value.([]byte))
+		default:
+			buf.WriteString(fmt.Sprintf("Size(%d)", len(r.Value.([]byte))))
+		}
+	case ReplyTypeInteger:
+		buf.WriteString("IntegerReply:")
+	case ReplyTypeBulk:
+		buf.WriteString("BulkReply:")
+		switch r.Value.(type) {
+		case string:
+			buf.WriteString(r.Value.(string))
+		case []byte:
+			buf.Write(r.Value.([]byte))
+		default:
+			buf.WriteString(fmt.Sprintf("Size(%d)", len(r.Value.([]byte))))
+		}
+	case ReplyTypeMultiBulks:
+		buf.WriteString("MultiBulksReply:")
+	}
+	buf.WriteString(">")
+	return buf.String()
+}
 
 /**
  * 返回错误Reply或正确Reply（精简判断语句）

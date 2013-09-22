@@ -1,6 +1,6 @@
 // Copyright (c) 2013, Latermoon <lptmoon@gmail.com>
 // All rights reserved.
-//
+// http://redis.io/topics/protocol
 package goredis
 
 import (
@@ -31,6 +31,124 @@ func lightReadBytes(reader *bufio.Reader, delim byte) (line []byte, err error) {
 			break
 		}
 		line = append(line, c)
+	}
+	return
+}
+
+func readInteger(reader *bufio.Reader, delim byte) (i int, err error) {
+	var line []byte
+	line, err = lightReadBytes(reader, delim)
+	if err == nil {
+		i, err = strconv.Atoi(string(line))
+	}
+	return
+}
+
+func ReadInteger(reader *bufio.Reader, delim byte) (i int, err error) {
+	return readInteger(reader, delim)
+}
+
+// 阻塞读取
+func blockReadBytes(reader *bufio.Reader, bufsize int) (bs []byte, err error) {
+	bs = make([]byte, bufsize)
+	var n int
+	n, err = reader.Read(bs)
+	if err == io.EOF {
+		return
+	}
+	// 如果网络较慢，会出现一次读不完，剩下的逐个读取
+	if n < bufsize {
+		//fmt.Printf("%d < bufsize %d\n", n, bufsize)
+		var c byte
+		for j := n; j < bufsize; j++ {
+			c, err = reader.ReadByte()
+			if err != nil {
+				return
+			}
+			bs[j] = c
+		}
+	}
+	return
+}
+
+// 临时方法: 跳过指定长度
+func SkipReaderCursor(reader *bufio.Reader, bufsize int) (err error) {
+	for i := 0; i < bufsize; i++ {
+		_, err = reader.ReadByte()
+	}
+	return
+}
+
+/*
+In a Status Reply the first byte of the reply is "+"
+In an Error Reply the first byte of the reply is "-"
+In an Integer Reply the first byte of the reply is ":"
+In a Bulk Reply the first byte of the reply is "$"
+In a Multi Bulk Reply the first byte of the reply s "*"
+*/
+func ReadReply(reader *bufio.Reader) (reply *Reply, err error) {
+	reply = &Reply{}
+	var c byte
+	if c, err = reader.ReadByte(); err != nil {
+		return
+	}
+
+	switch c {
+	case '+':
+		reply.Type = ReplyTypeStatus
+		reply.Value, err = lightReadBytes(reader, CR)
+		_, err = reader.ReadBytes(LF) // CRLF
+	case '-':
+		reply.Type = ReplyTypeError
+		reply.Value, err = lightReadBytes(reader, CR)
+		_, err = reader.ReadBytes(LF) // CRLF
+	case ':':
+		reply.Type = ReplyTypeInteger
+		reply.Value, err = readInteger(reader, CR)
+		if err == nil {
+			_, err = reader.ReadBytes(LF) // CRLF
+		}
+	case '$':
+		reply.Type = ReplyTypeBulk
+		var bufsize int
+		bufsize, err = readInteger(reader, CR)
+		if err != nil {
+			break
+		}
+		_, err = reader.ReadBytes(LF) // CRLF
+		reply.Value, err = blockReadBytes(reader, bufsize)
+		if err != nil {
+			break
+		}
+		_, err = reader.ReadBytes(LF) // CRLF
+	case '*':
+		reply.Type = ReplyTypeMultiBulks
+		var argCount int
+		argCount, err = readInteger(reader, CR)
+		if err != nil {
+			break
+		}
+		_, err = reader.ReadBytes(LF) // CRLF
+		var c byte
+		args := make([][]byte, argCount)
+		for i := 0; i < argCount; i++ {
+			c, err = reader.ReadByte()
+			if err != nil || c != '$' {
+				return
+			}
+			var argSize int
+			argSize, err = readInteger(reader, CR)
+			if err != nil {
+				return
+			}
+			_, err = reader.ReadBytes(LF) // CRLF
+			args[i], err = blockReadBytes(reader, argSize)
+			_, err = reader.ReadBytes(LF) // CRLF
+		}
+		reply.Value = args
+		_, err = reader.ReadBytes(LF) // CRLF
+	default:
+		err = errors.New("Bad Reply Flag:" + string([]byte{c}))
 	}
 	return
 }
