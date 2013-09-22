@@ -34,12 +34,12 @@ func NewSession(conn net.Conn) (s *Session) {
 	return
 }
 
-func (s *Session) WriteReply(reply *Reply) (err error) {
-	return s.Reply(reply)
-}
-
 // 返回数据到客户端
 func (s *Session) Reply(reply *Reply) (err error) {
+	return s.WriteReply(reply)
+}
+
+func (s *Session) WriteReply(reply *Reply) (err error) {
 	switch reply.Type {
 	case ReplyTypeStatus:
 		err = s.replyStatus(reply.Value.(string))
@@ -323,8 +323,9 @@ func (s *Session) skipSpecificBytes(bs []byte) (err error) {
 	return
 }
 
+// 读取到Redis通用换行符为止
 func (s *Session) readBytesToCRLF() (bs []byte, err error) {
-	bs, err = s.LightReadBytes(CR)
+	bs, err = s.lightReadBytes(CR)
 	if err != nil {
 		return
 	}
@@ -372,6 +373,18 @@ func (s *Session) String() string {
 	return fmt.Sprintf("<Session:%s>", s.conn.RemoteAddr().String())
 }
 
+func (s *Session) Read(p []byte) (n int, err error) {
+	return s.rw.Read(p)
+}
+
+func (s *Session) Write(p []byte) (n int, err error) {
+	n, err = s.rw.Write(p)
+	if err == nil {
+		s.rw.Flush()
+	}
+	return
+}
+
 // 获取字节而不移动游标
 func (s *Session) PeekByte() (c byte, err error) {
 	c, err = s.rw.ReadByte()
@@ -379,10 +392,6 @@ func (s *Session) PeekByte() (c byte, err error) {
 		err = s.rw.UnreadByte()
 	}
 	return
-}
-
-func (s *Session) Read(p []byte) (n int, err error) {
-	return s.rw.Read(p)
 }
 
 // 阻塞读取
@@ -408,26 +417,9 @@ func (s *Session) BlockReadBytes(bufsize int) (bs []byte, err error) {
 	return
 }
 
-func (s *Session) Write(p []byte) (n int, err error) {
-	n, err = s.rw.Write(p)
-	if err == nil {
-		s.rw.Flush()
-	}
-	return
-}
-
-func (s *Session) ReadInteger(delim byte) (i int, err error) {
-	var line []byte
-	line, err = s.LightReadBytes(delim)
-	if err == nil {
-		i, err = strconv.Atoi(string(line))
-	}
-	return
-}
-
 // 简化的ReadBytes(delim)方法
 // reader.ReadBytes(delim)创建对象过多，使用下面方法让GoRedis多处理2k/s
-func (s *Session) LightReadBytes(delim byte) (line []byte, err error) {
+func (s *Session) lightReadBytes(delim byte) (line []byte, err error) {
 	var c byte
 	// cap=4，是因为大部分场景下，redis里的数据长度不大于9999
 	line = make([]byte, 0, 4)
