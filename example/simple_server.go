@@ -61,8 +61,7 @@ func main() {
 	flag.Parse()
 	fmt.Printf("SimpleServer start, listen %d ...\r\n", *portPtr)
 
-	cmd := &Command{}
-	cmd.Args = [][]byte{[]byte("SYNC"), []byte("7b0a1520")}
+	cmd := NewCommand([]byte("SYNC"), []byte("7b0a1520"))
 	fmt.Println(cmd.String())
 
 	server := NewRedisServer(NewSimpleServerHandler())

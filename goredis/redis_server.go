@@ -84,7 +84,7 @@ func (server *RedisServer) Listen(host string) {
 		}
 		fmt.Println("[goredis] connection accepted from", conn.RemoteAddr())
 		// go
-		go server.handleConnection(newSession(conn))
+		go server.handleConnection(NewSession(conn))
 	}
 }
 
@@ -98,7 +98,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 		}
 	}()
 	for {
-		cmd, e1 := ReadCommand(session.reader)
+		cmd, e1 := session.ReadCommand()
 		// 常见的error是:
 		// 1) io.EOF
 		// 2) read tcp 127.0.0.1:51863: connection reset by peer

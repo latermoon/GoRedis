@@ -17,7 +17,7 @@ if ldb: set conn: nil
 	writeToldb yes
 set conn: net.Conn
 	wait stopWrite
-	send ldb
+	send ldbq
 		err:continue writeToldb
 	writeToSlave
 		err:continue writeToldb

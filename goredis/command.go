@@ -23,6 +23,12 @@ type Command struct {
 	session *Session // 需要重构
 }
 
+func NewCommand(args ...[]byte) (cmd *Command) {
+	cmd = &Command{}
+	cmd.Args = args
+	return
+}
+
 func (cmd *Command) Session() *Session {
 	return cmd.session
 }
