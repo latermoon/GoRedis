@@ -24,7 +24,7 @@ set conn: net.Conn
 
 */
 type SlaveServer struct {
-	conn       net.Conn
+	session    *Session
 	linkStatus LinkStatus
 	UID        string
 
@@ -127,6 +127,14 @@ func (s *SlaveServer) Send(bs []byte) (err error) {
 func (s *SlaveServer) SendCommand(cmd *Command) (err error) {
 	err = s.Send(cmd.Bytes())
 	return
+}
+
+func (s *SlaveServer) SetSession(session *Session) {
+	s.session = session
+}
+
+func (s *SlaveServer) Active() {
+	go s.runloop()
 }
 
 func (s *SlaveServer) BindConnection(conn net.Conn) {

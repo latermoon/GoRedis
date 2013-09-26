@@ -106,7 +106,6 @@ func (server *RedisServer) handleConnection(session *Session) {
 			panic(fmt.Sprintf("end connection %s", e1))
 		}
 		// 初始化
-		cmd.session = session
 		cmdName := strings.ToUpper(cmd.Name())
 		// 从Cache取出处理函数
 		method, exists := server.methodCache[cmdName]
@@ -116,8 +115,16 @@ func (server *RedisServer) handleConnection(session *Session) {
 		}
 
 		if method.IsValid() {
+			// 可以调用两种接口
 			// method = OnXXX(cmd *Command) (reply *Reply)
-			callResult := method.Call([]reflect.Value{reflect.ValueOf(cmd)})
+			// method = OnXXX(cmd *Command, session *Session) (reply *Reply)
+			var in []reflect.Value
+			if method.Type().NumIn() == 1 {
+				in = []reflect.Value{reflect.ValueOf(cmd)}
+			} else {
+				in = []reflect.Value{reflect.ValueOf(cmd), reflect.ValueOf(session)}
+			}
+			callResult := method.Call(in)
 			reply := callResult[0].Interface().(*Reply)
 			session.Reply(reply)
 		} else {
