@@ -6,7 +6,7 @@ import (
 )
 
 type LevelDBStorage struct {
-	StringStorage
+	MemoryStorage
 	db *leveldb.DB
 	ro *opt.ReadOptions
 	wo *opt.WriteOptions

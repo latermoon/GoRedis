@@ -5,6 +5,7 @@ import (
 	"./storage"
 	//"./uuid"
 	"fmt"
+	//"strings"
 )
 
 // GoRedisServer
@@ -37,7 +38,7 @@ func NewGoRedisServer() (server *GoRedisServer) {
 func (server *GoRedisServer) Listen(host string) {
 	// port := strings.Split(host, ":")[1]
 	// leveldbStorage, _ := storage.NewLevelDBStorage("/tmp/goredis_" + port + ".ldb")
-	// server.Storages.StringStorage = leveldbStorage
+	// server.Storage = leveldbStorage
 
 	server.initUID()
 
