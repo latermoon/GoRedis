@@ -13,11 +13,16 @@ const (
 )
 
 // 存储支持
-type RedisStorages struct {
-	StringStorage StringStorage
-	HashStorage   HashStorage
-	ListStorage   ListStorage
-	SetStorage    SetStorage
+type StorageProvider interface {
+	KeyStorage
+	StringStorage
+	HashStorage
+	ListStorage
+}
+
+type KeyStorage interface {
+	TypeOf(key string) (kt KeyType)
+	Del(keys ...string) (n int, err error)
 }
 
 type StringStorage interface {
@@ -25,7 +30,6 @@ type StringStorage interface {
 	Set(key string, value string) (err error)
 	MGet(keys ...string) (values []interface{}, err error)
 	MSet(keyvals ...string) (err error)
-	Del(keys ...string) (n int, err error)
 }
 
 type HashStorage interface {
@@ -36,7 +40,6 @@ type HashStorage interface {
 	HMSet(key string, keyvals ...string) (err error)
 	HLen(key string) (length int, err error)
 	HDel(key string, fields ...string) (n int, err error)
-	Del(keys ...string) (n int, err error)
 }
 
 type ListStorage interface {
@@ -47,7 +50,6 @@ type ListStorage interface {
 	LRange(key string, start int, end int) (values []interface{}, err error)
 	LIndex(key string, index int) (value interface{}, err error)
 	LLen(key string) (length int, err error)
-	Del(keys ...string) (n int, err error)
 }
 
 type SetStorage interface {
