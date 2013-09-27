@@ -3,7 +3,7 @@ package goredis_server
 import (
 	. "../goredis"
 	"./rdb"
-	"bufio"
+
 	"fmt"
 	"net"
 )
@@ -62,8 +62,6 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) slaveOf(session *Session) {
-	reader := bufio.NewReader(conn)
-
 	cmdsync := NewCommand([]byte("SYNC"), []byte("SLAVE_UID"), []byte(server.UID()))
 	session.WriteCommand(cmdsync)
 

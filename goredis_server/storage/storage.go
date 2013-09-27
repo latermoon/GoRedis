@@ -14,17 +14,10 @@ const (
 
 // 存储支持
 type RedisStorages struct {
-	KeyTypeStorage KeyTypeStorage
-	StringStorage  StringStorage
-	HashStorage    HashStorage
-	ListStorage    ListStorage
-	SetStorage     SetStorage
-}
-
-type KeyTypeStorage interface {
-	GetType(key string) (keytype KeyType)
-	SetType(key string, keytype KeyType) (err error)
-	DelType(key string) (keytype KeyType)
+	StringStorage StringStorage
+	HashStorage   HashStorage
+	ListStorage   ListStorage
+	SetStorage    SetStorage
 }
 
 type StringStorage interface {
