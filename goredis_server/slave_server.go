@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-	"net"
 	"sync"
 )
 
@@ -24,7 +23,7 @@ set conn: net.Conn
 
 */
 type SlaveServer struct {
-	conn       net.Conn
+	session    *Session
 	linkStatus LinkStatus
 	UID        string
 
@@ -45,7 +44,7 @@ func NewSlaveServer(uid string) (server *SlaveServer) {
 	server.linkStatus = LinkStatusInit
 	server.UID = uid
 	server.useLevelDb = len(uid) > 0
-	server.commandchan = make(chan interface{}, 100000) // 缓冲区
+	server.commandchan = make(chan interface{}, 10000) // 缓冲区
 	server.chan1 = make(chan int)
 	server.writeMutex = &sync.Mutex{}
 	// leveldb
@@ -103,7 +102,7 @@ func (s *SlaveServer) runloop() {
 // 队列中的数据只有两个写入方向，一个是远程从库
 func (s *SlaveServer) writeToSlave(v interface{}) (err error) {
 	fmt.Println("writeToSlave...")
-	_, err = s.conn.Write(v.([]byte))
+	_, err = s.session.Write(v.([]byte))
 	return
 }
 
@@ -119,49 +118,20 @@ func (s *SlaveServer) sendLocalChanges() (err error) {
 	return
 }
 
-func (s *SlaveServer) Send(bs []byte) (err error) {
+func (s *SlaveServer) SendBytes(bs []byte) (err error) {
 	s.commandchan <- bs
 	return
 }
 
 func (s *SlaveServer) SendCommand(cmd *Command) (err error) {
-	err = s.Send(cmd.Bytes())
+	err = s.SendBytes(cmd.Bytes())
 	return
 }
 
-func (s *SlaveServer) BindConnection(conn net.Conn) {
-	s.conn = conn
-	if s.linkStatus == LinkStatusInit {
-		s.linkStatus = LinkStatusPending
-		go func() {
-			fmt.Println("Pending...")
-			// 绑定连接的时候，如果有绑定本地数据库，就发送出去
-			if s.useLevelDb {
-				s.sendLocalChanges()
-			}
-			s.linkStatus = LinkStatusUp
-			// 发送完毕后开始消化
-			go s.runloop()
-		}()
-	} else if s.linkStatus == LinkStatusDown {
-		s.shouldStopWrite = true
-		go func() {
-			fmt.Println("Stoping...")
-			go func() {
-				fmt.Println("Pending 2...")
-				// 绑定连接的时候，如果有绑定本地数据库，就发送出去
-				if s.useLevelDb {
-					s.sendLocalChanges()
-				}
-				s.linkStatus = LinkStatusUp
-				// 发送完毕后开始消化
-				go s.runloop()
-			}()
-		}()
-	}
-
+func (s *SlaveServer) SetSession(session *Session) {
+	s.session = session
 }
 
-func (s *SlaveServer) Connection() net.Conn {
-	return s.conn
+func (s *SlaveServer) Active() {
+	go s.runloop()
 }

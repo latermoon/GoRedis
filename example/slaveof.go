@@ -36,7 +36,7 @@ func main() {
 		} else if c == '$' {
 			fmt.Println("skip rdb...")
 			if e3 := sess.ReadRDB(); e3 != nil {
-				panic(e3)
+				panic(e3) 
 			} else {
 				fmt.Println("skip finish")
 			}

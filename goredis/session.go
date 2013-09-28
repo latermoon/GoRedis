@@ -301,6 +301,7 @@ func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 	return
 }
 
+// 验证并跳过指定的字节，用于开始符和结束符的判断
 func (s *Session) skipSpecificByte(c byte) (err error) {
 	var tmp byte
 	tmp, err = s.rw.ReadByte()
@@ -340,6 +341,7 @@ func (s *Session) readBytesToCRLF() (bs []byte, err error) {
 	return
 }
 
+// 读取字符串，遇到CRLF换行为止
 func (s *Session) readLineString() (str string, err error) {
 	var line []byte
 	line, err = s.readBytesToCRLF()
@@ -350,6 +352,7 @@ func (s *Session) readLineString() (str string, err error) {
 	return
 }
 
+// 读取整形，遇到CRLF换行为止
 func (s *Session) readLineInteger() (i int, err error) {
 	var line string
 	line, err = s.readLineString()
@@ -358,10 +361,6 @@ func (s *Session) readLineInteger() (i int, err error) {
 	}
 	i, err = strconv.Atoi(line)
 	return
-}
-
-func (s *Session) Connection() net.Conn {
-	return s.conn
 }
 
 // Close conn

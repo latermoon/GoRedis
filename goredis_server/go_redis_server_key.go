@@ -2,45 +2,41 @@ package goredis_server
 
 import (
 	. "../goredis"
-	"./storage"
+	. "./storage"
 )
 
 func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	keys := cmd.StringArgs()[1:]
-	count := 0
+	n := 0
 	for _, key := range keys {
-		switch server.Storages.KeyTypeStorage.GetType(key) {
-		case storage.KeyTypeString:
-			n, _ := server.Storages.StringStorage.Del([]string{key}...)
-			count += n
-		case storage.KeyTypeList:
-			n, _ := server.Storages.ListStorage.Del([]string{key}...)
-			count += n
-		case storage.KeyTypeHash:
-			n, _ := server.Storages.HashStorage.Del([]string{key}...)
-			count += n
-		default:
+		entry, _ := server.datasource.Get(key)
+		if entry != nil {
+			server.datasource.Remove(key)
+			n++
 		}
-		server.Storages.KeyTypeStorage.DelType(key)
 	}
-	reply = IntegerReply(count)
+	reply = IntegerReply(n)
 	return
 }
 
 func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	keytype := server.Storages.KeyTypeStorage.GetType(key)
-	typestr := "none"
+	var keytype EntryType
+	entry, _ := server.datasource.Get(key)
+	if entry != nil {
+		keytype = entry.Type()
+	}
+	var typestr string
 	switch keytype {
-	case storage.KeyTypeString:
+	case EntryTypeString:
 		typestr = "string"
-	case storage.KeyTypeHash:
+	case EntryTypeHash:
 		typestr = "hash"
-	case storage.KeyTypeList:
+	case EntryTypeList:
 		typestr = "list"
-	case storage.KeyTypeSet:
+	case EntryTypeSet:
 		typestr = "set"
-	case storage.KeyTypeSortedSet:
+	case EntryTypeSortedSet:
 		typestr = "zset"
 	default:
 		typestr = "none"

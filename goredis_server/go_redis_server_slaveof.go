@@ -3,14 +3,13 @@ package goredis_server
 import (
 	. "../goredis"
 	"./rdb"
-	"bufio"
+
 	"fmt"
-	//"github.com/garyburd/redigo/redis"
 	"net"
 )
 
 // SYNC SLAVE_UID 7cc0745b-66de-46d7-b155-321998c7c20e
-func (server *GoRedisServer) OnSYNC(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnSYNC(cmd *Command, session *Session) (reply *Reply) {
 	fmt.Println("[OnSYNC]", cmd.String())
 
 	// 填充配置
@@ -28,7 +27,8 @@ func (server *GoRedisServer) OnSYNC(cmd *Command) (reply *Reply) {
 		slave = NewSlaveServer(uid)
 		server.slaveMgr.Add(slave)
 	}
-	slave.BindConnection(cmd.Session().Connection())
+	slave.SetSession(session)
+	slave.Active()
 
 	// update info
 	server.ReplicationInfo.IsMaster = true
@@ -56,39 +56,39 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 	server.ReplicationInfo.MasterHost = host
 	server.ReplicationInfo.MasterPort = port
 
-	go server.slaveOf(conn)
+	session := NewSession(conn)
+	go server.slaveOf(session)
 	return
 }
 
-func (server *GoRedisServer) slaveOf(conn net.Conn) {
-	reader := bufio.NewReader(conn)
+func (server *GoRedisServer) slaveOf(session *Session) {
+	cmdsync := NewCommand([]byte("SYNC"), []byte("SLAVE_UID"), []byte(server.UID()))
+	session.WriteCommand(cmdsync)
 
-	syncCmd := &Command{}
-	syncCmd.Args = [][]byte{[]byte("SYNC"), []byte("SLAVE_UID"), []byte(server.UID())}
-	conn.Write(syncCmd.Bytes())
-
-	/*
-		// skip $size
-		_, _ = reader.ReadBytes('\n')
-		// rdb data
-		e2 := rdb.Decode(reader, &decoder{})
-		if e2 != nil {
-			fmt.Println("Decode error", e2.Error())
-			return
-		}
-
-	*/
-	// find next command start
-	reader.ReadBytes('*')
-	// step back
-	reader.UnreadByte()
 	for {
-		cmd, e3 := ReadCommand(reader)
-		if e3 != nil {
-			fmt.Println("ReadCommand error", e3.Error())
-			return
+		var c byte
+		var err error
+		if c, err = session.PeekByte(); err != nil {
+			panic(err)
 		}
-		fmt.Println("RECV:", cmd.String())
+		//fmt.Println("char:", string(c))
+		if c == '*' {
+			if cmd, e2 := session.ReadCommand(); e2 != nil {
+				panic(e2)
+			} else {
+				fmt.Println(cmd.Name())
+			}
+		} else if c == '$' {
+			fmt.Println("skip rdb...")
+			if e3 := session.ReadRDB(); e3 != nil {
+				panic(e3)
+			} else {
+				fmt.Println("skip finish")
+			}
+		} else {
+			panic(fmt.Sprintf("Bad first byte: %s", c))
+			break
+		}
 	}
 }
 

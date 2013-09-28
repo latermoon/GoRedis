@@ -19,18 +19,13 @@ import (
 // cmd.StringAtIndex(2) == "Latermoon"
 // ==============================
 type Command struct {
-	Args    [][]byte
-	session *Session // 需要重构
+	Args [][]byte
 }
 
 func NewCommand(args ...[]byte) (cmd *Command) {
 	cmd = &Command{}
 	cmd.Args = args
 	return
-}
-
-func (cmd *Command) Session() *Session {
-	return cmd.session
 }
 
 // 指令名称

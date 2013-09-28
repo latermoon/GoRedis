@@ -16,7 +16,7 @@ func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnAUTH(cmd *Command) (reply *Reply) {
 	password := cmd.StringAtIndex(1)
-	if password == "GoRedis" {
+	if password == "1234" {
 		reply = StatusReply("OK")
 	} else {
 		reply = ErrorReply("403")

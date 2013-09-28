@@ -67,7 +67,7 @@ func (sl *SafeList) Len() (length int) {
 	return
 }
 
-// 枚举实现，超大列表下性能不佳，并且lock住其它操作
+// 通过枚举实现，列表数据较大时性能不佳，并且lock住其它操作
 func (sl *SafeList) Index(index int) (value interface{}) {
 	sl.mutex.Lock()
 	i := 0
@@ -82,7 +82,7 @@ func (sl *SafeList) Index(index int) (value interface{}) {
 	return
 }
 
-// 枚举实现，超大列表下性能不佳，并且lock住其它操作
+// 通过枚举实现，列表数据较大时性能不佳，并且lock住其它操作
 func (sl *SafeList) Range(start int, end int) (values []interface{}) {
 	sl.mutex.Lock()
 	defer sl.mutex.Unlock()
@@ -98,15 +98,14 @@ func (sl *SafeList) Range(start int, end int) (values []interface{}) {
 	} else {
 		resultsize = length - start
 	}
-	values = make([]interface{}, resultsize)
+	values = make([]interface{}, 0, resultsize)
 	// 填充数据
 	i := 0
 	for e := sl.innerList.Front(); e != nil; e = e.Next() {
-		values[i] = e.Value
-		i++
-		if i >= resultsize {
-			break
+		if i >= start && i <= end {
+			values = append(values, e.Value)
 		}
+		i++
 	}
 	return
 }
