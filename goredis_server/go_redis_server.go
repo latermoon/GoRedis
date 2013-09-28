@@ -8,6 +8,10 @@ import (
 	//"strings"
 )
 
+var (
+	WrongKindReply = ErrorReply("Wrong kind opration")
+)
+
 // GoRedisServer
 type GoRedisServer struct {
 	CommandHandler

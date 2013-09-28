@@ -10,8 +10,8 @@ func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	entry, _ := server.datasource.Get(key)
 	if entry != nil {
-		if entry.Type == EntryTypeString {
-			reply = BulkReply(entry.Value)
+		if entry.Type() == EntryTypeString {
+			reply = BulkReply(entry.Value())
 		} else {
 			reply = ErrorReply("Wrong kind opration")
 		}
@@ -24,7 +24,7 @@ func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	val := cmd.StringAtIndex(2)
-	entry := NewEntry(val, EntryTypeString)
+	entry := NewStringEntry(val)
 	err := server.datasource.Set(key, entry)
 	reply = ReplySwitch(err, StatusReply("OK"))
 	return
@@ -35,8 +35,8 @@ func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
 	vals := make([]interface{}, len(keys))
 	for i, key := range keys {
 		entry, _ := server.datasource.Get(key)
-		if entry != nil && entry.Type == EntryTypeString {
-			vals[i] = entry.Value
+		if entry != nil && entry.Type() == EntryTypeString {
+			vals[i] = entry.Value()
 		} else {
 			vals[i] = nil
 		}
@@ -47,10 +47,16 @@ func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
 	keyvals := cmd.StringArgs()[1:]
-	if len(keyvals)%2 != 0 {
+	count := len(keyvals)
+	if count%2 != 0 {
 		return ErrorReply("Bad Argument Count")
 	}
-	err := server.Storage.MSet(keyvals...)
-	reply = ReplySwitch(err, StatusReply("OK"))
+	for i := 0; i < count; i += 2 {
+		key := keyvals[i]
+		val := keyvals[i+1]
+		entry := NewStringEntry(val)
+		server.datasource.Set(key, entry)
+	}
+	reply = StatusReply("OK")
 	return
 }

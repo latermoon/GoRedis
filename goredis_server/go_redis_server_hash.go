@@ -2,13 +2,26 @@ package goredis_server
 
 import (
 	. "../goredis"
+	. "./storage"
 )
 
 func (server *GoRedisServer) OnHGET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	field := cmd.StringAtIndex(2)
-	value, err := server.Storage.HGet(key, field)
-	reply = ReplySwitch(err, BulkReply(value))
+	entry, _ := server.datasource.Get(key)
+	if entry != nil {
+		if entry.Type() == EntryTypeHash {
+			hashentry := entry.(*HashEntry)
+			hashentry.Mutex.Lock()
+			val := hashentry.Get(field)
+			hashentry.Mutex.Unlock()
+			reply = BulkReply(val)
+		} else {
+			reply = WrongKindReply
+		}
+	} else {
+		reply = BulkReply(nil)
+	}
 	return
 }
 
@@ -16,23 +29,70 @@ func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	field := cmd.StringAtIndex(2)
 	value := cmd.StringAtIndex(3)
-	result, err := server.Storage.HSet(key, field, value)
-	reply = ReplySwitch(err, IntegerReply(result))
+	entry, _ := server.datasource.Get(key)
+	var hashentry *HashEntry
+	if entry != nil {
+		hashentry = entry.(*HashEntry)
+	} else {
+		hashentry = NewHashEntry()
+		server.datasource.Set(key, hashentry)
+	}
+
+	hashentry.Mutex.Lock()
+	hashentry.Set(field, value)
+	hashentry.Mutex.Unlock()
+
+	reply = IntegerReply(1)
 	return
 }
 
 func (server *GoRedisServer) OnHGETALL(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	keyvals, err := server.Storage.HGetAll(key)
-	reply = ReplySwitch(err, MultiBulksReply(keyvals))
+	entry, _ := server.datasource.Get(key)
+	if entry != nil {
+		if entry.Type() == EntryTypeHash {
+			hashentry := entry.(*HashEntry)
+			// response
+			keyvals := make([]interface{}, 0, len(hashentry.Map())*2)
+			hashentry.Mutex.Lock()
+			for key, val := range hashentry.Map() {
+				keyvals = append(keyvals, key)
+				keyvals = append(keyvals, val)
+			}
+			hashentry.Mutex.Unlock()
+			reply = MultiBulksReply(keyvals)
+		} else {
+			reply = WrongKindReply
+		}
+	} else {
+		reply = MultiBulksReply([]interface{}{})
+	}
 	return
 }
 
 func (server *GoRedisServer) OnHMGET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	fields := cmd.StringArgs()[2:]
-	values, err := server.Storage.HMGet(key, fields...)
-	reply = ReplySwitch(err, MultiBulksReply(values))
+	entry, _ := server.datasource.Get(key)
+	if entry != nil {
+		if entry.Type() == EntryTypeHash {
+			keyvals := make([]interface{}, 0, len(fields))
+			for _, field := range fields {
+				val := entry.(*HashEntry).Get(field)
+				keyvals = append(keyvals, field)
+				keyvals = append(keyvals, val)
+			}
+			reply = MultiBulksReply(keyvals)
+		} else {
+			reply = WrongKindReply
+		}
+	} else {
+		keyvals := make([]interface{}, 0, len(fields))
+		for _, _ = range fields {
+			keyvals = append(keyvals, nil)
+		}
+		reply = MultiBulksReply(keyvals)
+	}
 	return
 }
 
@@ -43,22 +103,67 @@ func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
 		reply = ErrorReply("Bad field/value paires")
 		return
 	}
-	err := server.Storage.HMSet(key, keyvals...)
-	reply = ReplySwitch(err, StatusReply("OK"))
+	entry, _ := server.datasource.Get(key)
+	var hashentry *HashEntry
+	if entry != nil {
+		hashentry = entry.(*HashEntry)
+	} else {
+		hashentry = NewHashEntry()
+		server.datasource.Set(key, hashentry)
+	}
+	for i := 0; i < len(keyvals); i += 2 {
+		field := keyvals[i]
+		val := keyvals[i+1]
+		hashentry.Set(field, val)
+	}
+
+	reply = StatusReply("OK")
 	return
 }
 
 func (server *GoRedisServer) OnHLEN(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	length, err := server.Storage.HLen(key)
-	reply = ReplySwitch(err, IntegerReply(length))
+	entry, _ := server.datasource.Get(key)
+	length := 0
+	if entry != nil {
+		if entry.Type() == EntryTypeHash {
+			hashentry := entry.(*HashEntry)
+			hashentry.Mutex.Lock()
+			length = len(hashentry.Map())
+			hashentry.Mutex.Unlock()
+		}
+	}
+	reply = IntegerReply(length)
 	return
 }
 
 func (server *GoRedisServer) OnHDEL(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	fields := cmd.StringArgs()[2:]
-	n, err := server.Storage.HDel(key, fields...)
-	reply = ReplySwitch(err, IntegerReply(n))
+	entry, _ := server.datasource.Get(key)
+	if entry != nil {
+		if entry.Type() == EntryTypeHash {
+			hashentry := entry.(*HashEntry)
+			hashentry.Mutex.Lock()
+			n := 0
+			for _, field := range fields {
+				_, exist := hashentry.Map()[field]
+				if exist {
+					delete(hashentry.Map(), field)
+					n++
+				}
+			}
+			hashentry.Mutex.Unlock()
+			if len(hashentry.Map()) == 0 {
+				server.datasource.Remove(key)
+			}
+			reply = IntegerReply(n)
+		} else {
+			reply = WrongKindReply
+		}
+	} else {
+		reply = IntegerReply(0)
+	}
+
 	return
 }
