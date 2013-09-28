@@ -98,15 +98,14 @@ func (sl *SafeList) Range(start int, end int) (values []interface{}) {
 	} else {
 		resultsize = length - start
 	}
-	values = make([]interface{}, resultsize)
+	values = make([]interface{}, 0, resultsize)
 	// 填充数据
 	i := 0
 	for e := sl.innerList.Front(); e != nil; e = e.Next() {
-		values[i] = e.Value
-		i++
-		if i >= resultsize {
-			break
+		if i >= start && i <= end {
+			values = append(values, e.Value)
 		}
+		i++
 	}
 	return
 }

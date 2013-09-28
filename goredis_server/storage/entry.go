@@ -76,3 +76,21 @@ func NewHashEntry() (e *HashEntry) {
 	e.value = make(map[string]interface{})
 	return
 }
+
+// ====================ListEntry====================
+type ListEntry struct {
+	BaseEntry
+}
+
+func (l *ListEntry) List() (sl *SafeList) {
+	return l.value.(*SafeList)
+}
+
+func NewListEntry() (e *ListEntry) {
+	e = &ListEntry{}
+	e.entryType = EntryTypeList
+	e.value = NewSafeList()
+	return
+}
+
+// ====================SetEntry====================
