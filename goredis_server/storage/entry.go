@@ -6,6 +6,7 @@ import (
 
 type EntryType int
 
+// 数据类型
 const (
 	EntryTypeUnknown   = 0
 	EntryTypeString    = 1
@@ -16,12 +17,14 @@ const (
 )
 
 // ====================Entry====================
+// Redis协议基本数据结构
 type Entry interface {
 	Value() interface{}
 	Type() EntryType
 	Size() int
 }
 
+// 基本类型，简化子类代码
 type BaseEntry struct {
 	value     interface{}
 	entryType EntryType

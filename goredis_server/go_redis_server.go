@@ -5,7 +5,7 @@ import (
 	"./storage"
 	//"./uuid"
 	"fmt"
-	//"strings"
+	"strings"
 )
 
 var (
@@ -16,9 +16,7 @@ var (
 type GoRedisServer struct {
 	CommandHandler
 	RedisServer
-
-	// 存储支持
-	Storage    storage.StorageProvider
+	// 数据源
 	datasource storage.DataSource
 	// 从库
 	slaveMgr *SlaveServerManager
@@ -32,8 +30,7 @@ func NewGoRedisServer() (server *GoRedisServer) {
 	server = &GoRedisServer{}
 	// set as itself
 	server.SetHandler(server)
-	// default storages
-	server.Storage = storage.NewMemoryStorage()
+	// default datasource
 	server.datasource = storage.NewMemoryDataSource()
 	// slave
 	server.slaveMgr = NewSlaveServerManager(server)
@@ -42,12 +39,13 @@ func NewGoRedisServer() (server *GoRedisServer) {
 }
 
 func (server *GoRedisServer) Listen(host string) {
-	// port := strings.Split(host, ":")[1]
-	// leveldbStorage, _ := storage.NewLevelDBStorage("/tmp/goredis_" + port + ".ldb")
-	// server.Storage = leveldbStorage
-
+	port := strings.Split(host, ":")[1]
+	var e1 error
+	server.datasource, e1 = storage.NewLevelDBDataSource("/tmp/goredis_" + port + ".ldb")
+	if e1 != nil {
+		panic(e1)
+	}
 	server.initUID()
-
 	server.RedisServer.Listen(host)
 }
 

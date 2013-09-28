@@ -4,6 +4,7 @@ import (
 	"sync"
 )
 
+// 内存数据源
 type MemoryDataSource struct {
 	DataSource
 	table map[string]Entry
