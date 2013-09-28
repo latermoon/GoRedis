@@ -1,7 +1,7 @@
 package storage
 
 type DataSource interface {
-	GetObject(key string) (val interface{})
-	SetObject(key string, val interface{}) (err error)
-	DelObject(key string) (err error)
+	Get(key string) (entry *Entry, exist bool)
+	Set(key string, entry *Entry) (err error)
+	Remove(key string) (err error)
 }

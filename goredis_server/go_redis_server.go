@@ -14,7 +14,8 @@ type GoRedisServer struct {
 	RedisServer
 
 	// 存储支持
-	Storage storage.StorageProvider
+	Storage    storage.StorageProvider
+	datasource storage.DataSource
 	// 从库
 	slaveMgr *SlaveServerManager
 	// 当前实例名字
@@ -29,6 +30,7 @@ func NewGoRedisServer() (server *GoRedisServer) {
 	server.SetHandler(server)
 	// default storages
 	server.Storage = storage.NewMemoryStorage()
+	server.datasource = storage.NewMemoryDataSource()
 	// slave
 	server.slaveMgr = NewSlaveServerManager(server)
 	server.ReplicationInfo = ReplicationInfo{}
