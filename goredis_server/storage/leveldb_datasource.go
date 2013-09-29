@@ -59,3 +59,7 @@ func (l *LevelDBDataSource) Remove(key string) (err error) {
 	err = l.db.Delete([]byte(key), l.wo)
 	return
 }
+
+func (l *LevelDBDataSource) NotifyEntryUpdate(key string, entry Entry) {
+
+}

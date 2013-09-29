@@ -37,3 +37,7 @@ func (m *MemoryDataSource) Remove(key string) (err error) {
 	delete(m.table, key)
 	return
 }
+
+func (m *MemoryDataSource) NotifyEntryUpdate(key string, entry Entry) {
+
+}
