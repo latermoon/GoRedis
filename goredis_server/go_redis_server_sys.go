@@ -15,16 +15,6 @@ func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnAUTH(cmd *Command) (reply *Reply) {
-	password := cmd.StringAtIndex(1)
-	if password == "1234" {
-		reply = StatusReply("OK")
-	} else {
-		reply = ErrorReply("403")
-	}
-	return
-}
-
 func (server *GoRedisServer) OnCOUNTER(cmd *Command) (reply *Reply) {
 	bulks := make([]interface{}, 0, len(server.counters))
 
