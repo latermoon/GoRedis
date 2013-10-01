@@ -22,7 +22,7 @@ func NewLevelDBDataSource(path string) (l *LevelDBDataSource, err error) {
 	return
 }
 
-func (l *LevelDBDataSource) Get(key string) (entry Entry, exist bool) {
+func (l *LevelDBDataSource) Get(key string) (entry Entry) {
 	// l.mutex.Lock()
 	// defer l.mutex.Unlock()
 	bs, e1 := l.db.Get([]byte(key), l.ro)
@@ -31,12 +31,11 @@ func (l *LevelDBDataSource) Get(key string) (entry Entry, exist bool) {
 	}
 	var entryType EntryType
 	entryType = EntryType(bs[0])
-	fmt.Println("Get Type", bs, string(bs), entryType)
+	//fmt.Println("Get Type", bs, string(bs), entryType)
 	switch entryType {
 	case EntryTypeString:
 		entry = NewStringEntry(nil)
 	case EntryTypeHash:
-		fmt.Println("NewHashEntry", bs, string(bs), entryType)
 		entry = NewHashEntry()
 	default:
 		entry = NewStringEntry(nil)

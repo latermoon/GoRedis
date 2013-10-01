@@ -8,7 +8,7 @@ import (
 func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
 	// [TODO] 严谨的情况下应该校验参数数量，这里大部分都不校验是为了简化代码，panic后会断开client connection
 	key := cmd.StringAtIndex(1)
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	if entry == nil {
 		reply = BulkReply(nil)
 	} else if entry.Type() == EntryTypeString {
@@ -33,7 +33,7 @@ func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
 	keys := cmd.StringArgs()[1:]
 	vals := make([]interface{}, len(keys))
 	for i, key := range keys {
-		entry, _ := server.datasource.Get(key)
+		entry := server.datasource.Get(key)
 		if entry != nil && entry.Type() == EntryTypeString {
 			vals[i] = entry.(*StringEntry).Value()
 		} else {

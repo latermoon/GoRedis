@@ -23,10 +23,11 @@ const (
 
 // 命令处理接口
 type CommandHandler interface {
-	On(name string, cmd *Command) (reply *Reply)
-	// 如果存在"On+大写NAME"格式的函数，会被优先调用，而不调用On(name, cmd)函数
-	// OnXXXX(cmd *Command) (reply *Reply)
+	// 首先搜索"On+大写NAME"格式的函数，存在则调用，不存在则调用On
 	// OnGET(cmd *Command) (reply *Reply)
+	// OnGET(cmd *Command, session *Session) (reply *Reply)
+	OnUndefined(cmd *Command, session *Session) (reply *Reply)
+	On(cmd *Command, session *Session)
 }
 
 // 一个空的默认命令处理对象
@@ -34,7 +35,10 @@ type emptyCommandHandler struct {
 	CommandHandler
 }
 
-func (s *emptyCommandHandler) On(name string, cmd *Command) (reply *Reply) {
+func (s *emptyCommandHandler) On(cmd *Command, session *Session) {
+}
+
+func (s *emptyCommandHandler) OnUndefined(cmd *Command, session *Session) (reply *Reply) {
 	return ErrorReply("Not Supported: " + cmd.String())
 }
 
@@ -114,6 +118,8 @@ func (server *RedisServer) handleConnection(session *Session) {
 			server.methodCache[cmdName] = method
 		}
 
+		// 通用调用
+		server.handler.On(cmd, session)
 		if method.IsValid() {
 			// 可以调用两种接口
 			// method = OnXXX(cmd *Command) (reply *Reply)
@@ -128,7 +134,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 			reply := callResult[0].Interface().(*Reply)
 			session.Reply(reply)
 		} else {
-			reply := server.handler.On(cmdName, cmd)
+			reply := server.handler.OnUndefined(cmd, session)
 			session.Reply(reply)
 		}
 	}

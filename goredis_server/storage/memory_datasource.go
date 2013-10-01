@@ -17,10 +17,10 @@ func NewMemoryDataSource() (m *MemoryDataSource) {
 	return
 }
 
-func (m *MemoryDataSource) Get(key string) (entry Entry, exist bool) {
+func (m *MemoryDataSource) Get(key string) (entry Entry) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	entry, exist = m.table[key]
+	entry = m.table[key]
 	return
 }
 
@@ -39,5 +39,5 @@ func (m *MemoryDataSource) Remove(key string) (err error) {
 }
 
 func (m *MemoryDataSource) NotifyEntryUpdate(key string, entry Entry) {
-
+	// do nothing
 }
