@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"errors"
+	"github.com/ugorji/go/codec"
 	"sync"
 )
 
@@ -16,83 +18,122 @@ const (
 	EntryTypeSortedSet = 5
 )
 
+var (
+	mh = codec.MsgpackHandle{}
+)
+
 // ====================Entry====================
 // Redis协议基本数据结构
 type Entry interface {
-	Value() interface{}
 	Type() EntryType
-	Size() int
+	Encode() (bs []byte, err error)
+	Decode(bs []byte) (err error)
 }
 
 // 基本类型，简化子类代码
 type BaseEntry struct {
-	value     interface{}
-	entryType EntryType
+	InnerType EntryType
 }
 
-func (b *BaseEntry) Value() interface{} {
-	return b.value
+func (b *BaseEntry) Encode() (bs []byte, err error) {
+	return
+}
+
+func (b *BaseEntry) Decode(bs []byte) (err error) {
+	return
 }
 
 func (b *BaseEntry) Type() EntryType {
-	return b.entryType
-}
-
-func (b *BaseEntry) Size() int {
-	return 0
+	return b.InnerType
 }
 
 // ====================StringEntry====================
 type StringEntry struct {
 	BaseEntry
+	value interface{}
 }
 
 func NewStringEntry(value interface{}) (e *StringEntry) {
 	e = &StringEntry{}
-	e.entryType = EntryTypeString
+	e.InnerType = EntryTypeString
 	e.value = value
 	return
+}
+
+func (s *StringEntry) Encode() (bs []byte, err error) {
+	switch s.value.(type) {
+	case []byte:
+		bs = s.value.([]byte)
+	case string:
+		bs = []byte(s.value.(string))
+	default:
+		err = errors.New("bad string value")
+	}
+	return
+}
+
+func (s *StringEntry) Decode(bs []byte) (err error) {
+	s.value = bs
+	return
+}
+
+func (s *StringEntry) Value() (value interface{}) {
+	return s.value
 }
 
 // ====================HashEntry====================
 type HashEntry struct {
 	BaseEntry
+	table map[string]interface{}
 	Mutex sync.Mutex
-}
-
-func (h *HashEntry) Get(field string) (val interface{}) {
-	val, _ = h.value.(map[string]interface{})[field]
-	return
-}
-
-func (h *HashEntry) Set(field string, val interface{}) {
-	h.value.(map[string]interface{})[field] = val
-}
-
-func (h *HashEntry) Map() map[string]interface{} {
-	return h.value.(map[string]interface{})
 }
 
 func NewHashEntry() (e *HashEntry) {
 	e = &HashEntry{}
-	e.entryType = EntryTypeHash
-	e.value = make(map[string]interface{})
+	e.InnerType = EntryTypeHash
+	e.table = make(map[string]interface{})
 	return
+}
+
+func (h *HashEntry) Encode() (bs []byte, err error) {
+	enc := codec.NewEncoderBytes(&bs, &mh)
+	err = enc.Encode(h.table)
+	return
+}
+
+func (h *HashEntry) Decode(bs []byte) (err error) {
+	dec := codec.NewDecoderBytes(bs, &mh)
+	err = dec.Decode(&h.table)
+	return
+}
+
+func (h *HashEntry) Get(field string) (val interface{}) {
+	val, _ = h.table[field]
+	return
+}
+
+func (h *HashEntry) Set(field string, val interface{}) {
+	h.table[field] = val
+}
+
+func (h *HashEntry) Map() map[string]interface{} {
+	return h.table
 }
 
 // ====================ListEntry====================
 type ListEntry struct {
 	BaseEntry
+	sl *SafeList
 }
 
 func (l *ListEntry) List() (sl *SafeList) {
-	return l.value.(*SafeList)
+	return l.sl
 }
 
 func NewListEntry() (e *ListEntry) {
 	e = &ListEntry{}
-	e.entryType = EntryTypeList
-	e.value = NewSafeList()
+	e.InnerType = EntryTypeList
+	e.sl = NewSafeList()
 	return
 }
 

@@ -12,7 +12,7 @@ func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
 	if entry == nil {
 		reply = BulkReply(nil)
 	} else if entry.Type() == EntryTypeString {
-		reply = BulkReply(entry.Value())
+		reply = BulkReply(entry.(*StringEntry).Value())
 	} else {
 		reply = WrongKindReply
 	}
@@ -35,7 +35,7 @@ func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
 	for i, key := range keys {
 		entry, _ := server.datasource.Get(key)
 		if entry != nil && entry.Type() == EntryTypeString {
-			vals[i] = entry.Value()
+			vals[i] = entry.(*StringEntry).Value()
 		} else {
 			vals[i] = nil
 		}

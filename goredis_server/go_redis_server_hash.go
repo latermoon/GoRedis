@@ -40,6 +40,8 @@ func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
 	hashentry.Set(field, value)
 	hashentry.Mutex.Unlock()
 
+	// update
+	server.datasource.NotifyEntryUpdate(key, hashentry)
 	reply = IntegerReply(1)
 	return
 }
@@ -106,7 +108,8 @@ func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
 		val := keyvals[i+1]
 		hashentry.Set(field, val)
 	}
-
+	// update
+	server.datasource.NotifyEntryUpdate(key, hashentry)
 	reply = StatusReply("OK")
 	return
 }
@@ -148,10 +151,14 @@ func (server *GoRedisServer) OnHDEL(cmd *Command) (reply *Reply) {
 		hashentry.Mutex.Unlock()
 		if len(hashentry.Map()) == 0 {
 			server.datasource.Remove(key)
+		} else {
+			// update
+			server.datasource.NotifyEntryUpdate(key, hashentry)
 		}
 		reply = IntegerReply(n)
 	} else {
 		reply = WrongKindReply
 	}
+
 	return
 }
