@@ -467,10 +467,11 @@ func (s *SkipList) Set(key, value interface{}) {
 //
 // It returns the old value and whether the node was present.
 func (s *SkipList) Delete(key interface{}) (value interface{}, ok bool) {
+	return s.DeleteKeyValue(key, nil)
 }
 
 // 删除指定key和value的条目
-func (s *SkipList) Delete(key interface{}, thevalue interface{}) (value interface{}, ok bool) {
+func (s *SkipList) DeleteKeyValue(key interface{}, thevalue interface{}) (value interface{}, ok bool) {
 	if key == nil {
 		panic("goskiplist: nil keys are not supported")
 	}
