@@ -77,8 +77,22 @@ func (s *StringEntry) Decode(bs []byte) (err error) {
 	return
 }
 
+func (s *StringEntry) SetValue(value interface{}) {
+	s.value = value
+}
+
 func (s *StringEntry) Value() (value interface{}) {
 	return s.value
+}
+
+func (s *StringEntry) String() (str string) {
+	switch s.value.(type) {
+	case []byte:
+		str = string(s.value.([]byte))
+	case string:
+		str = s.value.(string)
+	}
+	return
 }
 
 // ====================HashEntry====================

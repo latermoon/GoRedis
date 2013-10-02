@@ -29,6 +29,9 @@ type GoRedisServer struct {
 	uid string
 	// 从库状态
 	ReplicationInfo ReplicationInfo
+
+	// locks
+	stringMutex sync.Mutex
 }
 
 func NewGoRedisServer() (server *GoRedisServer) {
