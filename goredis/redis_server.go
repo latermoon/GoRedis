@@ -23,10 +23,11 @@ const (
 
 // 命令处理接口
 type CommandHandler interface {
-	On(name string, cmd *Command) (reply *Reply)
-	// 如果存在"On+大写NAME"格式的函数，会被优先调用，而不调用On(name, cmd)函数
-	// OnXXXX(cmd *Command) (reply *Reply)
+	// 首先搜索"On+大写NAME"格式的函数，存在则调用，不存在则调用On
 	// OnGET(cmd *Command) (reply *Reply)
+	// OnGET(cmd *Command, session *Session) (reply *Reply)
+	OnUndefined(cmd *Command, session *Session) (reply *Reply)
+	On(cmd *Command, session *Session)
 }
 
 // 一个空的默认命令处理对象
@@ -34,7 +35,10 @@ type emptyCommandHandler struct {
 	CommandHandler
 }
 
-func (s *emptyCommandHandler) On(name string, cmd *Command) (reply *Reply) {
+func (s *emptyCommandHandler) On(cmd *Command, session *Session) {
+}
+
+func (s *emptyCommandHandler) OnUndefined(cmd *Command, session *Session) (reply *Reply) {
 	return ErrorReply("Not Supported: " + cmd.String())
 }
 
@@ -90,13 +94,13 @@ func (server *RedisServer) Listen(host string) {
 
 // 处理一个客户端连接
 func (server *RedisServer) handleConnection(session *Session) {
-	// 异常处理
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Println(fmt.Sprintf("%s %s", session.conn.RemoteAddr(), err))
-			session.Close()
-		}
-	}()
+	// // 异常处理
+	// defer func() {
+	// 	if err := recover(); err != nil {
+	// 		fmt.Println(fmt.Sprintf("%s %s", session.conn.RemoteAddr(), err))
+	// 		session.Close()
+	// 	}
+	// }()
 	for {
 		cmd, e1 := session.ReadCommand()
 		// 常见的error是:
@@ -114,6 +118,9 @@ func (server *RedisServer) handleConnection(session *Session) {
 			server.methodCache[cmdName] = method
 		}
 
+		// 通用调用
+		server.handler.On(cmd, session)
+		var reply *Reply
 		if method.IsValid() {
 			// 可以调用两种接口
 			// method = OnXXX(cmd *Command) (reply *Reply)
@@ -125,10 +132,13 @@ func (server *RedisServer) handleConnection(session *Session) {
 				in = []reflect.Value{reflect.ValueOf(cmd), reflect.ValueOf(session)}
 			}
 			callResult := method.Call(in)
-			reply := callResult[0].Interface().(*Reply)
-			session.Reply(reply)
+			reply = callResult[0].Interface().(*Reply)
 		} else {
-			reply := server.handler.On(cmdName, cmd)
+			reply = server.handler.OnUndefined(cmd, session)
+		}
+		if reply == nil {
+			session.Reply(ErrorReply("Empty Reply"))
+		} else {
 			session.Reply(reply)
 		}
 	}

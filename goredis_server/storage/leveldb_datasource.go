@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
@@ -21,12 +22,27 @@ func NewLevelDBDataSource(path string) (l *LevelDBDataSource, err error) {
 	return
 }
 
-func (l *LevelDBDataSource) Get(key string) (entry Entry, exist bool) {
+func (l *LevelDBDataSource) Get(key string) (entry Entry) {
 	// l.mutex.Lock()
 	// defer l.mutex.Unlock()
 	bs, e1 := l.db.Get([]byte(key), l.ro)
-	if e1 == nil {
-		entry = NewStringEntry(bs)
+	if e1 != nil || len(bs) == 0 {
+		return
+	}
+	var entryType EntryType
+	entryType = EntryType(bs[0])
+	//fmt.Println("Get Type", bs, string(bs), entryType)
+	switch entryType {
+	case EntryTypeString:
+		entry = NewStringEntry(nil)
+	case EntryTypeHash:
+		entry = NewHashEntry()
+	default:
+		entry = NewStringEntry(nil)
+	}
+	err := entry.Decode(bs[1:])
+	if err != nil {
+		fmt.Println(err)
 	}
 	return
 }
@@ -43,13 +59,13 @@ func (l *LevelDBDataSource) Set(key string, entry Entry) (err error) {
 	// l.mutex.Lock()
 	// defer l.mutex.Unlock()
 	var bs []byte
-	switch entry.Value().(type) {
-	case string:
-		bs = []byte(entry.Value().(string))
-	default:
-		bs = entry.Value().([]byte)
+	bs, err = entry.Encode()
+	if err == nil {
+		buf := make([]byte, len(bs)+1)
+		copy(buf, []byte{byte(entry.Type())})
+		copy(buf[1:], bs)
+		err = l.db.Put([]byte(key), buf, l.wo)
 	}
-	err = l.db.Put([]byte(key), bs, l.wo)
 	return
 }
 
@@ -58,4 +74,10 @@ func (l *LevelDBDataSource) Remove(key string) (err error) {
 	// defer l.mutex.Unlock()
 	err = l.db.Delete([]byte(key), l.wo)
 	return
+}
+
+func (l *LevelDBDataSource) NotifyEntryUpdate(key string, entry Entry) {
+	go func() {
+		l.Set(key, entry)
+	}()
 }

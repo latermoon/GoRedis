@@ -8,7 +8,7 @@ import (
 
 func (server *GoRedisServer) OnLLEN(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	if entry == nil {
 		reply = IntegerReply(0)
 	} else if entry.Type() == EntryTypeList {
@@ -23,7 +23,7 @@ func (server *GoRedisServer) OnLLEN(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	index, _ := strconv.Atoi(cmd.StringAtIndex(2))
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	if entry == nil {
 		reply = BulkReply(nil)
 	} else if entry.Type() == EntryTypeList {
@@ -48,7 +48,7 @@ func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	start, _ := strconv.Atoi(cmd.StringAtIndex(2))
 	end, _ := strconv.Atoi(cmd.StringAtIndex(3))
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	if entry == nil {
 		reply = MultiBulksReply([]interface{}{})
 	} else if entry.Type() == EntryTypeList {
@@ -63,7 +63,7 @@ func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	values := cmd.StringArgs()[2:]
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	if entry == nil {
 		entry = NewListEntry()
 		server.datasource.Set(key, entry)
@@ -78,7 +78,7 @@ func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	if entry == nil {
 		reply = BulkReply(nil)
 		return
@@ -98,7 +98,7 @@ func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	values := cmd.StringArgs()[2:]
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	if entry == nil {
 		entry = NewListEntry()
 		server.datasource.Set(key, entry)
@@ -113,7 +113,7 @@ func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	if entry == nil {
 		reply = BulkReply(nil)
 		return

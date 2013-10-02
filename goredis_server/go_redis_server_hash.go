@@ -8,8 +8,8 @@ import (
 func (server *GoRedisServer) OnHGET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	field := cmd.StringAtIndex(2)
-	entry, _ := server.datasource.Get(key)
-	if entry != nil {
+	entry := server.datasource.Get(key)
+	if entry == nil {
 		reply = BulkReply(nil)
 	} else if entry.Type() == EntryTypeHash {
 		hashentry := entry.(*HashEntry)
@@ -27,7 +27,7 @@ func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	field := cmd.StringAtIndex(2)
 	value := cmd.StringAtIndex(3)
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	var hashentry *HashEntry
 	if entry != nil {
 		hashentry = entry.(*HashEntry)
@@ -40,14 +40,16 @@ func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
 	hashentry.Set(field, value)
 	hashentry.Mutex.Unlock()
 
+	// update
+	server.datasource.NotifyEntryUpdate(key, hashentry)
 	reply = IntegerReply(1)
 	return
 }
 
 func (server *GoRedisServer) OnHGETALL(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, _ := server.datasource.Get(key)
-	if entry != nil {
+	entry := server.datasource.Get(key)
+	if entry == nil {
 		reply = MultiBulksReply([]interface{}{})
 	} else if entry.Type() == EntryTypeHash {
 		hashentry := entry.(*HashEntry)
@@ -69,7 +71,7 @@ func (server *GoRedisServer) OnHGETALL(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnHMGET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	fields := cmd.StringArgs()[2:]
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	if entry == nil {
 		reply = MultiBulksReply(make([]interface{}, len(fields)))
 	} else if entry.Type() == EntryTypeHash {
@@ -93,7 +95,7 @@ func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
 		reply = ErrorReply("Bad field/value paires")
 		return
 	}
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	var hashentry *HashEntry
 	if entry != nil {
 		hashentry = entry.(*HashEntry)
@@ -106,14 +108,15 @@ func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
 		val := keyvals[i+1]
 		hashentry.Set(field, val)
 	}
-
+	// update
+	server.datasource.NotifyEntryUpdate(key, hashentry)
 	reply = StatusReply("OK")
 	return
 }
 
 func (server *GoRedisServer) OnHLEN(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, _ := server.datasource.Get(key)
+	entry := server.datasource.Get(key)
 	if entry == nil {
 		reply = IntegerReply(0)
 	} else if entry.Type() == EntryTypeHash {
@@ -131,8 +134,8 @@ func (server *GoRedisServer) OnHLEN(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnHDEL(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	fields := cmd.StringArgs()[2:]
-	entry, _ := server.datasource.Get(key)
-	if entry != nil {
+	entry := server.datasource.Get(key)
+	if entry == nil {
 		reply = IntegerReply(0)
 	} else if entry.Type() == EntryTypeHash {
 		hashentry := entry.(*HashEntry)
@@ -148,10 +151,14 @@ func (server *GoRedisServer) OnHDEL(cmd *Command) (reply *Reply) {
 		hashentry.Mutex.Unlock()
 		if len(hashentry.Map()) == 0 {
 			server.datasource.Remove(key)
+		} else {
+			// update
+			server.datasource.NotifyEntryUpdate(key, hashentry)
 		}
 		reply = IntegerReply(n)
 	} else {
 		reply = WrongKindReply
 	}
+
 	return
 }

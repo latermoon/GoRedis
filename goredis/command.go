@@ -8,6 +8,7 @@ package goredis
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 )
 
@@ -37,6 +38,15 @@ func (cmd *Command) Name() string {
 // 参数按字符串返回
 func (cmd *Command) StringAtIndex(i int) string {
 	return string(cmd.Args[i])
+}
+
+func (cmd *Command) IntAtIndex(i int) (n int, err error) {
+	if i >= len(cmd.Args) {
+		err = errors.New("Argument out of range")
+		return
+	}
+	n, err = strconv.Atoi(string(cmd.Args[i]))
+	return
 }
 
 // 返回全部参数的字符串形式
