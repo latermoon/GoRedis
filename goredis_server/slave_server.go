@@ -44,7 +44,7 @@ func NewSlaveServer(uid string) (server *SlaveServer) {
 	server.linkStatus = LinkStatusInit
 	server.UID = uid
 	server.useLevelDb = len(uid) > 0
-	server.commandchan = make(chan interface{}, 10000) // 缓冲区
+	server.commandchan = make(chan interface{}, 1000) // 缓冲区
 	server.chan1 = make(chan int)
 	server.writeMutex = &sync.Mutex{}
 	// leveldb

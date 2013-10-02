@@ -94,13 +94,13 @@ func (server *RedisServer) Listen(host string) {
 
 // 处理一个客户端连接
 func (server *RedisServer) handleConnection(session *Session) {
-	// 异常处理
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Println(fmt.Sprintf("%s %s", session.conn.RemoteAddr(), err))
-			session.Close()
-		}
-	}()
+	// // 异常处理
+	// defer func() {
+	// 	if err := recover(); err != nil {
+	// 		fmt.Println(fmt.Sprintf("%s %s", session.conn.RemoteAddr(), err))
+	// 		session.Close()
+	// 	}
+	// }()
 	for {
 		cmd, e1 := session.ReadCommand()
 		// 常见的error是:
@@ -120,6 +120,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 
 		// 通用调用
 		server.handler.On(cmd, session)
+		var reply *Reply
 		if method.IsValid() {
 			// 可以调用两种接口
 			// method = OnXXX(cmd *Command) (reply *Reply)
@@ -131,10 +132,13 @@ func (server *RedisServer) handleConnection(session *Session) {
 				in = []reflect.Value{reflect.ValueOf(cmd), reflect.ValueOf(session)}
 			}
 			callResult := method.Call(in)
-			reply := callResult[0].Interface().(*Reply)
-			session.Reply(reply)
+			reply = callResult[0].Interface().(*Reply)
 		} else {
-			reply := server.handler.OnUndefined(cmd, session)
+			reply = server.handler.OnUndefined(cmd, session)
+		}
+		if reply == nil {
+			session.Reply(ErrorReply("Empty Reply"))
+		} else {
 			session.Reply(reply)
 		}
 	}
