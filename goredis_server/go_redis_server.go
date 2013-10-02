@@ -4,12 +4,14 @@ import (
 	. "../goredis"
 	"./monitor"
 	"./storage"
+	"errors"
 	"strings"
 	"sync"
 )
 
 var (
-	WrongKindReply = ErrorReply("Wrong kind opration")
+	WrongKindError = errors.New("Wrong kind opration")
+	WrongKindReply = ErrorReply(WrongKindError)
 )
 
 // GoRedisServer

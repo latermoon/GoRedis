@@ -65,16 +65,25 @@ func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
 /**
  * 计数器基于字符串，对字符串进行修改
  * TODO 性能需要改进
- * @param count 正负数均可
+ * @param chg 增减量，正负数均可
  */
-func (server *GoRedisServer) incrValue(entry *StringEntry, count int) (newvalue int, err error) {
+func (server *GoRedisServer) incrStringEntry(key string, chg int) (newvalue int, err error) {
+	entry := server.datasource.Get(key)
+	if entry == nil {
+		entry = NewStringEntry("0")
+	} else if entry.Type() != EntryTypeString {
+		err = WrongKindError
+		return
+	}
+	// incr
 	var oldvalue int
-	oldvalue, err = strconv.Atoi(entry.String())
+	oldvalue, err = strconv.Atoi(entry.(*StringEntry).String())
 	if err != nil {
 		return
 	}
-	newvalue = oldvalue + count
-	entry.SetValue(strconv.Itoa(newvalue))
+	newvalue = oldvalue + chg
+	entry.(*StringEntry).SetValue(strconv.Itoa(newvalue))
+	server.datasource.Set(key, entry)
 	return
 }
 
@@ -83,22 +92,23 @@ func (server *GoRedisServer) OnINCR(cmd *Command) (reply *Reply) {
 	defer server.stringMutex.Unlock()
 
 	key := cmd.StringAtIndex(1)
-	entry := server.datasource.Get(key)
-	if entry == nil {
-		entry = NewStringEntry("0")
-	} else if entry.Type() != EntryTypeString {
-		reply = WrongKindReply
-		return
-	}
-	// incr
-	newvalue, err := server.incrValue(entry.(*StringEntry), 1)
-	if err != nil {
-		reply = ErrorReply(err)
-		return
-	}
-	server.datasource.Set(key, entry)
+	newvalue, err := server.incrStringEntry(key, 1)
+	reply = ReplySwitch(err, IntegerReply(newvalue))
+	return
+}
 
-	reply = IntegerReply(newvalue)
+func (server *GoRedisServer) OnINCRBY(cmd *Command) (reply *Reply) {
+	server.stringMutex.Lock()
+	defer server.stringMutex.Unlock()
+
+	key := cmd.StringAtIndex(1)
+	chg, e1 := strconv.Atoi(cmd.StringAtIndex(2))
+	if e1 != nil {
+		reply = ErrorReply(e1)
+		return
+	}
+	newvalue, err := server.incrStringEntry(key, chg)
+	reply = ReplySwitch(err, IntegerReply(newvalue))
 	return
 }
 
@@ -107,21 +117,22 @@ func (server *GoRedisServer) OnDECR(cmd *Command) (reply *Reply) {
 	defer server.stringMutex.Unlock()
 
 	key := cmd.StringAtIndex(1)
-	entry := server.datasource.Get(key)
-	if entry == nil {
-		entry = NewStringEntry("0")
-	} else if entry.Type() != EntryTypeString {
-		reply = WrongKindReply
-		return
-	}
-	// decr
-	newvalue, err := server.incrValue(entry.(*StringEntry), -1)
-	if err != nil {
-		reply = ErrorReply(err)
-		return
-	}
-	server.datasource.Set(key, entry)
+	newvalue, err := server.incrStringEntry(key, -1)
+	reply = ReplySwitch(err, IntegerReply(newvalue))
+	return
+}
 
-	reply = IntegerReply(newvalue)
+func (server *GoRedisServer) OnDECRBY(cmd *Command) (reply *Reply) {
+	server.stringMutex.Lock()
+	defer server.stringMutex.Unlock()
+
+	key := cmd.StringAtIndex(1)
+	chg, e1 := strconv.Atoi(cmd.StringAtIndex(2))
+	if e1 != nil {
+		reply = ErrorReply(e1)
+		return
+	}
+	newvalue, err := server.incrStringEntry(key, chg*-1)
+	reply = ReplySwitch(err, IntegerReply(newvalue))
 	return
 }
