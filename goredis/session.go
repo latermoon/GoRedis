@@ -335,7 +335,7 @@ func (s *Session) readBytesToCRLF() (bs []byte, err error) {
 	if c, err = s.rw.ReadByte(); err != nil {
 		return
 	} else if c != LF {
-		err = errors.New("Illegal LF ...")
+		err = errors.New(fmt.Sprintf("Illegal LF / %d", c))
 	}
 
 	return
@@ -352,6 +352,10 @@ func (s *Session) readLineString() (str string, err error) {
 	return
 }
 
+func (s *Session) ReadLineString() (str string, err error) {
+	return s.readLineString()
+}
+
 // 读取整形，遇到CRLF换行为止
 func (s *Session) readLineInteger() (i int, err error) {
 	var line string
@@ -361,6 +365,10 @@ func (s *Session) readLineInteger() (i int, err error) {
 	}
 	i, err = strconv.Atoi(line)
 	return
+}
+
+func (s *Session) ReadLineInteger() (i int, err error) {
+	return s.readLineInteger()
 }
 
 // Close conn
@@ -382,6 +390,14 @@ func (s *Session) Write(p []byte) (n int, err error) {
 		s.rw.Flush()
 	}
 	return
+}
+
+func (s *Session) ReadByte() (c byte, err error) {
+	return s.rw.ReadByte()
+}
+
+func (s *Session) ReadBytes(delim byte) (line []byte, err error) {
+	return s.rw.ReadBytes(delim)
 }
 
 // 获取字节而不移动游标

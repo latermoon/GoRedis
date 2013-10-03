@@ -1,23 +1,38 @@
 package goredis_server
 
+// TODO 严谨的情况下应该校验参数数量，这里大部分都不校验是为了简化代码，panic后会断开client connection
+
 import (
 	. "../goredis"
 	. "./storage"
 	"strconv"
 )
 
-func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
-	// [TODO] 严谨的情况下应该校验参数数量，这里大部分都不校验是为了简化代码，panic后会断开client connection
-	key := cmd.StringAtIndex(1)
+// 获取String，不存在则自动创建
+func (server *GoRedisServer) stringByKey(key string, create bool) (e *StringEntry, err error) {
 	entry := server.datasource.Get(key)
-	if entry == nil {
-		reply = BulkReply(nil)
-	} else if entry.Type() == EntryTypeString {
-		reply = BulkReply(entry.(*StringEntry).Value())
-	} else {
-		reply = WrongKindReply
+	if entry != nil && entry.Type() != EntryTypeString {
+		err = WrongKindError
+		return
 	}
+	if entry != nil {
+		e = entry.(*StringEntry)
+	} else if create {
+		e = NewStringEntry(nil)
+		server.datasource.Set(key, e)
+	}
+	return
+}
 
+func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	entry, err := server.stringByKey(key, false)
+	if err != nil {
+		return ErrorReply(err)
+	} else if entry == nil {
+		return BulkReply(nil)
+	}
+	reply = BulkReply(entry.Value())
 	return
 }
 
@@ -34,11 +49,12 @@ func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
 	keys := cmd.StringArgs()[1:]
 	vals := make([]interface{}, len(keys))
 	for i, key := range keys {
-		entry := server.datasource.Get(key)
-		if entry != nil && entry.Type() == EntryTypeString {
-			vals[i] = entry.(*StringEntry).Value()
-		} else {
+		entry, err := server.stringByKey(key, false)
+		if err != nil || entry == nil {
 			vals[i] = nil
+			continue
+		} else {
+			vals[i] = entry.Value()
 		}
 	}
 	reply = MultiBulksReply(vals)
@@ -46,7 +62,6 @@ func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
-	// TODO 是否需要加lock
 	keyvals := cmd.StringArgs()[1:]
 	count := len(keyvals)
 	if count%2 != 0 {
@@ -55,6 +70,7 @@ func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
 	for i := 0; i < count; i += 2 {
 		key := keyvals[i]
 		val := keyvals[i+1]
+		// 不做类型检查，其他数据会被string覆盖
 		entry := NewStringEntry(val)
 		server.datasource.Set(key, entry)
 	}
