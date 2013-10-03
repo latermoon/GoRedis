@@ -3,6 +3,7 @@ package storage
 import (
 	"../libs/sortedset"
 	"errors"
+	"fmt"
 	"github.com/ugorji/go/codec"
 	"sync"
 )
@@ -169,4 +170,22 @@ func NewSortedSetEntry() (s *SortedSetEntry) {
 
 func (s *SortedSetEntry) SortedSet() (zset *sortedset.SortedSet) {
 	return s.zset
+}
+
+func (s *SortedSetEntry) Encode() (bs []byte, err error) {
+	enc := codec.NewEncoderBytes(&bs, &mh)
+	err = enc.Encode(s.zset.Table())
+	fmt.Println("encode", s.zset.Table(), bs)
+	return
+}
+
+func (s *SortedSetEntry) Decode(bs []byte) (err error) {
+	dec := codec.NewDecoderBytes(bs, &mh)
+	table := make(map[string]float64)
+	err = dec.Decode(&table)
+	fmt.Println("zset", table)
+	for member, score := range table {
+		s.zset.Add(member, score)
+	}
+	return
 }

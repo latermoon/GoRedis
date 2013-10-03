@@ -14,9 +14,8 @@ SotredSet的实现
 100 [A]
 103.1 [D]
 
-优化空间：
 当应用场景里score基本不重复，性能问题不大，但如果score重复太多，会导致value数组过大，不利于修改
-因此可以根据value数组的大小选择合适的数据结构，比如又是一个skiplist或者map
+因此可以根据value数组的大小选择合适的数据结构
 */
 type SortedSet struct {
 	skiplist *skiplist.SkipList
@@ -53,6 +52,10 @@ func (s *SortedSet) Iterator() (iter Iterator) {
 
 func (s *SortedSet) Len() int {
 	return len(s.table)
+}
+
+func (s *SortedSet) Table() map[string]float64 {
+	return s.table
 }
 
 func (s *SortedSet) Score(member string) (score float64, exist bool) {

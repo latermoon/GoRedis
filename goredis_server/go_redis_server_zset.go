@@ -46,6 +46,7 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 		member := scoreMembers[i+1]
 		entry.SortedSet().Add(member, score)
 	}
+	server.datasource.Set(key, entry)
 	// The number of elements added to the sorted sets
 	reply = IntegerReply(count / 2)
 	return
@@ -222,6 +223,8 @@ func (server *GoRedisServer) OnZREMRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	return
 }
 
+// ZREVRANGE key start stop [WITHSCORES]
+// Return a range of members in a sorted set, by index, with scores ordered from high to low
 func (server *GoRedisServer) OnZREVRANGE(cmd *Command) (reply *Reply) {
 	return
 }
@@ -241,5 +244,16 @@ func (server *GoRedisServer) OnZSCORE(cmd *Command) (reply *Reply) {
 	} else {
 		reply = BulkReply(nil)
 	}
+	return
+}
+
+func (server *GoRedisServer) OnZSAVE(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	entry, err := server.sortedSetByKey(key)
+	if err != nil {
+		return ErrorReply(err)
+	}
+	err = server.datasource.Set(key, entry)
+	reply = ReplySwitch(err, StatusReply("OK"))
 	return
 }
