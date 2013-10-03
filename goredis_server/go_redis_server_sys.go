@@ -11,7 +11,7 @@ func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
-	reply = BulkReply("GoRedis by latemroon")
+	reply = BulkReply("GoRedis by latemroon\n")
 	return
 }
 
