@@ -1,8 +1,9 @@
 package storage
 
 import (
-	"../skiplist"
+	"../libs/sortedset"
 	"errors"
+	"fmt"
 	"github.com/ugorji/go/codec"
 	"sync"
 )
@@ -141,10 +142,6 @@ type ListEntry struct {
 	sl *SafeList
 }
 
-func (l *ListEntry) List() (sl *SafeList) {
-	return l.sl
-}
-
 func NewListEntry() (e *ListEntry) {
 	e = &ListEntry{}
 	e.InnerType = EntryTypeList
@@ -152,21 +149,133 @@ func NewListEntry() (e *ListEntry) {
 	return
 }
 
+func (l *ListEntry) List() (sl *SafeList) {
+	return l.sl
+}
+
+func (l *ListEntry) Encode() (bs []byte, err error) {
+	enc := codec.NewEncoderBytes(&bs, &mh)
+	arr := make([]string, 0, l.List().Len())
+	for e := l.List().Front(); e != nil; e = e.Next() {
+		arr = append(arr, e.Value.(string))
+	}
+	err = enc.Encode(arr)
+	fmt.Println("list encode:", bs)
+	return
+}
+
+func (l *ListEntry) Decode(bs []byte) (err error) {
+	dec := codec.NewDecoderBytes(bs, &mh)
+	arr := make([]string, 0)
+	err = dec.Decode(&arr)
+	fmt.Println("decode lst", arr)
+	l.List().RPush(arr...)
+	return
+}
+
 // ====================SetEntry====================
+type SetEntry struct {
+	BaseEntry
+	table map[string]interface{}
+	mutex sync.Mutex
+}
+
+func NewSetEntry() (s *SetEntry) {
+	s = &SetEntry{}
+	s.InnerType = EntryTypeSet
+	s.table = make(map[string]interface{})
+	return
+}
+
+// ok=true, 添加新key
+// ok=false, key已存在
+func (s *SetEntry) Put(key string) (ok bool) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	_, exist := s.table[key]
+	if !exist {
+		s.table[key] = nil
+		ok = true
+	}
+	return
+}
+
+func (s *SetEntry) Contains(key string) (exist bool) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	_, exist = s.table[key]
+	return
+}
+
+func (s *SetEntry) Remove(key string) (ok bool) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	_, exist := s.table[key]
+	if exist {
+		delete(s.table, key)
+		ok = true
+	}
+	return
+}
+
+func (s *SetEntry) Keys() (keys []interface{}) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	keys = make([]interface{}, 0, len(s.table))
+	for key, _ := range s.table {
+		keys = append(keys, key)
+	}
+	return
+}
+
+func (s *SetEntry) Count() int {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return len(s.table)
+}
+
+func (s *SetEntry) Encode() (bs []byte, err error) {
+	enc := codec.NewEncoderBytes(&bs, &mh)
+	err = enc.Encode(s.table)
+	return
+}
+
+func (s *SetEntry) Decode(bs []byte) (err error) {
+	dec := codec.NewDecoderBytes(bs, &mh)
+	err = dec.Decode(&s.table)
+	return
+}
 
 // ====================SortedSetEntry====================
 type SortedSetEntry struct {
 	BaseEntry
-	skiplist *skiplist.SkipList
+	zset *sortedset.SortedSet
 }
 
 func NewSortedSetEntry() (s *SortedSetEntry) {
 	s = &SortedSetEntry{}
 	s.InnerType = EntryTypeSortedSet
-	s.skiplist = skiplist.NewIntMap()
+	s.zset = sortedset.NewSortedSet()
 	return
 }
 
-func (s *SortedSetEntry) SkipList() (skiplist *skiplist.SkipList) {
-	return s.skiplist
+func (s *SortedSetEntry) SortedSet() (zset *sortedset.SortedSet) {
+	return s.zset
+}
+
+func (s *SortedSetEntry) Encode() (bs []byte, err error) {
+	enc := codec.NewEncoderBytes(&bs, &mh)
+	err = enc.Encode(s.zset.Table())
+	return
+}
+
+func (s *SortedSetEntry) Decode(bs []byte) (err error) {
+	dec := codec.NewDecoderBytes(bs, &mh)
+	table := make(map[string]float64)
+	err = dec.Decode(&table)
+	// 重新构建SortedSet，成本较高，应该减少反序列化
+	for member, score := range table {
+		s.zset.Add(member, score)
+	}
+	return
 }

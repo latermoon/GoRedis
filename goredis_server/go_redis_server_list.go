@@ -3,93 +3,104 @@ package goredis_server
 import (
 	. "../goredis"
 	. "./storage"
-	"strconv"
 )
+
+// 获取List，不存在则自动创建
+func (server *GoRedisServer) listByKey(key string, create bool) (lst *ListEntry, err error) {
+	entry := server.datasource.Get(key)
+	if entry != nil && entry.Type() != EntryTypeList {
+		err = WrongKindError
+		return
+	}
+	if entry != nil {
+		lst = entry.(*ListEntry)
+	} else if create {
+		lst = NewListEntry()
+		server.datasource.Set(key, lst)
+	}
+	return
+}
 
 func (server *GoRedisServer) OnLLEN(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry := server.datasource.Get(key)
-	if entry == nil {
-		reply = IntegerReply(0)
-	} else if entry.Type() == EntryTypeList {
-		length := entry.(*ListEntry).List().Len()
-		reply = IntegerReply(length)
-	} else {
-		reply = WrongKindReply
+	entry, err := server.listByKey(key, false)
+	if err != nil {
+		return ErrorReply(err)
+	} else if entry == nil {
+		return IntegerReply(0)
 	}
+	n := entry.List().Len()
+	reply = IntegerReply(n)
 	return
 }
 
 func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	index, _ := strconv.Atoi(cmd.StringAtIndex(2))
-	entry := server.datasource.Get(key)
-	if entry == nil {
-		reply = BulkReply(nil)
-	} else if entry.Type() == EntryTypeList {
-		val := entry.(*ListEntry).List().Index(index)
-		reply = BulkReply(val)
-	} else {
-		reply = WrongKindReply
+	entry, err := server.listByKey(key, false)
+	if err != nil {
+		return ErrorReply(err)
+	} else if entry == nil {
+		return BulkReply(nil)
 	}
+
+	index, e1 := cmd.IntAtIndex(2)
+	if e1 != nil {
+		return ErrorReply(e1)
+	}
+	val := entry.List().Index(index)
+	reply = BulkReply(val)
 	return
 }
 
-/*
-if entry == nil {
-
-	} else if entry.Type() == EntryTypeList {
-		entry.(*ListEntry).List()
-	} else {
-		reply = WrongKindReply
-	}
-*/
 func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	start, _ := strconv.Atoi(cmd.StringAtIndex(2))
-	end, _ := strconv.Atoi(cmd.StringAtIndex(3))
-	entry := server.datasource.Get(key)
-	if entry == nil {
-		reply = MultiBulksReply([]interface{}{})
-	} else if entry.Type() == EntryTypeList {
-		vals := entry.(*ListEntry).List().Range(start, end)
-		reply = MultiBulksReply(vals)
-	} else {
-		reply = WrongKindReply
+	entry, err := server.listByKey(key, false)
+	if err != nil {
+		return ErrorReply(err)
+	} else if entry == nil {
+		return MultiBulksReply([]interface{}{})
 	}
+
+	start, e1 := cmd.IntAtIndex(2)
+	end, e2 := cmd.IntAtIndex(3)
+	if e1 != nil || e2 != nil {
+		return ErrorReply("Bad start/end")
+	}
+	vals := entry.List().Range(start, end)
+	reply = MultiBulksReply(vals)
 	return
 }
 
 func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	values := cmd.StringArgs()[2:]
-	entry := server.datasource.Get(key)
-	if entry == nil {
-		entry = NewListEntry()
-		server.datasource.Set(key, entry)
-	} else if entry.Type() != EntryTypeList {
-		reply = WrongKindReply
-		return
+	entry, err := server.listByKey(key, true)
+	if err != nil {
+		return ErrorReply(err)
 	}
-	n := entry.(*ListEntry).List().RPush(values...)
+
+	values := cmd.StringArgs()[2:]
+	n := entry.List().RPush(values...)
+	if n > 0 {
+		server.datasource.NotifyEntryUpdate(key, entry)
+	}
 	reply = IntegerReply(n)
 	return
 }
 
 func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry := server.datasource.Get(key)
-	if entry == nil {
-		reply = BulkReply(nil)
-		return
-	} else if entry.Type() != EntryTypeList {
-		reply = WrongKindReply
-		return
+	entry, err := server.listByKey(key, false)
+	if err != nil {
+		return ErrorReply(err)
+	} else if entry == nil {
+		return BulkReply(nil)
 	}
-	sl := entry.(*ListEntry).List()
-	val := sl.LPop()
-	if sl.Len() == 0 {
+
+	val := entry.List().LPop()
+	if entry.List().Len() == 0 {
 		server.datasource.Remove(key)
+	} else {
+		server.datasource.NotifyEntryUpdate(key, entry)
 	}
 	reply = BulkReply(val)
 	return
@@ -97,34 +108,34 @@ func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	values := cmd.StringArgs()[2:]
-	entry := server.datasource.Get(key)
-	if entry == nil {
-		entry = NewListEntry()
-		server.datasource.Set(key, entry)
-	} else if entry.Type() != EntryTypeList {
-		reply = WrongKindReply
-		return
+	entry, err := server.listByKey(key, true)
+	if err != nil {
+		return ErrorReply(err)
 	}
-	n := entry.(*ListEntry).List().LPush(values...)
+
+	values := cmd.StringArgs()[2:]
+	n := entry.List().LPush(values...)
+	if n > 0 {
+		server.datasource.NotifyEntryUpdate(key, entry)
+	}
 	reply = IntegerReply(n)
 	return
 }
 
 func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry := server.datasource.Get(key)
-	if entry == nil {
-		reply = BulkReply(nil)
-		return
-	} else if entry.Type() != EntryTypeList {
-		reply = WrongKindReply
-		return
+	entry, err := server.listByKey(key, false)
+	if err != nil {
+		return ErrorReply(err)
+	} else if entry == nil {
+		return BulkReply(nil)
 	}
-	sl := entry.(*ListEntry).List()
-	val := sl.RPop()
-	if sl.Len() == 0 {
+
+	val := entry.List().RPop()
+	if entry.List().Len() == 0 {
 		server.datasource.Remove(key)
+	} else {
+		server.datasource.NotifyEntryUpdate(key, entry)
 	}
 	reply = BulkReply(val)
 	return
