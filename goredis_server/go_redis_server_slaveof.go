@@ -3,6 +3,7 @@ package goredis_server
 import (
 	. "../goredis"
 	"./rdb"
+	. "./storage"
 
 	"fmt"
 	"net"
@@ -68,11 +69,11 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 	session.WriteCommand(cmdsync)
 
 	// for {
-	// 	line, e1 := session.ReadByte()
+	// 	line, e1 := session.ReadBytes(LF)
 	// 	if e1 != nil {
 	// 		panic(e1)
 	// 	}
-	// 	fmt.Println(line, string(line))
+	// 	fmt.Println(string(line))
 	// }
 	// return
 
@@ -122,6 +123,12 @@ type rdbDecoder struct {
 	i  int
 	rdb.NopDecoder
 	server *GoRedisServer
+	// 数据缓冲区
+	stringEntry *StringEntry
+	hashEntry   *HashEntry
+	setEntry    *SetEntry
+	listEntry   *ListEntry
+	zsetEntry   *SortedSetEntry
 }
 
 func newDecoder(server *GoRedisServer) (dec *rdbDecoder) {
@@ -134,36 +141,76 @@ func (p *rdbDecoder) StartDatabase(n int) {
 	p.db = n
 }
 
+func (p *rdbDecoder) EndDatabase(n int) {
+
+}
+
 func (p *rdbDecoder) EndRDB() {
 	fmt.Println("End RDB")
 }
 
 func (p *rdbDecoder) Set(key, value []byte, expiry int64) {
-	fmt.Printf("db=%d %q -> %q\n", p.db, key, value)
+	p.stringEntry = NewStringEntry(string(value))
+	p.server.datasource.Set(string(key), p.stringEntry)
+	fmt.Printf("db=%d [string] %q -> %q\n", p.db, key, value)
+}
+
+func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
+	p.hashEntry = NewHashEntry()
 }
 
 func (p *rdbDecoder) Hset(key, field, value []byte) {
-	fmt.Printf("db=%d %q . %q -> %q\n", p.db, key, field, value)
+	p.hashEntry.Set(string(field), string(value))
+	//fmt.Printf("db=%d %q . %q -> %q\n", p.db, key, field, value)
+}
+
+func (p *rdbDecoder) EndHash(key []byte) {
+	p.server.datasource.Set(string(key), p.hashEntry)
+	fmt.Printf("db=%d [hash] %q\n", p.db, key)
+}
+
+func (p *rdbDecoder) StartSet(key []byte, cardinality, expiry int64) {
+	p.setEntry = NewSetEntry()
 }
 
 func (p *rdbDecoder) Sadd(key, member []byte) {
-	fmt.Printf("db=%d %q { %q }\n", p.db, key, member)
+	p.setEntry.Put(string(member))
+	//fmt.Printf("db=%d %q { %q }\n", p.db, key, member)
+}
+
+func (p *rdbDecoder) EndSet(key []byte) {
+	p.server.datasource.Set(string(key), p.setEntry)
+	fmt.Printf("db=%d [set] %q\n", p.db, key)
 }
 
 func (p *rdbDecoder) StartList(key []byte, length, expiry int64) {
+	p.listEntry = NewListEntry()
 	p.i = 0
 }
 
 func (p *rdbDecoder) Rpush(key, value []byte) {
-	fmt.Printf("db=%d %q[%d] ->\n", p.db, key, p.i)
+	p.listEntry.List().RPush(string(value))
+	//fmt.Printf("db=%d %q[%d] ->\n", p.db, key, p.i)
 	p.i++
 }
 
+func (p *rdbDecoder) EndList(key []byte) {
+	p.server.datasource.Set(string(key), p.listEntry)
+	fmt.Printf("db=%d [list] %q\n", p.db, key)
+}
+
 func (p *rdbDecoder) StartZSet(key []byte, cardinality, expiry int64) {
+	p.zsetEntry = NewSortedSetEntry()
 	p.i = 0
 }
 
 func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
-	fmt.Printf("db=%d %q[%d] -> {%q, score=%g}\n", p.db, key, p.i, member, score)
+	p.zsetEntry.SortedSet().Add(string(member), score)
+	//fmt.Printf("db=%d %q[%d] -> {%q, score=%g}\n", p.db, key, p.i, member, score)
 	p.i++
+}
+
+func (p *rdbDecoder) EndZSet(key []byte) {
+	p.server.datasource.Set(string(key), p.zsetEntry)
+	fmt.Printf("db=%d [zset] %q\n", p.db, key)
 }

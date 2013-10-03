@@ -3,7 +3,6 @@ package storage
 import (
 	"../libs/sortedset"
 	"errors"
-	"fmt"
 	"github.com/ugorji/go/codec"
 	"sync"
 )
@@ -160,7 +159,6 @@ func (l *ListEntry) Encode() (bs []byte, err error) {
 		arr = append(arr, e.Value.(string))
 	}
 	err = enc.Encode(arr)
-	fmt.Println("list encode:", bs)
 	return
 }
 
@@ -168,7 +166,6 @@ func (l *ListEntry) Decode(bs []byte) (err error) {
 	dec := codec.NewDecoderBytes(bs, &mh)
 	arr := make([]string, 0)
 	err = dec.Decode(&arr)
-	fmt.Println("decode lst", arr)
 	l.List().RPush(arr...)
 	return
 }
