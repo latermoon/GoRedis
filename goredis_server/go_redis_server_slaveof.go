@@ -61,9 +61,20 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 	return
 }
 
+// -ERR wrong number of arguments for 'sync' command
 func (server *GoRedisServer) slaveOf(session *Session) {
-	cmdsync := NewCommand([]byte("SYNC"), []byte("SLAVE_UID"), []byte(server.UID()))
+	//cmdsync := NewCommand([]byte("SYNC"), []byte("SLAVE_UID"), []byte(server.UID()))
+	cmdsync := NewCommand([]byte("SYNC"))
 	session.WriteCommand(cmdsync)
+
+	// for {
+	// 	line, e1 := session.ReadByte()
+	// 	if e1 != nil {
+	// 		panic(e1)
+	// 	}
+	// 	fmt.Println(line, string(line))
+	// }
+	// return
 
 	for {
 		var c byte
@@ -73,65 +84,86 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 		}
 		//fmt.Println("char:", string(c))
 		if c == '*' {
+			fmt.Println("read cmd...")
 			if cmd, e2 := session.ReadCommand(); e2 != nil {
 				panic(e2)
 			} else {
 				fmt.Println(cmd.Name())
 			}
 		} else if c == '$' {
-			fmt.Println("skip rdb...")
-			if e3 := session.ReadRDB(); e3 != nil {
+			fmt.Println("read rdb...")
+			session.ReadByte()
+			rdbsize, e3 := session.ReadLineInteger()
+			if e3 != nil {
 				panic(e3)
-			} else {
-				fmt.Println("skip finish")
 			}
+			fmt.Println("rdbsize", rdbsize)
+			// read
+			dec := newDecoder(server)
+			e2 := rdb.Decode(session, dec)
+			if e2 != nil {
+				panic(e2)
+			}
+
+			// if e3 := session.ReadRDB(); e3 != nil {
+			// 	panic(e3)
+			// } else {
+			// 	fmt.Println("skip finish")
+			// }
 		} else {
-			panic(fmt.Sprintf("Bad first byte: %s", c))
-			break
+			fmt.Println("skip byte %d %s", c, string(c))
+			session.ReadByte()
 		}
 	}
 }
 
-type decoder struct {
+type rdbDecoder struct {
 	db int
 	i  int
 	rdb.NopDecoder
+	server *GoRedisServer
 }
 
-func (p *decoder) StartDatabase(n int) {
+func newDecoder(server *GoRedisServer) (dec *rdbDecoder) {
+	dec = &rdbDecoder{}
+	dec.server = server
+	return
+}
+
+func (p *rdbDecoder) StartDatabase(n int) {
 	p.db = n
 }
 
-func (p *decoder) EndRDB() {
+func (p *rdbDecoder) EndRDB() {
 	fmt.Println("End RDB")
 }
 
-func (p *decoder) Set(key, value []byte, expiry int64) {
+func (p *rdbDecoder) Set(key, value []byte, expiry int64) {
 	fmt.Printf("db=%d %q -> %q\n", p.db, key, value)
 }
 
-func (p *decoder) Hset(key, field, value []byte) {
+func (p *rdbDecoder) Hset(key, field, value []byte) {
 	fmt.Printf("db=%d %q . %q -> %q\n", p.db, key, field, value)
 }
 
-func (p *decoder) Sadd(key, member []byte) {
+func (p *rdbDecoder) Sadd(key, member []byte) {
 	fmt.Printf("db=%d %q { %q }\n", p.db, key, member)
 }
 
-func (p *decoder) StartList(key []byte, length, expiry int64) {
+func (p *rdbDecoder) StartList(key []byte, length, expiry int64) {
 	p.i = 0
 }
 
-func (p *decoder) Rpush(key, value []byte) {
+func (p *rdbDecoder) Rpush(key, value []byte) {
 	fmt.Printf("db=%d %q[%d] ->\n", p.db, key, p.i)
 	p.i++
 }
 
-func (p *decoder) StartZSet(key []byte, cardinality, expiry int64) {
+func (p *rdbDecoder) StartZSet(key []byte, cardinality, expiry int64) {
 	p.i = 0
 }
 
-func (p *decoder) Zadd(key []byte, score float64, member []byte) {
+func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
 	fmt.Printf("db=%d %q[%d] -> {%q, score=%g}\n", p.db, key, p.i, member, score)
 	p.i++
 }
