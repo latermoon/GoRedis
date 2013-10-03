@@ -2,7 +2,9 @@ package storage
 
 import (
 	"../libs/sortedset"
+	"container/list"
 	"errors"
+	"fmt"
 	"github.com/ugorji/go/codec"
 	"sync"
 )
@@ -141,14 +143,29 @@ type ListEntry struct {
 	sl *SafeList
 }
 
-func (l *ListEntry) List() (sl *SafeList) {
-	return l.sl
-}
-
 func NewListEntry() (e *ListEntry) {
 	e = &ListEntry{}
 	e.InnerType = EntryTypeList
 	e.sl = NewSafeList()
+	return
+}
+
+func (l *ListEntry) List() (sl *SafeList) {
+	return l.sl
+}
+
+func (l *ListEntry) Encode() (bs []byte, err error) {
+	enc := codec.NewEncoderBytes(&bs, &mh)
+	err = enc.Encode(l.sl.InnerList())
+	return
+}
+
+func (l *ListEntry) Decode(bs []byte) (err error) {
+	dec := codec.NewDecoderBytes(bs, &mh)
+	lst := list.New()
+	err = dec.Decode(lst)
+	fmt.Println("decode lst", lst)
+	l.sl.InnerList().PushBackList(lst)
 	return
 }
 

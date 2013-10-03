@@ -41,6 +41,8 @@ func (l *LevelDBDataSource) Get(key string) (entry Entry) {
 		entry = NewSortedSetEntry()
 	case EntryTypeSet:
 		entry = NewSetEntry()
+	case EntryTypeList:
+		entry = NewListEntry()
 	default:
 		entry = NewStringEntry(nil)
 	}

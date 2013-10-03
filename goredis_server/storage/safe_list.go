@@ -18,6 +18,10 @@ func NewSafeList() (sl *SafeList) {
 	return
 }
 
+func (sl *SafeList) InnerList() (l *list.List) {
+	return sl.innerList
+}
+
 func (sl *SafeList) LPop() (value interface{}) {
 	sl.mutex.Lock()
 	elem := sl.innerList.Front()

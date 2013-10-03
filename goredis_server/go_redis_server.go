@@ -56,7 +56,7 @@ func (server *GoRedisServer) Listen(host string) {
 	if e1 != nil {
 		panic(e1)
 	}
-	//server.datasource = storage.NewMemoryDataSource()
+	server.datasource = storage.NewMemoryDataSource()
 	server.statusLogger = monitor.NewStatusLogger("/tmp/monitor_" + port + ".log")
 	server.statusLogger.Add(monitor.NewTimeFormater("Time", 8))
 	cmds := []string{"TOTAL", "GET", "SET"}
