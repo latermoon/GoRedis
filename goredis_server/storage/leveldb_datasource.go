@@ -29,10 +29,9 @@ func (l *LevelDBDataSource) Get(key string) (entry Entry) {
 	if e1 != nil || len(bs) == 0 {
 		return
 	}
-	var entryType EntryType
-	entryType = EntryType(bs[0])
+
 	//fmt.Println("Get Type", bs, string(bs), entryType)
-	switch entryType {
+	switch EntryType(bs[0]) {
 	case EntryTypeString:
 		entry = NewStringEntry(nil)
 	case EntryTypeHash:
@@ -46,6 +45,7 @@ func (l *LevelDBDataSource) Get(key string) (entry Entry) {
 	default:
 		entry = NewStringEntry(nil)
 	}
+	// 反序列化
 	err := entry.Decode(bs[1:])
 	if err != nil {
 		fmt.Println(err)

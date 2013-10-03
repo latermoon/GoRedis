@@ -11,17 +11,18 @@ import (
 )
 
 // 获取SortedSet，不存在则自动创建
-func (server *GoRedisServer) sortedSetByKey(key string) (sse *SortedSetEntry, err error) {
+func (server *GoRedisServer) sortedSetByKey(key string, create bool) (sse *SortedSetEntry, err error) {
 	entry := server.datasource.Get(key)
 	if entry != nil && entry.Type() != EntryTypeSortedSet {
 		err = WrongKindError
 		return
 	}
-	if entry == nil {
-		entry = NewSortedSetEntry()
-		server.datasource.Set(key, entry)
+	if entry != nil {
+		sse = entry.(*SortedSetEntry)
+	} else if create {
+		sse = NewSortedSetEntry()
+		server.datasource.Set(key, sse)
 	}
-	sse = entry.(*SortedSetEntry)
 	return
 }
 
@@ -34,7 +35,7 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 	if count%2 != 0 {
 		return ErrorReply("Bad argument count")
 	}
-	entry, err := server.sortedSetByKey(key)
+	entry, err := server.sortedSetByKey(key, true)
 	if err != nil {
 		return ErrorReply(err)
 	}
@@ -54,16 +55,14 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnZCARD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, err := server.sortedSetByKey(key)
+	entry, err := server.sortedSetByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
+	} else if entry == nil {
+		return IntegerReply(0)
 	}
 	count := entry.SortedSet().Len()
 	reply = IntegerReply(count)
-	return
-}
-
-func (server *GoRedisServer) OnZCOUNT(cmd *Command) (reply *Reply) {
 	return
 }
 
@@ -72,9 +71,11 @@ func (server *GoRedisServer) OnZCOUNT(cmd *Command) (reply *Reply) {
 // Return a range of members in a sorted set, by index
 func (server *GoRedisServer) OnZRANGE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, err := server.sortedSetByKey(key)
+	entry, err := server.sortedSetByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
+	} else if entry == nil {
+		return MultiBulksReply([]interface{}{})
 	}
 	start, e1 := cmd.IntAtIndex(2)
 	stop, e2 := cmd.IntAtIndex(3)
@@ -109,9 +110,11 @@ func (server *GoRedisServer) OnZRANGE(cmd *Command) (reply *Reply) {
 // Return a range of members in a sorted set, by score
 func (server *GoRedisServer) OnZRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, err := server.sortedSetByKey(key)
+	entry, err := server.sortedSetByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
+	} else if entry == nil {
+		return MultiBulksReply([]interface{}{})
 	}
 	min, e1 := cmd.FloatAtIndex(2)
 	max, e2 := cmd.FloatAtIndex(3)
@@ -147,9 +150,11 @@ func (server *GoRedisServer) OnZRANGEBYSCORE(cmd *Command) (reply *Reply) {
 // Return a range of members in a sorted set, by score, with scores ordered from high to low
 func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, err := server.sortedSetByKey(key)
+	entry, err := server.sortedSetByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
+	} else if entry == nil {
+		return MultiBulksReply([]interface{}{})
 	}
 	max, e1 := cmd.FloatAtIndex(2)
 	min, e2 := cmd.FloatAtIndex(3)
@@ -189,9 +194,11 @@ func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnZREM(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, err := server.sortedSetByKey(key)
+	entry, err := server.sortedSetByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
+	} else if entry == nil {
+		return IntegerReply(0)
 	}
 	members := cmd.StringArgs()[2:]
 	n := 0
@@ -212,9 +219,11 @@ func (server *GoRedisServer) OnZREM(cmd *Command) (reply *Reply) {
 // Remove all members in a sorted set within the given scores
 func (server *GoRedisServer) OnZREMRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, err := server.sortedSetByKey(key)
+	entry, err := server.sortedSetByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
+	} else if entry == nil {
+		return IntegerReply(0)
 	}
 	min, e1 := cmd.FloatAtIndex(2)
 	max, e2 := cmd.FloatAtIndex(3)
@@ -236,9 +245,11 @@ func (server *GoRedisServer) OnZREVRANGE(cmd *Command) (reply *Reply) {
 // Get the score associated with the given member in a sorted set
 func (server *GoRedisServer) OnZSCORE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	entry, err := server.sortedSetByKey(key)
+	entry, err := server.sortedSetByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
+	} else if entry == nil {
+		return BulkReply(nil)
 	}
 	member := cmd.StringAtIndex(2)
 	score, exist := entry.SortedSet().Score(member)

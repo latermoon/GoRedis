@@ -8,18 +8,21 @@ import (
 // 线程安全的List，提供满足Redis List的函数
 type SafeList struct {
 	innerList *list.List
-	mutex     *sync.Mutex
+	mutex     sync.Mutex
 }
 
 func NewSafeList() (sl *SafeList) {
 	sl = &SafeList{}
 	sl.innerList = list.New()
-	sl.mutex = &sync.Mutex{}
 	return
 }
 
-func (sl *SafeList) InnerList() (l *list.List) {
-	return sl.innerList
+func (sl *SafeList) Front() (elem *list.Element) {
+	return sl.innerList.Front()
+}
+
+func (sl *SafeList) Back() (elem *list.Element) {
+	return sl.innerList.Back()
 }
 
 func (sl *SafeList) LPop() (value interface{}) {

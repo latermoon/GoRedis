@@ -2,7 +2,6 @@ package storage
 
 import (
 	"../libs/sortedset"
-	"container/list"
 	"errors"
 	"fmt"
 	"github.com/ugorji/go/codec"
@@ -156,16 +155,21 @@ func (l *ListEntry) List() (sl *SafeList) {
 
 func (l *ListEntry) Encode() (bs []byte, err error) {
 	enc := codec.NewEncoderBytes(&bs, &mh)
-	err = enc.Encode(l.sl.InnerList())
+	arr := make([]string, 0, l.List().Len())
+	for e := l.List().Front(); e != nil; e = e.Next() {
+		arr = append(arr, e.Value.(string))
+	}
+	err = enc.Encode(arr)
+	fmt.Println("list encode:", bs)
 	return
 }
 
 func (l *ListEntry) Decode(bs []byte) (err error) {
 	dec := codec.NewDecoderBytes(bs, &mh)
-	lst := list.New()
-	err = dec.Decode(lst)
-	fmt.Println("decode lst", lst)
-	l.sl.InnerList().PushBackList(lst)
+	arr := make([]string, 0)
+	err = dec.Decode(&arr)
+	fmt.Println("decode lst", arr)
+	l.List().RPush(arr...)
 	return
 }
 
