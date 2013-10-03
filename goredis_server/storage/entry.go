@@ -3,7 +3,6 @@ package storage
 import (
 	"../libs/sortedset"
 	"errors"
-	"fmt"
 	"github.com/ugorji/go/codec"
 	"sync"
 )
@@ -154,6 +153,77 @@ func NewListEntry() (e *ListEntry) {
 }
 
 // ====================SetEntry====================
+type SetEntry struct {
+	BaseEntry
+	table map[string]interface{}
+	mutex sync.Mutex
+}
+
+func NewSetEntry() (s *SetEntry) {
+	s = &SetEntry{}
+	s.InnerType = EntryTypeSet
+	s.table = make(map[string]interface{})
+	return
+}
+
+// ok=true, 添加新key
+// ok=false, key已存在
+func (s *SetEntry) Put(key string) (ok bool) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	_, exist := s.table[key]
+	if !exist {
+		s.table[key] = nil
+		ok = true
+	}
+	return
+}
+
+func (s *SetEntry) Contains(key string) (exist bool) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	_, exist = s.table[key]
+	return
+}
+
+func (s *SetEntry) Remove(key string) (ok bool) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	_, exist := s.table[key]
+	if exist {
+		delete(s.table, key)
+		ok = true
+	}
+	return
+}
+
+func (s *SetEntry) Keys() (keys []interface{}) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	keys = make([]interface{}, 0, len(s.table))
+	for key, _ := range s.table {
+		keys = append(keys, key)
+	}
+	return
+}
+
+func (s *SetEntry) Count() int {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return len(s.table)
+}
+
+func (s *SetEntry) Encode() (bs []byte, err error) {
+	enc := codec.NewEncoderBytes(&bs, &mh)
+	err = enc.Encode(s.table)
+	return
+}
+
+func (s *SetEntry) Decode(bs []byte) (err error) {
+	dec := codec.NewDecoderBytes(bs, &mh)
+	err = dec.Decode(&s.table)
+	return
+}
 
 // ====================SortedSetEntry====================
 type SortedSetEntry struct {
@@ -175,7 +245,6 @@ func (s *SortedSetEntry) SortedSet() (zset *sortedset.SortedSet) {
 func (s *SortedSetEntry) Encode() (bs []byte, err error) {
 	enc := codec.NewEncoderBytes(&bs, &mh)
 	err = enc.Encode(s.zset.Table())
-	fmt.Println("encode", s.zset.Table(), bs)
 	return
 }
 
@@ -183,7 +252,7 @@ func (s *SortedSetEntry) Decode(bs []byte) (err error) {
 	dec := codec.NewDecoderBytes(bs, &mh)
 	table := make(map[string]float64)
 	err = dec.Decode(&table)
-	fmt.Println("zset", table)
+	// 重新构建SortedSet，成本较高，应该减少反序列化
 	for member, score := range table {
 		s.zset.Add(member, score)
 	}

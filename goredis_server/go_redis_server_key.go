@@ -31,3 +31,14 @@ func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	}
 	return StatusReply("none")
 }
+
+func (server *GoRedisServer) OnSAVEKEY(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	entry := server.datasource.Get(key)
+	if entry == nil {
+		return ErrorReply(key + " not exist")
+	}
+	err := server.datasource.Set(key, entry)
+	reply = ReplySwitch(err, StatusReply("OK"))
+	return
+}

@@ -201,6 +201,9 @@ func (server *GoRedisServer) OnZREM(cmd *Command) (reply *Reply) {
 			n++
 		}
 	}
+	if n > 0 {
+		server.datasource.NotifyEntryUpdate(key, entry)
+	}
 	reply = IntegerReply(n)
 	return
 }
@@ -244,16 +247,5 @@ func (server *GoRedisServer) OnZSCORE(cmd *Command) (reply *Reply) {
 	} else {
 		reply = BulkReply(nil)
 	}
-	return
-}
-
-func (server *GoRedisServer) OnZSAVE(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
-	entry, err := server.sortedSetByKey(key)
-	if err != nil {
-		return ErrorReply(err)
-	}
-	err = server.datasource.Set(key, entry)
-	reply = ReplySwitch(err, StatusReply("OK"))
 	return
 }
