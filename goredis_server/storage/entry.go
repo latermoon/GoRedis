@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"../skiplist"
+	"../libs/sortedset"
 	"errors"
 	"github.com/ugorji/go/codec"
 	"sync"
@@ -157,16 +157,16 @@ func NewListEntry() (e *ListEntry) {
 // ====================SortedSetEntry====================
 type SortedSetEntry struct {
 	BaseEntry
-	skiplist *skiplist.SkipList
+	zset *sortedset.SortedSet
 }
 
 func NewSortedSetEntry() (s *SortedSetEntry) {
 	s = &SortedSetEntry{}
 	s.InnerType = EntryTypeSortedSet
-	s.skiplist = skiplist.NewIntMap()
+	s.zset = sortedset.NewSortedSet()
 	return
 }
 
-func (s *SortedSetEntry) SkipList() (skiplist *skiplist.SkipList) {
-	return s.skiplist
+func (s *SortedSetEntry) SortedSet() (zset *sortedset.SortedSet) {
+	return s.zset
 }

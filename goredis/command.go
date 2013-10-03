@@ -49,6 +49,15 @@ func (cmd *Command) IntAtIndex(i int) (n int, err error) {
 	return
 }
 
+func (cmd *Command) FloatAtIndex(i int) (n float64, err error) {
+	if i >= len(cmd.Args) {
+		err = errors.New("Argument out of range")
+		return
+	}
+	n, err = strconv.ParseFloat(string(cmd.Args[i]), 64)
+	return
+}
+
 // 返回全部参数的字符串形式
 func (cmd *Command) StringArgs() (strs []string) {
 	strs = make([]string, len(cmd.Args))

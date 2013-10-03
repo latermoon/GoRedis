@@ -15,14 +15,11 @@
 package skiplist
 
 import (
-	"fmt"
 	"math/rand"
 )
 
 // TODO(ryszard):
 //   - A separately seeded source of randomness
-// TODO(latermoon):
-// 修改为redis版本的sortedset
 
 // p is the fraction of nodes with level i pointers that also have
 // level i+1 pointers. p equal to 1/4 is a good value from the point
@@ -417,10 +414,8 @@ func (s *SkipList) Set(key, value interface{}) {
 	candidate := s.getPath(s.header, update, key)
 
 	if candidate != nil && candidate.key == key {
-		fmt.Println("key exists", candidate.key, candidate.value)
-		// by latermoon, 存在相同key(score)时，并不覆盖
-		// candidate.value = value
-		// return
+		candidate.value = value
+		return
 	}
 
 	newLevel := s.randomLevel()
@@ -467,11 +462,6 @@ func (s *SkipList) Set(key, value interface{}) {
 //
 // It returns the old value and whether the node was present.
 func (s *SkipList) Delete(key interface{}) (value interface{}, ok bool) {
-	return s.DeleteKeyValue(key, nil)
-}
-
-// 删除指定key和value的条目
-func (s *SkipList) DeleteKeyValue(key interface{}, thevalue interface{}) (value interface{}, ok bool) {
 	if key == nil {
 		panic("goskiplist: nil keys are not supported")
 	}
@@ -480,11 +470,6 @@ func (s *SkipList) DeleteKeyValue(key interface{}, thevalue interface{}) (value 
 
 	if candidate == nil || candidate.key != key {
 		return nil, false
-	}
-
-	// 找到指定value
-	if candidate.value != value {
-
 	}
 
 	previous := candidate.backward
