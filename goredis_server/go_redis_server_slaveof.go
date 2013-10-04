@@ -4,7 +4,6 @@ import (
 	. "../goredis"
 	"./rdb"
 	. "./storage"
-
 	"fmt"
 	"net"
 )
@@ -78,11 +77,13 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 		}
 		//fmt.Println("char:", string(c))
 		if c == '*' {
-			fmt.Println("read cmd...")
-			if cmd, e2 := session.ReadCommand(); e2 != nil {
-				panic(e2)
+			// fmt.Println("read cmd...")
+			if cmd, e2 := session.ReadCommand(); e2 == nil {
+				// 这些sync回来的command，全部是更新操作，不需要返回reply
+				reply := server.InvokeCommandHandler(session, cmd)
+				fmt.Println(cmd, reply)
 			} else {
-				fmt.Println(cmd.Name())
+				panic(e2)
 			}
 		} else if c == '$' {
 			fmt.Println("read rdb...")
@@ -105,6 +106,7 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 	}
 }
 
+// 第三方rdb解释函数
 type rdbDecoder struct {
 	db int
 	i  int

@@ -54,6 +54,7 @@ func (r *Reply) String() string {
 		}
 	case ReplyTypeInteger:
 		buf.WriteString("IntegerReply:")
+		buf.WriteString(fmt.Sprintf("%d", r.Value))
 	case ReplyTypeBulk:
 		buf.WriteString("BulkReply:")
 		switch r.Value.(type) {

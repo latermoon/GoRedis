@@ -21,7 +21,10 @@ func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	for _, key := range keys {
 		entry := server.datasource.Get(key)
 		if entry != nil {
-			server.datasource.Remove(key)
+			err := server.datasource.Remove(key)
+			if err != nil {
+				fmt.Println(err)
+			}
 			n++
 		}
 	}

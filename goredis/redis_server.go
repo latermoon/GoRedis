@@ -92,6 +92,35 @@ func (server *RedisServer) Listen(host string) {
 	}
 }
 
+func (server *RedisServer) InvokeCommandHandler(session *Session, cmd *Command) (reply *Reply) {
+	cmdName := strings.ToUpper(cmd.Name())
+	// 从Cache取出处理函数
+	method, exists := server.methodCache[cmdName]
+	if !exists {
+		method = reflect.ValueOf(server.handler).MethodByName("On" + cmdName)
+		server.methodCache[cmdName] = method
+	}
+
+	// 通用调用
+	server.handler.On(cmd, session)
+	if method.IsValid() {
+		// 可以调用两种接口
+		// method = OnXXX(cmd *Command) (reply *Reply)
+		// method = OnXXX(cmd *Command, session *Session) (reply *Reply)
+		var in []reflect.Value
+		if method.Type().NumIn() == 1 {
+			in = []reflect.Value{reflect.ValueOf(cmd)}
+		} else {
+			in = []reflect.Value{reflect.ValueOf(cmd), reflect.ValueOf(session)}
+		}
+		callResult := method.Call(in)
+		reply = callResult[0].Interface().(*Reply)
+	} else {
+		reply = server.handler.OnUndefined(cmd, session)
+	}
+	return
+}
+
 // 处理一个客户端连接
 func (server *RedisServer) handleConnection(session *Session) {
 	// 异常处理
@@ -109,33 +138,8 @@ func (server *RedisServer) handleConnection(session *Session) {
 		if e1 != nil {
 			panic(fmt.Sprintf("end connection %s", e1))
 		}
-		// 初始化
-		cmdName := strings.ToUpper(cmd.Name())
-		// 从Cache取出处理函数
-		method, exists := server.methodCache[cmdName]
-		if !exists {
-			method = reflect.ValueOf(server.handler).MethodByName("On" + cmdName)
-			server.methodCache[cmdName] = method
-		}
-
-		// 通用调用
-		server.handler.On(cmd, session)
-		var reply *Reply
-		if method.IsValid() {
-			// 可以调用两种接口
-			// method = OnXXX(cmd *Command) (reply *Reply)
-			// method = OnXXX(cmd *Command, session *Session) (reply *Reply)
-			var in []reflect.Value
-			if method.Type().NumIn() == 1 {
-				in = []reflect.Value{reflect.ValueOf(cmd)}
-			} else {
-				in = []reflect.Value{reflect.ValueOf(cmd), reflect.ValueOf(session)}
-			}
-			callResult := method.Call(in)
-			reply = callResult[0].Interface().(*Reply)
-		} else {
-			reply = server.handler.OnUndefined(cmd, session)
-		}
+		// 处理
+		reply := server.InvokeCommandHandler(session, cmd)
 		if reply == nil {
 			session.Reply(ErrorReply("Empty Reply"))
 		} else {
