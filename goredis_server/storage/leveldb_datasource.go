@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"strings"
 	"sync"
 )
 
@@ -80,11 +81,14 @@ func (l *LevelDBDataSource) Set(key string, entry Entry) (err error) {
 func (l *LevelDBDataSource) Keys(pattern string) (keys []string) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	keys = make([]string, 0)
+	keys = make([]string, 0, 100)
 	iter := l.db.NewIterator(l.ro)
+	iter.Seek([]byte(pattern))
 	for iter.Next() {
-		//fmt.Println(string(iter.Key()), string(iter.Value()))
-		keys = append(keys, string(iter.Key()))
+		key := string(iter.Key())
+		if strings.HasPrefix(key, pattern) {
+			keys = append(keys, key)
+		}
 	}
 	iter.Release()
 	return
