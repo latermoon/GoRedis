@@ -33,7 +33,7 @@ func (l *LevelDBDataSource) Get(key string) (entry Entry) {
 		return
 	}
 
-	//fmt.Println("Get Type", bs, string(bs), entryType)
+	//fmt.Println("Get Type", bs, string(bs))
 	switch EntryType(bs[0]) {
 	case EntryTypeString:
 		entry = NewStringEntry(nil)
