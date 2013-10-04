@@ -6,6 +6,7 @@ import (
 	. "./storage"
 	"fmt"
 	"net"
+	"strings"
 )
 
 // SYNC SLAVE_UID 7cc0745b-66de-46d7-b155-321998c7c20e
@@ -70,20 +71,32 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 	// 这里代码有有点乱，可优化
 
 	for {
-		var c byte
-		var err error
-		if c, err = session.PeekByte(); err != nil {
+		c, err := session.PeekByte()
+		if err != nil {
 			panic(err)
 		}
-		//fmt.Println("char:", string(c))
 		if c == '*' {
-			// fmt.Println("read cmd...")
 			if cmd, e2 := session.ReadCommand(); e2 == nil {
 				// 这些sync回来的command，全部是更新操作，不需要返回reply
 				reply := server.InvokeCommandHandler(session, cmd)
+				server.syncCounters.Get("total").Incr(1)
+				cmdName := strings.ToUpper(cmd.Name())
+				switch cmdName {
+				case "SET":
+					server.syncCounters.Get("string").Incr(1)
+				case "HSET":
+					server.syncCounters.Get("hash").Incr(1)
+				case "SADD":
+					server.syncCounters.Get("set").Incr(1)
+				case "RPUSH":
+					server.syncCounters.Get("list").Incr(1)
+				case "ZADD":
+					server.syncCounters.Get("zset").Incr(1)
+				}
 				fmt.Println(cmd, reply)
 			} else {
-				panic(e2)
+				fmt.Println("sync error, ", e2)
+				return
 			}
 		} else if c == '$' {
 			fmt.Println("read rdb...")
@@ -100,7 +113,7 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 				panic(e2)
 			}
 		} else {
-			fmt.Println("skip byte %d %s", c, string(c))
+			fmt.Println("skip byte %q %s", c, string(c))
 			session.ReadByte()
 		}
 	}
