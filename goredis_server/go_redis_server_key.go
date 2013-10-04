@@ -7,14 +7,6 @@ import (
 	"fmt"
 )
 
-var typeTable = map[EntryType]string{
-	EntryTypeUnknown:   "unknown",
-	EntryTypeString:    "string",
-	EntryTypeHash:      "hash",
-	EntryTypeList:      "list",
-	EntryTypeSet:       "set",
-	EntryTypeSortedSet: "zset"}
-
 func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	keys := cmd.StringArgs()[1:]
 	n := 0
