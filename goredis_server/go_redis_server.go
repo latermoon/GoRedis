@@ -4,6 +4,7 @@ import (
 	. "../goredis"
 	"./monitor"
 	. "./storage"
+	"container/list"
 	"errors"
 	"strings"
 	"sync"
@@ -44,9 +45,7 @@ type GoRedisServer struct {
 	statusLogger *monitor.StatusLogger
 	syncMonitor  *monitor.StatusLogger
 	// 从库
-	slaveMgr *SlaveServerManager
-	// 从库状态
-	ReplicationInfo ReplicationInfo
+	slavelist *list.List
 	// locks
 	stringMutex sync.Mutex
 }
@@ -70,8 +69,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")
 	// slave
-	server.slaveMgr = NewSlaveServerManager(server)
-	server.ReplicationInfo = ReplicationInfo{}
+	server.slavelist = list.New()
 	return
 }
 

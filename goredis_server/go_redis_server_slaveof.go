@@ -2,47 +2,16 @@ package goredis_server
 
 import (
 	. "../goredis"
-	"./rdb"
+	"./libs/rdb"
 	. "./storage"
 	"fmt"
 	"net"
 	"strings"
 )
 
-// SYNC SLAVE_UID 7cc0745b-66de-46d7-b155-321998c7c20e
-func (server *GoRedisServer) OnSYNC(cmd *Command, session *Session) (reply *Reply) {
-	fmt.Println("[OnSYNC]", cmd.String())
-
-	// 填充配置
-	syncInfo := make(map[string]string)
-	for i := 1; i < len(cmd.Args); i += 2 {
-		syncInfo[cmd.StringAtIndex(i)] = cmd.StringAtIndex(i + 1)
-	}
-	uid, exists := syncInfo["SLAVE_UID"]
-	if !exists {
-		uid = ""
-	}
-	// 加入管理
-	slave := server.slaveMgr.Slave(uid)
-	if slave == nil {
-		slave = NewSlaveServer(uid)
-		server.slaveMgr.Add(slave)
-	}
-	slave.SetSession(session)
-	slave.Active()
-
-	// update info
-	server.ReplicationInfo.IsMaster = true
-
-	return StatusReply("OK")
-}
-
+// 从主库获取数据
+// 对应 go_redis_server_sync.go
 func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
-	if server.ReplicationInfo.IsSlave {
-		reply = ErrorReply("already slaveof " + server.ReplicationInfo.MasterHost + ":" + server.ReplicationInfo.MasterPort)
-		return
-	}
-
 	// connect master
 	host := cmd.StringAtIndex(1)
 	port := cmd.StringAtIndex(2)
@@ -51,11 +20,6 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 	if err != nil {
 		return
 	}
-
-	// update info
-	server.ReplicationInfo.IsSlave = true
-	server.ReplicationInfo.MasterHost = host
-	server.ReplicationInfo.MasterPort = port
 
 	session := NewSession(conn)
 	go server.slaveOf(session)
