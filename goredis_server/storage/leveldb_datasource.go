@@ -88,6 +88,8 @@ func (l *LevelDBDataSource) Keys(pattern string) (keys []string) {
 		key := string(iter.Key())
 		if strings.HasPrefix(key, pattern) {
 			keys = append(keys, key)
+		} else {
+			break
 		}
 	}
 	iter.Release()

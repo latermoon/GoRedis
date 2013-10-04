@@ -13,7 +13,7 @@ import (
 // go run goredis-server.go -h localhost -p 1602
 func main() {
 	runtime.GOMAXPROCS(4)
-	hostPtr := flag.String("h", "localhost", "Server host")
+	hostPtr := flag.String("h", "", "Server host")
 	portPtr := flag.Int("p", 1602, "Server port")
 	flag.Parse()
 
