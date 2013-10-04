@@ -19,30 +19,40 @@ type GoRedisServer struct {
 	CommandHandler
 	RedisServer
 	// 数据源
+	directory  string
 	datasource storage.DataSource
 	// counters
-	counters     map[string]*monitor.Counter
-	counterMutex sync.Mutex
+	cmdCounters  *monitor.Counters
+	syncCounters *monitor.Counters
 	// logger
 	statusLogger *monitor.StatusLogger
+	syncMonitor  *monitor.StatusLogger
 	// 从库
 	slaveMgr *SlaveServerManager
-	// 当前实例名字
-	uid string
 	// 从库状态
 	ReplicationInfo ReplicationInfo
-
 	// locks
 	stringMutex sync.Mutex
 }
 
-func NewGoRedisServer() (server *GoRedisServer) {
+func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server = &GoRedisServer{}
 	// set as itself
 	server.SetHandler(server)
 	// default datasource
-	server.datasource = storage.NewMemoryDataSource()
-	server.counters = make(map[string]*monitor.Counter)
+	server.directory = directory
+	var e1 error
+	server.datasource, e1 = storage.NewLevelDBDataSource(server.directory + "/db0")
+	if e1 != nil {
+		panic(e1)
+	}
+	// server.datasource = storage.NewMemoryDataSource()
+	// counter
+	server.cmdCounters = monitor.NewCounters()
+	server.syncCounters = monitor.NewCounters()
+	// monitor
+	server.initCommandMonitor(server.directory + "/cmd.log")
+	server.initSyncMonitor(server.directory + "/sync.log")
 	// slave
 	server.slaveMgr = NewSlaveServerManager(server)
 	server.ReplicationInfo = ReplicationInfo{}
@@ -50,67 +60,42 @@ func NewGoRedisServer() (server *GoRedisServer) {
 }
 
 func (server *GoRedisServer) Listen(host string) {
-	port := strings.Split(host, ":")[1]
-	var e1 error
-	server.datasource, e1 = storage.NewLevelDBDataSource("/tmp/goredis_" + port + ".ldb")
-	if e1 != nil {
-		panic(e1)
-	}
-	//server.datasource = storage.NewMemoryDataSource()
-	server.statusLogger = monitor.NewStatusLogger("/tmp/monitor_" + port + ".log")
-	server.statusLogger.Add(monitor.NewTimeFormater("Time", 8))
-	cmds := []string{"TOTAL", "GET", "SET"}
-	for _, cmd := range cmds {
-		server.statusLogger.Add(monitor.NewCountFormater(server.Counter(cmd), cmd, 7))
-	}
-	server.initUID()
-	server.statusLogger.Start()
 	server.RedisServer.Listen(host)
 }
 
-func (server *GoRedisServer) Counter(name string) (counter *monitor.Counter) {
-	server.counterMutex.Lock()
-	defer server.counterMutex.Unlock()
-	var exist bool
-	counter, exist = server.counters[name]
-	if !exist {
-		counter = monitor.NewCounter()
-		server.counters[name] = counter
+// 命令执行监控
+func (server *GoRedisServer) initCommandMonitor(path string) {
+	// monitor
+	server.statusLogger = monitor.NewStatusLogger(path)
+	server.statusLogger.Add(monitor.NewTimeFormater("Time", 8))
+	cmds := []string{"TOTAL", "GET", "SET", "HSET", "HGET", "HGETALL", "INCR", "DEL", "ZADD"}
+	for _, cmd := range cmds {
+		padding := len(cmd) + 1
+		if padding < 7 {
+			padding = 7
+		}
+		server.statusLogger.Add(monitor.NewCountFormater(server.cmdCounters.Get(cmd), cmd, padding))
 	}
-	return
+	server.statusLogger.Start()
 }
 
-func (server *GoRedisServer) initUID() {
-	// uuidKey := "__goredis_uuid__"
-	// data, e1 := server.Storages.StringStorage.Get(uuidKey)
-	// if e1 != nil {
-	// 	panic(e1)
-	// }
-	// if data != nil {
-	// 	switch data.(type) {
-	// 	case string:
-	// 		server.uid = data.(string)
-	// 	case []byte:
-	// 		server.uid = string(data.([]byte))
-	// 	default:
-	// 		panic("Bad UUID")
-	// 	}
-	// } else {
-	// 	server.uid = uuid.NewV4().String()
-	// 	server.Storages.StringStorage.Set(uuidKey, server.uid)
-	// }
-	// fmt.Println("GoRedis UUID:", server.UID())
-}
-
-func (server *GoRedisServer) UID() string {
-	return server.uid
+// 从库同步监控
+func (server *GoRedisServer) initSyncMonitor(path string) {
+	server.syncMonitor = monitor.NewStatusLogger(path)
+	server.syncMonitor.Add(monitor.NewTimeFormater("Time", 8))
+	cmds := []string{"string", "hash", "set", "list", "zset", "total"}
+	for _, cmd := range cmds {
+		server.syncMonitor.Add(monitor.NewCountFormater(server.syncCounters.Get(cmd), cmd, 8))
+	}
+	server.syncMonitor.Start()
 }
 
 // for CommandHandler
 func (server *GoRedisServer) On(cmd *Command, session *Session) {
 	go func() {
-		server.Counter(strings.ToUpper(cmd.Name())).Incr(1)
-		server.Counter("TOTAL").Incr(1)
+		cmdName := strings.ToUpper(cmd.Name())
+		server.cmdCounters.Get(cmdName).Incr(1)
+		server.cmdCounters.Get("TOTAL").Incr(1)
 	}()
 }
 

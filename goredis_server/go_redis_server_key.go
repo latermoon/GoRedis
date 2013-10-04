@@ -7,7 +7,13 @@ import (
 	"fmt"
 )
 
-var typeTable = map[EntryType]string{EntryTypeString: "string", EntryTypeHash: "hash", EntryTypeList: "list", EntryTypeSet: "set", EntryTypeSortedSet: "zset"}
+var typeTable = map[EntryType]string{
+	EntryTypeUnknown:   "unknown",
+	EntryTypeString:    "string",
+	EntryTypeHash:      "hash",
+	EntryTypeList:      "list",
+	EntryTypeSet:       "set",
+	EntryTypeSortedSet: "zset"}
 
 func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	keys := cmd.StringArgs()[1:]
@@ -15,12 +21,25 @@ func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	for _, key := range keys {
 		entry := server.datasource.Get(key)
 		if entry != nil {
-			server.datasource.Remove(key)
+			err := server.datasource.Remove(key)
+			if err != nil {
+				fmt.Println(err)
+			}
 			n++
 		}
 	}
 	reply = IntegerReply(n)
 	return
+}
+
+func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
+	pattern := cmd.StringAtIndex(1)
+	keys := server.datasource.Keys(pattern)
+	bulks := make([]interface{}, 0, len(keys))
+	for _, key := range keys {
+		bulks = append(bulks, key)
+	}
+	return MultiBulksReply(bulks)
 }
 
 func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
@@ -57,16 +76,14 @@ func (server *GoRedisServer) OnDESC(cmd *Command) (reply *Reply) {
 			continue
 		}
 		buf := bytes.Buffer{}
-		buf.WriteString(key + " ")
+		buf.WriteString(key + " [" + typeTable[entry.Type()] + "] ")
+
 		switch entry.Type() {
 		case EntryTypeString:
-			buf.WriteString("[String] ")
 			buf.WriteString(entry.(*StringEntry).String())
 		case EntryTypeHash:
-			buf.WriteString("[Hash] ")
 			buf.WriteString(fmt.Sprintf("%s", entry.(*HashEntry).Map()))
 		case EntryTypeSortedSet:
-			buf.WriteString("[SortedSet] ")
 			iter := entry.(*SortedSetEntry).SortedSet().Iterator()
 			for iter.Next() {
 				members := iter.Value().([]string)
@@ -76,16 +93,14 @@ func (server *GoRedisServer) OnDESC(cmd *Command) (reply *Reply) {
 				}
 			}
 		case EntryTypeSet:
-			buf.WriteString("[Set] ")
 			buf.WriteString(fmt.Sprintf("%s", entry.(*SetEntry).Keys()))
 		case EntryTypeList:
-			buf.WriteString("[List] ")
 			for e := entry.(*ListEntry).List().Front(); e != nil; e = e.Next() {
 				buf.WriteString(e.Value.(string))
 				buf.WriteString(" ")
 			}
 		default:
-			buf.WriteString(key + " [unknown]")
+
 		}
 		// append
 		bulks = append(bulks, buf.String())

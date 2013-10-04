@@ -16,9 +16,10 @@ func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnCOUNTER(cmd *Command) (reply *Reply) {
-	bulks := make([]interface{}, 0, len(server.counters))
+	counters := server.cmdCounters.Counters()
+	bulks := make([]interface{}, 0, len(counters))
 
-	for name, counter := range server.counters {
+	for name, counter := range counters {
 		line := fmt.Sprintf("%s, %d", name, counter.Count())
 		bulks = append(bulks, line)
 	}

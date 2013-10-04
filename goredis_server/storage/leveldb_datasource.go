@@ -4,14 +4,17 @@ import (
 	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"strings"
+	"sync"
 )
 
 // 使用LevelDB做数据源
 type LevelDBDataSource struct {
 	DataSource
-	db *leveldb.DB
-	ro *opt.ReadOptions
-	wo *opt.WriteOptions
+	db    *leveldb.DB
+	ro    *opt.ReadOptions
+	wo    *opt.WriteOptions
+	mutex sync.Mutex
 }
 
 func NewLevelDBDataSource(path string) (l *LevelDBDataSource, err error) {
@@ -72,6 +75,22 @@ func (l *LevelDBDataSource) Set(key string, entry Entry) (err error) {
 		copy(buf[1:], bs)
 		err = l.db.Put([]byte(key), buf, l.wo)
 	}
+	return
+}
+
+func (l *LevelDBDataSource) Keys(pattern string) (keys []string) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	keys = make([]string, 0, 100)
+	iter := l.db.NewIterator(l.ro)
+	iter.Seek([]byte(pattern))
+	for iter.Next() {
+		key := string(iter.Key())
+		if strings.HasPrefix(key, pattern) {
+			keys = append(keys, key)
+		}
+	}
+	iter.Release()
 	return
 }
 
