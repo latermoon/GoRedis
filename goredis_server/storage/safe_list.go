@@ -27,56 +27,57 @@ func (sl *SafeList) Back() (elem *list.Element) {
 
 func (sl *SafeList) LPop() (value interface{}) {
 	sl.mutex.Lock()
+	defer sl.mutex.Unlock()
 	elem := sl.innerList.Front()
 	if elem != nil {
 		value = elem.Value
 		sl.innerList.Remove(elem)
 	}
-	sl.mutex.Unlock()
 	return
 }
 
 func (sl *SafeList) RPop() (value interface{}) {
 	sl.mutex.Lock()
+	defer sl.mutex.Unlock()
 	elem := sl.innerList.Back()
 	if elem != nil {
 		value = elem.Value
 		sl.innerList.Remove(elem)
 	}
-	sl.mutex.Unlock()
 	return
 }
 
 func (sl *SafeList) LPush(values ...string) (length int) {
 	sl.mutex.Lock()
+	defer sl.mutex.Unlock()
 	for _, value := range values {
 		sl.innerList.PushFront(value)
 	}
 	length = sl.innerList.Len()
-	sl.mutex.Unlock()
 	return
 }
 
 func (sl *SafeList) RPush(values ...string) (length int) {
 	sl.mutex.Lock()
+	defer sl.mutex.Unlock()
 	for _, value := range values {
 		sl.innerList.PushBack(value)
 	}
 	length = sl.innerList.Len()
-	sl.mutex.Unlock()
 	return
 }
 
 func (sl *SafeList) Len() (length int) {
 	sl.mutex.Lock()
+	defer sl.mutex.Unlock()
 	length = sl.innerList.Len()
-	sl.mutex.Unlock()
 	return
 }
 
 // 通过枚举实现，列表数据较大时性能不佳，并且lock住其它操作
 func (sl *SafeList) Index(index int) (value interface{}) {
 	sl.mutex.Lock()
+	defer sl.mutex.Unlock()
 	i := 0
 	for e := sl.innerList.Front(); e != nil; e = e.Next() {
 		if i == index {
@@ -85,7 +86,6 @@ func (sl *SafeList) Index(index int) (value interface{}) {
 		}
 		i++
 	}
-	sl.mutex.Unlock()
 	return
 }
 

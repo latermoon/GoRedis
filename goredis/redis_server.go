@@ -140,9 +140,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 		}
 		// 处理
 		reply := server.InvokeCommandHandler(session, cmd)
-		if reply == nil {
-			session.Reply(ErrorReply("Empty Reply"))
-		} else {
+		if reply != nil {
 			session.Reply(reply)
 		}
 	}

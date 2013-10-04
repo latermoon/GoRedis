@@ -37,7 +37,8 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 	for {
 		c, err := session.PeekByte()
 		if err != nil {
-			panic(err)
+			fmt.Println("master gone away ...")
+			return
 		}
 		if c == '*' {
 			if cmd, e2 := session.ReadCommand(); e2 == nil {
