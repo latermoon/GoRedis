@@ -4,6 +4,7 @@ import (
 	. "../goredis"
 	"./monitor"
 	. "./storage"
+	"container/list"
 	"errors"
 	"strings"
 	"sync"
@@ -14,7 +15,8 @@ var (
 	WrongKindReply = ErrorReply(WrongKindError)
 )
 
-var typeTable = map[EntryType]string{
+// 数据类型描述
+var entryTypeDesc = map[EntryType]string{
 	EntryTypeUnknown:   "unknown",
 	EntryTypeString:    "string",
 	EntryTypeHash:      "hash",
@@ -22,13 +24,23 @@ var typeTable = map[EntryType]string{
 	EntryTypeSet:       "set",
 	EntryTypeSortedSet: "zset"}
 
-var cmdSets = map[string][]string{
+// 命令类型集合
+var cmdCategory = map[string][]string{
 	"string": []string{"GET", "SET", "INCR", "DECR", "INCRBY", "DECRBY", "MSET", "MGET"},
 	"hash":   []string{"HDEL", "HGET", "HSET", "HMGET", "HMSET", "HGETALL", "HINCRBY", "HKEYS", "HLEN"},
 	"list":   []string{"LINDEX", "LLEN", "LPOP", "LPUSH", "LRANGE", "LREM", "RPOP", "RPUSH"},
 	"set":    []string{"SADD", "SCARD", "SISMEMBER", "SMEMBERS", "SREM"},
 	"zset":   []string{"ZADD", "ZCARD", "ZINCRBY", "ZRANGE", "ZRANGEBYSCORE", "ZREM", "ZREMRANGEBYRANK", "ZREMRANGEBYSCORE", "ZREVRANGE", "ZREVRANGEBYSCORE", "ZSCORE"},
 }
+
+// 需要同步到从库的命令
+var needSyncCmds = []string{
+	"SET", "INCR", "DECR", "INCRBY", "DECRBY", "MSET",
+	"HDEL", "HSET", "HMSET", "HINCRBY",
+	"LPOP", "LPUSH", "LREM", "RPOP", "RPUSH",
+	"SADD", "SREM",
+	"ZADD", "ZINCRBY", "ZREM",
+	"DEL"}
 
 // GoRedisServer
 type GoRedisServer struct {
@@ -44,9 +56,8 @@ type GoRedisServer struct {
 	statusLogger *monitor.StatusLogger
 	syncMonitor  *monitor.StatusLogger
 	// 从库
-	slaveMgr *SlaveServerManager
-	// 从库状态
-	ReplicationInfo ReplicationInfo
+	slavelist        *list.List
+	needSyncCmdTable map[string]bool // 需要同步的指令
 	// locks
 	stringMutex sync.Mutex
 }
@@ -70,8 +81,11 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")
 	// slave
-	server.slaveMgr = NewSlaveServerManager(server)
-	server.ReplicationInfo = ReplicationInfo{}
+	server.slavelist = list.New()
+	server.needSyncCmdTable = make(map[string]bool)
+	for _, cmd := range needSyncCmds {
+		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
+	}
 	return
 }
 
@@ -112,6 +126,13 @@ func (server *GoRedisServer) On(cmd *Command, session *Session) {
 		cmdName := strings.ToUpper(cmd.Name())
 		server.cmdCounters.Get(cmdName).Incr(1)
 		server.cmdCounters.Get("TOTAL").Incr(1)
+
+		// 同步到从库
+		if _, ok := server.needSyncCmdTable[cmdName]; ok {
+			for e := server.slavelist.Front(); e != nil; e = e.Next() {
+				e.Value.(*SlaveSession).SendCommand(cmd)
+			}
+		}
 	}()
 }
 

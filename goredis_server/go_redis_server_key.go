@@ -38,7 +38,7 @@ func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	entry := server.datasource.Get(key)
 	if entry != nil {
-		if desc, exist := typeTable[entry.Type()]; exist {
+		if desc, exist := entryTypeDesc[entry.Type()]; exist {
 			return StatusReply(desc)
 		}
 	}
@@ -68,7 +68,7 @@ func (server *GoRedisServer) OnDESC(cmd *Command) (reply *Reply) {
 			continue
 		}
 		buf := bytes.Buffer{}
-		buf.WriteString(key + " [" + typeTable[entry.Type()] + "] ")
+		buf.WriteString(key + " [" + entryTypeDesc[entry.Type()] + "] ")
 
 		switch entry.Type() {
 		case EntryTypeString:

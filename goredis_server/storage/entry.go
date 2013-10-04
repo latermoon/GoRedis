@@ -86,6 +86,16 @@ func (s *StringEntry) Value() (value interface{}) {
 	return s.value
 }
 
+func (s *StringEntry) Bytes() (bs []byte) {
+	switch s.value.(type) {
+	case []byte:
+		bs = s.value.([]byte)
+	case string:
+		bs = []byte(s.value.(string))
+	}
+	return
+}
+
 func (s *StringEntry) String() (str string) {
 	switch s.value.(type) {
 	case []byte:

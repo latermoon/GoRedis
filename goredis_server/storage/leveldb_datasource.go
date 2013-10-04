@@ -25,6 +25,10 @@ func NewLevelDBDataSource(path string) (l *LevelDBDataSource, err error) {
 	return
 }
 
+func (l *LevelDBDataSource) DB() *leveldb.DB {
+	return l.db
+}
+
 func (l *LevelDBDataSource) Get(key string) (entry Entry) {
 	// l.mutex.Lock()
 	// defer l.mutex.Unlock()
@@ -33,7 +37,7 @@ func (l *LevelDBDataSource) Get(key string) (entry Entry) {
 		return
 	}
 
-	//fmt.Println("Get Type", bs, string(bs), entryType)
+	//fmt.Println("Get Type", bs, string(bs))
 	switch EntryType(bs[0]) {
 	case EntryTypeString:
 		entry = NewStringEntry(nil)
@@ -86,8 +90,10 @@ func (l *LevelDBDataSource) Keys(pattern string) (keys []string) {
 	iter.Seek([]byte(pattern))
 	for iter.Next() {
 		key := string(iter.Key())
-		if strings.HasPrefix(key, pattern) {
+		if pattern == "*" || strings.HasPrefix(key, pattern) {
 			keys = append(keys, key)
+		} else {
+			break
 		}
 	}
 	iter.Release()

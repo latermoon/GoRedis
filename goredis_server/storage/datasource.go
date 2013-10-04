@@ -9,16 +9,3 @@ type DataSource interface {
 	// 通知数据源，某个条目更新了
 	NotifyEntryUpdate(key string, entry Entry)
 }
-
-// 测试内容
-type DataSourceSeeker interface {
-	Interator() EntryIterator
-}
-
-type EntryIterator interface {
-	Seek(key string)
-	Key() string
-	Entry() Entry
-	Prev() bool
-	Next() bool
-}
