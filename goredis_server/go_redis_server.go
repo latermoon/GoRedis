@@ -99,7 +99,7 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 func (server *GoRedisServer) initSyncMonitor(path string) {
 	server.syncMonitor = monitor.NewStatusLogger(path)
 	server.syncMonitor.Add(monitor.NewTimeFormater("Time", 8))
-	cmds := []string{"total", "string", "hash", "set", "list", "zset"}
+	cmds := []string{"total", "string", "hash", "set", "list", "zset", "ping"}
 	for _, cmd := range cmds {
 		server.syncMonitor.Add(monitor.NewCountFormater(server.syncCounters.Get(cmd), cmd, 8))
 	}

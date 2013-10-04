@@ -92,6 +92,8 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 					server.syncCounters.Get("list").Incr(1)
 				case "ZADD":
 					server.syncCounters.Get("zset").Incr(1)
+				case "PING":
+					server.syncCounters.Get("ping").Incr(1)
 				}
 				fmt.Println(cmd, reply)
 			} else {
