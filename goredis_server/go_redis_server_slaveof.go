@@ -68,14 +68,7 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 	cmdsync := NewCommand([]byte("SYNC"))
 	session.WriteCommand(cmdsync)
 
-	// for {
-	// 	line, e1 := session.ReadBytes(LF)
-	// 	if e1 != nil {
-	// 		panic(e1)
-	// 	}
-	// 	fmt.Println(string(line))
-	// }
-	// return
+	// 这里代码有有点乱，可优化
 
 	for {
 		var c byte
@@ -105,12 +98,6 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 			if e2 != nil {
 				panic(e2)
 			}
-
-			// if e3 := session.ReadRDB(); e3 != nil {
-			// 	panic(e3)
-			// } else {
-			// 	fmt.Println("skip finish")
-			// }
 		} else {
 			fmt.Println("skip byte %d %s", c, string(c))
 			session.ReadByte()
@@ -152,6 +139,8 @@ func (p *rdbDecoder) EndRDB() {
 func (p *rdbDecoder) Set(key, value []byte, expiry int64) {
 	p.stringEntry = NewStringEntry(string(value))
 	p.server.datasource.Set(string(key), p.stringEntry)
+	p.server.syncCounters.Get("total").Incr(1)
+	p.server.syncCounters.Get("string").Incr(1)
 	fmt.Printf("db=%d [string] %q -> %q\n", p.db, key, value)
 }
 
@@ -166,6 +155,8 @@ func (p *rdbDecoder) Hset(key, field, value []byte) {
 
 func (p *rdbDecoder) EndHash(key []byte) {
 	p.server.datasource.Set(string(key), p.hashEntry)
+	p.server.syncCounters.Get("total").Incr(1)
+	p.server.syncCounters.Get("hash").Incr(1)
 	fmt.Printf("db=%d [hash] %q\n", p.db, key)
 }
 
@@ -180,6 +171,8 @@ func (p *rdbDecoder) Sadd(key, member []byte) {
 
 func (p *rdbDecoder) EndSet(key []byte) {
 	p.server.datasource.Set(string(key), p.setEntry)
+	p.server.syncCounters.Get("total").Incr(1)
+	p.server.syncCounters.Get("set").Incr(1)
 	fmt.Printf("db=%d [set] %q\n", p.db, key)
 }
 
@@ -196,6 +189,8 @@ func (p *rdbDecoder) Rpush(key, value []byte) {
 
 func (p *rdbDecoder) EndList(key []byte) {
 	p.server.datasource.Set(string(key), p.listEntry)
+	p.server.syncCounters.Get("total").Incr(1)
+	p.server.syncCounters.Get("list").Incr(1)
 	fmt.Printf("db=%d [list] %q\n", p.db, key)
 }
 
@@ -212,5 +207,7 @@ func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
 
 func (p *rdbDecoder) EndZSet(key []byte) {
 	p.server.datasource.Set(string(key), p.zsetEntry)
+	p.server.syncCounters.Get("total").Incr(1)
+	p.server.syncCounters.Get("zset").Incr(1)
 	fmt.Printf("db=%d [zset] %q\n", p.db, key)
 }

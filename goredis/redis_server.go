@@ -94,13 +94,13 @@ func (server *RedisServer) Listen(host string) {
 
 // 处理一个客户端连接
 func (server *RedisServer) handleConnection(session *Session) {
-	// // 异常处理
-	// defer func() {
-	// 	if err := recover(); err != nil {
-	// 		fmt.Println(fmt.Sprintf("%s %s", session.conn.RemoteAddr(), err))
-	// 		session.Close()
-	// 	}
-	// }()
+	// 异常处理
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(fmt.Sprintf("%s %s", session.conn.RemoteAddr(), err))
+			session.Close()
+		}
+	}()
 	for {
 		cmd, e1 := session.ReadCommand()
 		// 常见的error是:

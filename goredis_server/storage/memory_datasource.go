@@ -31,6 +31,16 @@ func (m *MemoryDataSource) Set(key string, entry Entry) (err error) {
 	return
 }
 
+func (m *MemoryDataSource) Keys(pattern string) (keys []string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	keys = make([]string, 0, len(m.table))
+	for key, _ := range m.table {
+		keys = append(keys, key)
+	}
+	return
+}
+
 func (m *MemoryDataSource) Remove(key string) (err error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
