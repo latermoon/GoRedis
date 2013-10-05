@@ -134,7 +134,7 @@ func (l *LevelList) Pop() (e *Element, err error) {
 	return
 }
 
-func (l *LevelList) Element(i int64) (e *Element) {
+func (l *LevelList) Index(i int64) (e *Element) {
 	if i < 0 || i >= l.Len() {
 		return nil
 	}

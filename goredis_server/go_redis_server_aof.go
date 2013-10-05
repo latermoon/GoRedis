@@ -13,7 +13,6 @@ import (
 	. "../goredis"
 	"./libs/leveltool"
 	. "./storage"
-	"fmt"
 )
 
 func (server *GoRedisServer) aoflistByKey(key string, create bool) (lst *leveltool.LevelList) {
@@ -65,7 +64,7 @@ func (server *GoRedisServer) OnAOF_INDEX(cmd *Command) (reply *Reply) {
 	if err != nil {
 		return ErrorReply("bad index")
 	}
-	elem := lst.Element(int64(idx))
+	elem := lst.Index(int64(idx))
 	if elem == nil {
 		return BulkReply(nil)
 	}
@@ -90,15 +89,12 @@ func (server *GoRedisServer) OnAOF_RANGE(cmd *Command) (reply *Reply) {
 	}
 	// 初始缓冲
 	buflen := end - start + 1
-	if end <= 0 || end > 10000 {
-		buflen = 10000
+	if end <= 0 || end > 100 {
+		buflen = 100
 	}
 	bulks := make([]interface{}, 0, buflen)
-	fmt.Println(start, end, buflen)
-	for i := start; i <= end || end == -1; i++ {
-		fmt.Println(i, i <= end || end == -1)
-		elem := lst.Element(int64(i))
-		fmt.Println(elem)
+	for i := start; end == -1 || i <= end; i++ {
+		elem := lst.Index(int64(i))
 		if elem == nil {
 			break
 		}
