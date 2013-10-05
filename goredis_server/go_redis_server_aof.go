@@ -64,8 +64,10 @@ func (server *GoRedisServer) OnAOF_INDEX(cmd *Command) (reply *Reply) {
 	if err != nil {
 		return ErrorReply("bad index")
 	}
-	elem := lst.Index(int64(idx))
-	if elem == nil {
+	elem, e2 := lst.Index(int64(idx))
+	if e2 != nil {
+		return ErrorReply(e2)
+	} else if elem == nil {
 		return BulkReply(nil)
 	}
 	reply = BulkReply(elem.Value.([]byte))
@@ -94,8 +96,10 @@ func (server *GoRedisServer) OnAOF_RANGE(cmd *Command) (reply *Reply) {
 	}
 	bulks := make([]interface{}, 0, buflen)
 	for i := start; end == -1 || i <= end; i++ {
-		elem := lst.Index(int64(i))
-		if elem == nil {
+		elem, e2 := lst.Index(int64(i))
+		if e2 != nil {
+			return ErrorReply(e2)
+		} else if elem == nil {
 			break
 		}
 		bulks = append(bulks, elem.Value.([]byte))

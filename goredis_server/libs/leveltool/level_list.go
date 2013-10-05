@@ -12,6 +12,13 @@ package leveltool
 [prefix]:idx:1006 = hello
 [prefix]:idx:1007 = hello
 [prefix]:idx:1008 = hello
+
+自定义aof指令集，用于实现海量日志存储
+aof_push key value [value ...]    <IntegerReply: length>
+aof_pop key    <BulkReply: nil>
+aof_index key index    <BulkReply: nil>
+aof_range key start end    <MultiBulksReply: nil>
+aof_len key    <IntegerReply: 0>
 */
 // 本页面命名注意，idx都表示大于l.start的那个索引序号，而不是0开始的数组序号
 
@@ -134,17 +141,16 @@ func (l *LevelList) Pop() (e *Element, err error) {
 	return
 }
 
-func (l *LevelList) Index(i int64) (e *Element) {
+func (l *LevelList) Index(i int64) (e *Element, err error) {
 	if i < 0 || i >= l.Len() {
-		return nil
+		return nil, nil
 	}
 	idx := l.start + i
-	value, err := l.db.Get(l.idxkey(idx), l.ro)
-	if err != nil {
-		return
-	}
 	e = &Element{}
-	e.Value = value
+	e.Value, err = l.db.Get(l.idxkey(idx), l.ro)
+	if err != nil {
+		return nil, err
+	}
 	return
 }
 
