@@ -25,4 +25,11 @@ __goredis:slave:d03b4f61:info = {
 \[prefix]:idx:1007 = hello
 \[prefix]:idx:1008 = hello
 
-ds 
+ds
+
+#### log
+cmd.log 
+sync.log
+stdout.log
+[2013-10-06 01:20:08] 
+stderr.log

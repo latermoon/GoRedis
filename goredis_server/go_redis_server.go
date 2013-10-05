@@ -161,7 +161,7 @@ func (server *GoRedisServer) initSyncMonitor(path string) {
 }
 
 // for CommandHandler
-func (server *GoRedisServer) On(cmd *Command, session *Session) {
+func (server *GoRedisServer) On(session *Session, cmd *Command) {
 	go func() {
 		cmdName := strings.ToUpper(cmd.Name())
 		server.cmdCounters.Get(cmdName).Incr(1)
@@ -176,6 +176,6 @@ func (server *GoRedisServer) On(cmd *Command, session *Session) {
 	}()
 }
 
-func (server *GoRedisServer) OnUndefined(cmd *Command, session *Session) (reply *Reply) {
+func (server *GoRedisServer) OnUndefined(session *Session, cmd *Command) (reply *Reply) {
 	return ErrorReply("Not Supported: " + cmd.String())
 }
