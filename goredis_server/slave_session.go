@@ -35,12 +35,12 @@ func (s *SlaveSession) runloop() {
 	}
 }
 
-func (s *SlaveSession) SendCommand(cmd *Command) {
+func (s *SlaveSession) AsyncSendCommand(cmd *Command) {
 	s.cmdbuffer <- cmd
 }
 
 // 向从库发送数据库快照
-// 时间关系，怎是使用了 []byte -> Entry -> Command -> slave 的方法，
+// 时间关系，暂时使用了 []byte -> Entry -> Command -> slave 的方法，
 // 应该改为官方发送rdb数据的方式
 func (s *SlaveSession) SendSnapshot(snapshot *leveldb.Snapshot) {
 	s.sendmutex.Lock()
