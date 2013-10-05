@@ -45,6 +45,8 @@ var needSyncCmds = []string{
 	"ZADD", "ZINCRBY", "ZREM",
 	"DEL"}
 
+var goredisPrefix string = "__goredis:"
+
 // GoRedisServer
 type GoRedisServer struct {
 	CommandHandler
@@ -88,9 +90,9 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")
 	// slave
-	server.uid = uuid.UUID(8)
-	fmt.Println("uid", server.uid)
+	fmt.Println("uid", server.UID())
 	server.slavelist = list.New()
+	server.initSlaveSessions()
 	server.needSyncCmdTable = make(map[string]bool)
 	for _, cmd := range needSyncCmds {
 		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
@@ -102,6 +104,33 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 
 func (server *GoRedisServer) Listen(host string) {
 	server.RedisServer.Listen(host)
+}
+
+func (server *GoRedisServer) UID() (uid string) {
+	if len(server.uid) == 0 {
+		uidkey := "__goredis:uid"
+		entry := server.datasource.Get(uidkey)
+		if entry == nil {
+			server.uid = uuid.UUID(8)
+			entry = NewStringEntry(server.uid)
+			server.datasource.Set(uidkey, entry)
+		} else {
+			server.uid = entry.(*StringEntry).String()
+		}
+	}
+	return server.uid
+}
+
+// 初始化从库
+func (server *GoRedisServer) initSlaveSessions() {
+	slavesEntry := server.slavesEntry()
+	for _, slaveuid := range slavesEntry.Keys() {
+		uid := slaveuid.(string)
+		fmt.Println("init slave", uid)
+		slaveSession := NewSlaveSession(server, nil, uid)
+		server.slavelist.PushBack(slaveSession)
+		slaveSession.ContinueAof()
+	}
 }
 
 // 命令执行监控

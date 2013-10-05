@@ -21,7 +21,7 @@ type SlaveSession struct {
 	currentCommand       *Command // 当前处理中的command
 	sendmutex            sync.Mutex
 	uid                  string               // 从库id
-	snapshotEnabled      bool                 // 支持从库快照
+	aofEnabled           bool                 // 支持从库快照
 	remoteExists         bool                 //是否存在远程连接
 	shouldChangeToRemote bool                 // 应该转向写入远程
 	aoflist              *leveltool.LevelList // 存放同步中断后指令
@@ -32,14 +32,36 @@ func NewSlaveSession(server *GoRedisServer, session *Session, uid string) (s *Sl
 	s.server = server
 	s.session = session
 	s.remoteExists = s.session != nil
-	s.uid = uid
-	s.snapshotEnabled = len(uid) > 0 //存在uid就可以访问本地快照
 	s.cmdbuffer = make(chan *Command, 100000)
+	s.uid = uid
+	s.aofEnabled = len(uid) > 0 //存在uid就可以访问本地快照
+	if s.aofEnabled {
+		// TODO aof之后存到另外的路径，节省主库空间
+		s.aoflist = leveltool.NewLevelList(s.server.datasource.(*LevelDBDataSource).DB(), "__goredis:slaveaof:"+s.uid)
+	}
 	return
 }
 
-func (s *SlaveSession) SnapshotEnabled() bool {
-	return s.snapshotEnabled
+func (s *SlaveSession) AofEnabled() bool {
+	return s.aofEnabled
+}
+
+func (s *SlaveSession) UID() string {
+	return s.uid
+}
+
+func (s *SlaveSession) SetSession(session *Session) {
+	s.session = session
+	s.remoteExists = s.session != nil
+}
+
+// 继续同步
+func (s *SlaveSession) ContinueSync() {
+	s.shouldChangeToRemote = true
+}
+
+func (s *SlaveSession) ContinueAof() {
+	go s.aofRunloop()
 }
 
 // 向远程写入
@@ -54,9 +76,9 @@ func (s *SlaveSession) remoteRunloop() {
 		if err != nil {
 			fmt.Println("slave gone away ...")
 			// 从库断开后写入本地aof
-			if s.SnapshotEnabled() {
+			if s.AofEnabled() {
 				fmt.Println("change to aof ...")
-				s.aofRunloop()
+				go s.aofRunloop()
 				return
 			}
 			return
@@ -71,6 +93,7 @@ func (s *SlaveSession) aofRunloop() {
 		if s.currentCommand == nil {
 			s.currentCommand = <-s.cmdbuffer
 		}
+		fmt.Println("aof push", s.currentCommand)
 		_, err := s.aoflist.Push(s.currentCommand.Bytes())
 		// 如果写入aof出错，应该废弃全部aof，重来snapshot
 		if err != nil {
@@ -79,7 +102,8 @@ func (s *SlaveSession) aofRunloop() {
 		}
 		if s.shouldChangeToRemote {
 			s.currentCommand = nil // 清空并跳转
-			s.aofToRemoteRunloop()
+			s.shouldChangeToRemote = false
+			go s.aofToRemoteRunloop()
 			return
 		}
 		s.currentCommand = <-s.cmdbuffer
@@ -104,7 +128,8 @@ func (s *SlaveSession) aofToRemoteRunloop() {
 		// 同步完毕，转向直接远程写入
 		if elem == nil {
 			fmt.Println("aof finish count", sendCount)
-			s.remoteRunloop()
+			go s.remoteRunloop()
+			return
 		}
 		sendCount++
 		// bs come from cmd.Bytes()
@@ -165,9 +190,8 @@ func (s *SlaveSession) SendSnapshot(snapshot *leveldb.Snapshot) {
 		}
 	}
 	// 构建aof
-	if s.SnapshotEnabled() {
-		// TODO aof之后存到另外的路径，节省主库空间
-		s.aoflist = leveltool.NewLevelList(s.server.datasource.(*LevelDBDataSource).DB(), "__goredis:slaveaof:"+s.uid)
+	if s.AofEnabled() {
+		s.server.snapshotSentCallback(s)
 	}
 	// 开始消费
 	go s.remoteRunloop()

@@ -28,8 +28,8 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 
 // -ERR wrong number of arguments for 'sync' command
 func (server *GoRedisServer) slaveOf(session *Session) {
-	//cmdsync := NewCommand([]byte("SYNC"), []byte("SLAVE_UID"), []byte(server.UID()))
-	cmdsync := NewCommand([]byte("SYNC"))
+	cmdsync := NewCommand([]byte("SYNC"), []byte("uid"), []byte(server.UID()))
+	// cmdsync := NewCommand([]byte("SYNC"))
 	session.WriteCommand(cmdsync)
 
 	// 这里代码有有点乱，可优化

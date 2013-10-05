@@ -17,19 +17,36 @@ func (server *GoRedisServer) OnSYNC(cmd *Command, session *Session) (reply *Repl
 	if len(args) >= 3 && strings.ToLower(args[1]) == "uid" {
 		uid = args[2]
 	}
-	fmt.Println("new slave ", uid)
 
-	snapshot, err := server.datasource.(*LevelDBDataSource).DB().GetSnapshot()
-	if err != nil {
-		return ErrorReply(err)
+	slave := server.findSlaveById(uid)
+	if slave == nil {
+		fmt.Println("new slave", uid)
+		snapshot, err := server.datasource.(*LevelDBDataSource).DB().GetSnapshot()
+		if err != nil {
+			return ErrorReply(err)
+		}
+		slave = NewSlaveSession(server, session, uid)
+		server.slavelist.PushBack(slave)
+		go slave.SendSnapshot(snapshot)
+	} else {
+		fmt.Println("slave exist", uid)
+		slave.SetSession(session)
+		go slave.ContinueSync()
 	}
-
-	slave := NewSlaveSession(server, session, uid)
-	server.slavelist.PushBack(slave)
-
-	go slave.SendSnapshot(snapshot)
-
 	// SYNC不需要Reply
 	reply = nil
+	return
+}
+
+func (server *GoRedisServer) findSlaveById(uid string) (slave *SlaveSession) {
+	if len(uid) == 0 {
+		return
+	}
+	for e := server.slavelist.Front(); e != nil; e = e.Next() {
+		if e.Value.(*SlaveSession).UID() == uid {
+			slave = e.Value.(*SlaveSession)
+			return
+		}
+	}
 	return
 }
