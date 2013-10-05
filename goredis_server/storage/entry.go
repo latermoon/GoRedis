@@ -31,6 +31,26 @@ type Entry interface {
 	Decode(bs []byte) (err error)
 }
 
+// ====================EntryFactory====================
+func NewEmptyEntry(et EntryType) (entry Entry) {
+	switch et {
+	case EntryTypeString:
+		entry = NewStringEntry(nil)
+	case EntryTypeHash:
+		entry = NewHashEntry()
+	case EntryTypeSortedSet:
+		entry = NewSortedSetEntry()
+	case EntryTypeSet:
+		entry = NewSetEntry()
+	case EntryTypeList:
+		entry = NewListEntry()
+	default:
+		entry = nil
+	}
+	return
+}
+
+// ====================BaseEntry====================
 // 基本类型，简化子类代码
 type BaseEntry struct {
 	InnerType EntryType
