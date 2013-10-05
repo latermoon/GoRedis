@@ -4,6 +4,7 @@ package leveltool
 基于leveldb实现的list，主要用于海量存储，比如aof、日志
 
 1、数据结构
+要提供序号访问，就不能删除中间的元素
 [prefix]:_start = 1004 (int64)
 [prefix]:_end = 1008 (int64)
 [prefix]:idx:1004 = hello ([]byte)
@@ -12,6 +13,7 @@ package leveltool
 [prefix]:idx:1007 = hello
 [prefix]:idx:1008 = hello
 */
+// 本页面命名注意，idx都表示大于l.start的那个索引序号，而不是0开始的数组序号
 
 import (
 	"encoding/binary"
@@ -29,13 +31,15 @@ type Element struct {
 // 类似双向链表，右进左出，可以通过索引查找
 // 海量存储，占用内存小
 type LevelList struct {
-	db     *leveldb.DB
-	ro     *opt.ReadOptions
-	wo     *opt.WriteOptions
+	db *leveldb.DB
+	ro *opt.ReadOptions
+	wo *opt.WriteOptions
+	// key前缀
 	prefix string
-	start  int64
-	end    int64
-	mutex  sync.Mutex
+	// 游标控制
+	start int64
+	end   int64
+	mutex sync.Mutex
 }
 
 func NewLevelList(db *leveldb.DB, prefix string) (lst *LevelList) {
@@ -73,16 +77,6 @@ func (l *LevelList) ldbGetInt64(key string, defaultValue int64) int64 {
 	return bytesToInt64(data)
 }
 
-func (l *LevelList) ldbSetInt64(key string, value int64) (err error) {
-	err = l.db.Put(l.ldbKey(key), int64ToBytes(value), l.wo)
-	return
-}
-
-// func (l *LevelList) ldbSet(key string, value []byte) (err error) {
-// 	err = l.db.Put(l.ldbKey(key), value, l.wo)
-// 	return
-// }
-
 // 数据转换
 func int64ToBytes(i int64) []byte {
 	var buf = make([]byte, 8)
@@ -99,13 +93,14 @@ func (l *LevelList) Push(value []byte) (e *Element, err error) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
+	// 添加数据并更新右游标
 	idx := l.end + 1
 	batch := new(leveldb.Batch)
 	batch.Put(l.idxkey(idx), value)
 	batch.Put(l.endkey(), int64ToBytes(idx))
 	err = l.db.Write(batch, l.wo)
 	if err == nil {
-		// 写入成功后才移动游标
+		// 写入成功
 		l.end++
 	}
 	e = &Element{}
@@ -125,13 +120,13 @@ func (l *LevelList) Pop() (e *Element, err error) {
 	if err != nil {
 		return nil, err
 	}
-	// move, move, move
+	// 更新左游标，并删除数据
 	batch := new(leveldb.Batch)
 	batch.Put(l.startkey(), int64ToBytes(l.start+1))
 	batch.Delete(l.idxkey(idx))
 	err = l.db.Write(batch, l.wo)
 	if err == nil {
-		// 写入成功后才移动游标
+		// 删除成功
 		l.start++
 	} else {
 		return nil, err
@@ -139,10 +134,11 @@ func (l *LevelList) Pop() (e *Element, err error) {
 	return
 }
 
-func (l *LevelList) Element(idx int64) (e *Element) {
-	if idx < 0 || idx >= l.Len() {
+func (l *LevelList) Element(i int64) (e *Element) {
+	if i < 0 || i >= l.Len() {
 		return nil
 	}
+	idx := l.start + i
 	value, err := l.db.Get(l.idxkey(idx), l.ro)
 	if err != nil {
 		return

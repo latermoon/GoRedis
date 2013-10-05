@@ -2,17 +2,18 @@ package goredis_server
 
 /*
 自定义aof指令集，用于实现海量日志存储
-aof_push key value [value ...]
-aof_pop key 10
-aof_index key index
-aof_range key start end
-aof_len key
+aof_push key value [value ...]    <IntegerReply: length>
+aof_pop key    <BulkReply: nil>
+aof_index key index    <BulkReply: nil>
+aof_range key start end    <MultiBulksReply: nil>
+aof_len key    <IntegerReply: 0>
 */
 
 import (
 	. "../goredis"
 	"./libs/leveltool"
 	. "./storage"
+	"fmt"
 )
 
 func (server *GoRedisServer) aoflistByKey(key string, create bool) (lst *leveltool.LevelList) {
@@ -22,12 +23,8 @@ func (server *GoRedisServer) aoflistByKey(key string, create bool) (lst *levelto
 	var exist bool
 	lst, exist = server.aoftable[key]
 	if !exist {
-		// inner key
-		// __aof:user:100422:lochistory:_start = 0
-		// __aof:user:100422:lochistory:_end = 1
-		// __aof:user:100422:lochistory:idx:0 = hello
-		// __aof:user:100422:lochistory:idx:1 = hello
-		lst = leveltool.NewLevelList(server.datasource.(*LevelDBDataSource).DB(), "__goredis:aof:"+key)
+		// 使用levellist实现
+		lst = leveltool.NewLevelList(server.datasource.(*LevelDBDataSource).DB(), "__aof:"+key)
 		server.aoftable[key] = lst
 	}
 	return
@@ -76,10 +73,40 @@ func (server *GoRedisServer) OnAOF_INDEX(cmd *Command) (reply *Reply) {
 	return
 }
 
-// func (server *GoRedisServer) OnAOF_RANGE(cmd *Command) (reply *Reply) {
-// 	key := cmd.StringAtIndex(1)
-// 	return
-// }
+func (server *GoRedisServer) OnAOF_RANGE(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	lst := server.aoflistByKey(key, false)
+	if lst == nil {
+		return MultiBulksReply([]interface{}{})
+	}
+	start, e1 := cmd.IntAtIndex(2)
+	end, e2 := cmd.IntAtIndex(3)
+	if e1 != nil || e2 != nil {
+		return ErrorReply("bad start/end")
+	} else if start < 0 {
+		return ErrorReply("start > end")
+	} else if end != -1 && start > end {
+		return ErrorReply("start > end")
+	}
+	// 初始缓冲
+	buflen := end - start + 1
+	if end <= 0 || end > 10000 {
+		buflen = 10000
+	}
+	bulks := make([]interface{}, 0, buflen)
+	fmt.Println(start, end, buflen)
+	for i := start; i <= end || end == -1; i++ {
+		fmt.Println(i, i <= end || end == -1)
+		elem := lst.Element(int64(i))
+		fmt.Println(elem)
+		if elem == nil {
+			break
+		}
+		bulks = append(bulks, elem.Value.([]byte))
+	}
+	reply = MultiBulksReply(bulks)
+	return
+}
 
 func (server *GoRedisServer) OnAOF_LEN(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
