@@ -2,10 +2,13 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"./libs/leveltool"
+	"./libs/uuid"
 	"./monitor"
 	. "./storage"
 	"container/list"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 )
@@ -56,10 +59,14 @@ type GoRedisServer struct {
 	statusLogger *monitor.StatusLogger
 	syncMonitor  *monitor.StatusLogger
 	// 从库
+	uid              string // 实例id
 	slavelist        *list.List
 	needSyncCmdTable map[string]bool // 需要同步的指令
 	// locks
 	stringMutex sync.Mutex
+	// aof
+	aoftable      map[string]*leveltool.LevelList
+	aoftableMutex sync.Mutex
 }
 
 func NewGoRedisServer(directory string) (server *GoRedisServer) {
@@ -81,11 +88,15 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")
 	// slave
+	server.uid = uuid.UUID(8)
+	fmt.Println("uid", server.uid)
 	server.slavelist = list.New()
 	server.needSyncCmdTable = make(map[string]bool)
 	for _, cmd := range needSyncCmds {
 		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
 	}
+	// aof
+	server.aoftable = make(map[string]*leveltool.LevelList)
 	return
 }
 
@@ -130,7 +141,7 @@ func (server *GoRedisServer) On(cmd *Command, session *Session) {
 		// 同步到从库
 		if _, ok := server.needSyncCmdTable[cmdName]; ok {
 			for e := server.slavelist.Front(); e != nil; e = e.Next() {
-				e.Value.(*SlaveSession).SendCommand(cmd)
+				e.Value.(*SlaveSession).AsyncSendCommand(cmd)
 			}
 		}
 	}()
