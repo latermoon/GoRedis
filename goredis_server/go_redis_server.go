@@ -2,6 +2,7 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"./libs/leveltool"
 	"./monitor"
 	. "./storage"
 	"container/list"
@@ -60,6 +61,9 @@ type GoRedisServer struct {
 	needSyncCmdTable map[string]bool // 需要同步的指令
 	// locks
 	stringMutex sync.Mutex
+	// aof
+	aoftable      map[string]*leveltool.LevelList
+	aoftableMutex sync.Mutex
 }
 
 func NewGoRedisServer(directory string) (server *GoRedisServer) {
@@ -86,6 +90,8 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	for _, cmd := range needSyncCmds {
 		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
 	}
+	// aof
+	server.aoftable = make(map[string]*leveltool.LevelList)
 	return
 }
 

@@ -37,10 +37,12 @@ type BaseEntry struct {
 }
 
 func (b *BaseEntry) Encode() (bs []byte, err error) {
+	err = errors.New("Not implemented")
 	return
 }
 
 func (b *BaseEntry) Decode(bs []byte) (err error) {
+	err = errors.New("Not implemented")
 	return
 }
 

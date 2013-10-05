@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"strings"
 	"sync"
 )
 
@@ -47,23 +48,34 @@ func (s *SlaveSession) SendSnapshot(snapshot *leveldb.Snapshot) {
 	defer s.sendmutex.Unlock()
 
 	iter := snapshot.NewIterator(&opt.ReadOptions{})
+	defer func() {
+		// 必须释放Iterator和Snapshot
+		iter.Release()
+		snapshot.Release()
+	}()
+
 	for iter.Next() {
+		// 跳过系统数据
+		key := string(iter.Key())
+		if strings.HasPrefix(key, "__goredis:") {
+			continue
+		}
 		entry, e1 := s.toEntry(iter.Value())
 		if e1 != nil {
 			fmt.Println(e1)
 			continue
 		}
 		cmd := entryToCommand(iter.Key(), entry)
-		fmt.Println("cmd", cmd)
-		if cmd != nil {
-			s.session.WriteCommand(cmd)
-		} else {
+		if cmd == nil {
 			fmt.Println(string(iter.Key()), string(iter.Value()))
+			continue
+		}
+		fmt.Println("cmd", cmd)
+		e2 := s.session.WriteCommand(cmd)
+		if e2 != nil {
+			// 销毁整个slave
 		}
 	}
-	// 必须释放Iterator和Snapshot
-	iter.Release()
-	snapshot.Release()
 	// 开始消费
 	go s.runloop()
 }
