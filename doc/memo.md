@@ -14,10 +14,14 @@ __goredis:slave:d03b4f61dd:info = {
 }
 ```
 
-__goredis:slave:d03b4f61dd:aof:1004 = [Entry]
-__goredis:slave:d03b4f61dd:aof:1005 = [Entry]
-__goredis:slave:d03b4f61dd:aof:1006 = [Entry]
-__goredis:slave:d03b4f61dd:aof:1007 = [Entry]
-__goredis:slave:d03b4f61dd:aof:1008 = [Entry]
+#### aof list
 
+\[prefix]:_start = 1004 (int64)
+\[prefix]:_end = 1008 (int64)
+\[prefix]:idx:1004 = hello ([]byte)
+\[prefix]:idx:1005 = hello
+\[prefix]:idx:1006 = hello
+\[prefix]:idx:1007 = hello
+\[prefix]:idx:1008 = hello
 
+ds 
