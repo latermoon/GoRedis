@@ -103,6 +103,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 }
 
 func (server *GoRedisServer) Listen(host string) {
+	stdlog.Info("listen %s", host)
 	server.RedisServer.Listen(host)
 }
 
