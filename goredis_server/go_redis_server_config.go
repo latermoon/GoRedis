@@ -30,13 +30,16 @@ func (server *GoRedisServer) configGet(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) configSet(cmd *Command) (reply *Reply) {
+	reply = StatusReply("OK")
 	return
 }
 
 func (server *GoRedisServer) configRewrite(cmd *Command) (reply *Reply) {
+	reply = StatusReply("OK")
 	return
 }
 
 func (server *GoRedisServer) configResetStat(cmd *Command) (reply *Reply) {
+	reply = StatusReply("OK")
 	return
 }

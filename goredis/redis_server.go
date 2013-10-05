@@ -25,9 +25,9 @@ const (
 type CommandHandler interface {
 	// 首先搜索"On+大写NAME"格式的函数，存在则调用，不存在则调用On
 	// OnGET(cmd *Command) (reply *Reply)
-	// OnGET(cmd *Command, session *Session) (reply *Reply)
-	OnUndefined(cmd *Command, session *Session) (reply *Reply)
-	On(cmd *Command, session *Session)
+	// OnGET(session *Session, cmd *Command) (reply *Reply)
+	OnUndefined(session *Session, cmd *Command) (reply *Reply)
+	On(session *Session, cmd *Command)
 }
 
 // 一个空的默认命令处理对象
@@ -35,10 +35,10 @@ type emptyCommandHandler struct {
 	CommandHandler
 }
 
-func (s *emptyCommandHandler) On(cmd *Command, session *Session) {
+func (s *emptyCommandHandler) On(session *Session, cmd *Command) {
 }
 
-func (s *emptyCommandHandler) OnUndefined(cmd *Command, session *Session) (reply *Reply) {
+func (s *emptyCommandHandler) OnUndefined(session *Session, cmd *Command) (reply *Reply) {
 	return ErrorReply("Not Supported: " + cmd.String())
 }
 
@@ -102,21 +102,21 @@ func (server *RedisServer) InvokeCommandHandler(session *Session, cmd *Command) 
 	}
 
 	// 通用调用
-	server.handler.On(cmd, session)
+	server.handler.On(session, cmd)
 	if method.IsValid() {
 		// 可以调用两种接口
 		// method = OnXXX(cmd *Command) (reply *Reply)
-		// method = OnXXX(cmd *Command, session *Session) (reply *Reply)
+		// method = OnXXX(session *Session, cmd *Command) (reply *Reply)
 		var in []reflect.Value
 		if method.Type().NumIn() == 1 {
 			in = []reflect.Value{reflect.ValueOf(cmd)}
 		} else {
-			in = []reflect.Value{reflect.ValueOf(cmd), reflect.ValueOf(session)}
+			in = []reflect.Value{reflect.ValueOf(session), reflect.ValueOf(cmd)}
 		}
 		callResult := method.Call(in)
 		reply = callResult[0].Interface().(*Reply)
 	} else {
-		reply = server.handler.OnUndefined(cmd, session)
+		reply = server.handler.OnUndefined(session, cmd)
 	}
 	return
 }
