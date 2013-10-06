@@ -47,11 +47,11 @@ package log4go
 
 import (
 	"errors"
-	"os"
 	"fmt"
-	"time"
-	"strings"
+	"os"
 	"runtime"
+	"strings"
+	"time"
 )
 
 // Version information
@@ -196,10 +196,16 @@ func (log Logger) intLogf(lvl level, format string, args ...interface{}) {
 	}
 
 	// Determine caller func
-	pc, _, lineno, ok := runtime.Caller(2)
+	_, filename, lineno, ok := runtime.Caller(2)
 	src := ""
 	if ok {
-		src = fmt.Sprintf("%s:%d", runtime.FuncForPC(pc).Name(), lineno)
+		// TODO latermoon
+		subs := strings.SplitAfter(filename, "/")
+		if len(subs) > 0 {
+			filename = subs[len(subs)-1]
+		}
+		// src = fmt.Sprintf("%s:%d", runtime.FuncForPC(pc).Name(), lineno)
+		src = fmt.Sprintf("%s:%d", filename, lineno)
 	}
 
 	msg := format

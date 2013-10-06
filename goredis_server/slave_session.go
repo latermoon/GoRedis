@@ -66,18 +66,20 @@ func (s *SlaveSession) ContinueAof() {
 
 // 向远程写入
 func (s *SlaveSession) remoteRunloop() {
+	s.server.stdlog.Info("remote runloop start")
+	defer s.server.stdlog.Info("remote runloop end")
 	for {
 		// 先消费别人的
 		if s.currentCommand == nil {
 			s.currentCommand = <-s.cmdbuffer
 		}
-		fmt.Println("send", s.currentCommand)
+		s.server.stdlog.Debug("remote send %s %s", s.session.RemoteAddr(), s.currentCommand)
 		err := s.session.WriteCommand(s.currentCommand)
 		if err != nil {
-			fmt.Println("slave gone away ...")
+			s.server.stdlog.Warn("remote slave gone away %s", s.session.RemoteAddr())
 			// 从库断开后写入本地aof
 			if s.AofEnabled() {
-				fmt.Println("change to aof ...")
+				s.server.stdlog.Info("redirect to aof writer")
 				go s.aofRunloop()
 				return
 			}
@@ -89,15 +91,17 @@ func (s *SlaveSession) remoteRunloop() {
 
 // 向本地aof写入
 func (s *SlaveSession) aofRunloop() {
+	s.server.stdlog.Info("aof wirte runloop start")
+	defer s.server.stdlog.Info("aof write runloop end")
 	for {
 		if s.currentCommand == nil {
 			s.currentCommand = <-s.cmdbuffer
 		}
-		fmt.Println("aof push", s.currentCommand)
+		s.server.stdlog.Debug("aof write %s", s.currentCommand)
 		_, err := s.aoflist.Push(s.currentCommand.Bytes())
 		// 如果写入aof出错，应该废弃全部aof，重来snapshot
 		if err != nil {
-			fmt.Println("Error aof push ...", err)
+			s.server.stdlog.Error("aof write err %s", err)
 			return
 		}
 		if s.shouldChangeToRemote {
@@ -112,9 +116,11 @@ func (s *SlaveSession) aofRunloop() {
 
 // 从aof读取向远程写入
 func (s *SlaveSession) aofToRemoteRunloop() {
+	s.server.stdlog.Info("aof to remote runloop start")
+	defer s.server.stdlog.Info("aof to remote runloop end")
 	// 从aof向远程写时，不应该有待处理的数据
 	if s.currentCommand != nil {
-		fmt.Println("where are you?", s.currentCommand)
+		s.server.stdlog.Error("where are you come from? %s", s.currentCommand)
 		return
 	}
 	sendCount := 0
@@ -122,12 +128,12 @@ func (s *SlaveSession) aofToRemoteRunloop() {
 		elem, e1 := s.aoflist.Index(0)
 		if e1 != nil {
 			// 如果aof出错，应该废弃全部aof，重来snapshot
-			fmt.Println("Error aof index ...", e1)
+			s.server.stdlog.Error("aof to remote peek error %s", e1)
 			return
 		}
 		// 同步完毕，转向直接远程写入
 		if elem == nil {
-			fmt.Println("aof finish count", sendCount)
+			s.server.stdlog.Info("aof to remote finish, send %d cmd", sendCount)
 			go s.remoteRunloop()
 			return
 		}
@@ -136,14 +142,14 @@ func (s *SlaveSession) aofToRemoteRunloop() {
 		bs := elem.Value.([]byte)
 		n, e2 := s.session.Write(bs)
 		if e2 != nil {
-			fmt.Println("aof to remote error", n, e2)
+			s.server.stdlog.Error("aof to remote send error n(%d), %s", n, e2)
 			return
 		}
 		// 移除
 		_, e3 := s.aoflist.Pop()
 		if e3 != nil {
 			// 如果aof出错，应该废弃全部aof，重来snapshot
-			fmt.Println("Error aof pop ...", e3)
+			s.server.stdlog.Error("aof to remote pop error %s", e3)
 			return
 		}
 	}
@@ -157,6 +163,8 @@ func (s *SlaveSession) AsyncSendCommand(cmd *Command) {
 // 时间关系，暂时使用了 []byte -> Entry -> Command -> slave 的方法，
 // 应该改为官方发送rdb数据的方式
 func (s *SlaveSession) SendSnapshot(snapshot *leveldb.Snapshot) {
+	s.server.stdlog.Info("snapshot send runloop start")
+	defer s.server.stdlog.Info("snapshot send runloop end")
 	s.sendmutex.Lock()
 	defer s.sendmutex.Unlock()
 
@@ -175,15 +183,15 @@ func (s *SlaveSession) SendSnapshot(snapshot *leveldb.Snapshot) {
 		}
 		entry, e1 := s.toEntry(iter.Value())
 		if e1 != nil {
-			fmt.Println(e1)
+			s.server.stdlog.Warn("snapshot fetch entry error %s", e1)
 			continue
 		}
 		cmd := entryToCommand(iter.Key(), entry)
 		if cmd == nil {
-			fmt.Println(string(iter.Key()), string(iter.Value()))
+			s.server.stdlog.Warn("snapshot entry to command error %s, %s", string(iter.Key()), string(iter.Value()))
 			continue
 		}
-		fmt.Println("cmd", cmd)
+		s.server.stdlog.Debug("snapshot send %s", cmd)
 		e2 := s.session.WriteCommand(cmd)
 		if e2 != nil {
 			// 销毁整个slave

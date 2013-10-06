@@ -34,6 +34,14 @@ func NewSession(conn net.Conn) (s *Session) {
 	return
 }
 
+func (s *Session) LocalAddr() net.Addr {
+	return s.conn.LocalAddr()
+}
+
+func (s *Session) RemoteAddr() net.Addr {
+	return s.conn.RemoteAddr()
+}
+
 // 返回数据到客户端
 func (s *Session) Reply(reply *Reply) (err error) {
 	return s.WriteReply(reply)

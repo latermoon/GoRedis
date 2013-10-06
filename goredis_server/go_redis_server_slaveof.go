@@ -4,7 +4,6 @@ import (
 	. "../goredis"
 	"./libs/rdb"
 	. "./storage"
-	"fmt"
 	"net"
 	"strings"
 )
@@ -37,7 +36,7 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 	for {
 		c, err := session.PeekByte()
 		if err != nil {
-			fmt.Println("master gone away ...")
+			server.stdlog.Warn("master gone away %s", session.RemoteAddr())
 			return
 		}
 		if c == '*' {
@@ -60,19 +59,19 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 				case "PING":
 					server.syncCounters.Get("ping").Incr(1)
 				}
-				fmt.Println(cmd, reply)
+				server.stdlog.Debug("sync recv %s %s", cmd, reply)
 			} else {
-				fmt.Println("sync error, ", e2)
+				server.stdlog.Error("sync error %s", e2)
 				return
 			}
 		} else if c == '$' {
-			fmt.Println("read rdb...")
+			server.stdlog.Info("read rdb %s", session.RemoteAddr())
 			session.ReadByte()
 			rdbsize, e3 := session.ReadLineInteger()
 			if e3 != nil {
 				panic(e3)
 			}
-			fmt.Println("rdbsize", rdbsize)
+			server.stdlog.Info("rdbsize %d", rdbsize)
 			// read
 			dec := newDecoder(server)
 			e2 := rdb.Decode(session, dec)
@@ -80,7 +79,7 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 				panic(e2)
 			}
 		} else {
-			fmt.Println("skip byte %q %s", c, string(c))
+			server.stdlog.Debug("skip byte %q %s", c, string(c))
 			session.ReadByte()
 		}
 	}
@@ -115,7 +114,7 @@ func (p *rdbDecoder) EndDatabase(n int) {
 }
 
 func (p *rdbDecoder) EndRDB() {
-	fmt.Println("End RDB")
+	p.server.stdlog.Info("rdb end")
 }
 
 func (p *rdbDecoder) Set(key, value []byte, expiry int64) {
@@ -123,7 +122,7 @@ func (p *rdbDecoder) Set(key, value []byte, expiry int64) {
 	p.server.datasource.Set(string(key), p.stringEntry)
 	p.server.syncCounters.Get("total").Incr(1)
 	p.server.syncCounters.Get("string").Incr(1)
-	fmt.Printf("db=%d [string] %q -> %q\n", p.db, key, value)
+	p.server.stdlog.Debug("db=%d [string] %q -> %q", p.db, key, value)
 }
 
 func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
@@ -139,7 +138,7 @@ func (p *rdbDecoder) EndHash(key []byte) {
 	p.server.datasource.Set(string(key), p.hashEntry)
 	p.server.syncCounters.Get("total").Incr(1)
 	p.server.syncCounters.Get("hash").Incr(1)
-	fmt.Printf("db=%d [hash] %q\n", p.db, key)
+	p.server.stdlog.Debug("db=%d [hash] %q", p.db, key)
 }
 
 func (p *rdbDecoder) StartSet(key []byte, cardinality, expiry int64) {
@@ -155,7 +154,7 @@ func (p *rdbDecoder) EndSet(key []byte) {
 	p.server.datasource.Set(string(key), p.setEntry)
 	p.server.syncCounters.Get("total").Incr(1)
 	p.server.syncCounters.Get("set").Incr(1)
-	fmt.Printf("db=%d [set] %q\n", p.db, key)
+	p.server.stdlog.Debug("db=%d [set] %q", p.db, key)
 }
 
 func (p *rdbDecoder) StartList(key []byte, length, expiry int64) {
@@ -173,7 +172,7 @@ func (p *rdbDecoder) EndList(key []byte) {
 	p.server.datasource.Set(string(key), p.listEntry)
 	p.server.syncCounters.Get("total").Incr(1)
 	p.server.syncCounters.Get("list").Incr(1)
-	fmt.Printf("db=%d [list] %q\n", p.db, key)
+	p.server.stdlog.Debug("db=%d [list] %q", p.db, key)
 }
 
 func (p *rdbDecoder) StartZSet(key []byte, cardinality, expiry int64) {
@@ -191,5 +190,5 @@ func (p *rdbDecoder) EndZSet(key []byte) {
 	p.server.datasource.Set(string(key), p.zsetEntry)
 	p.server.syncCounters.Get("total").Incr(1)
 	p.server.syncCounters.Get("zset").Incr(1)
-	fmt.Printf("db=%d [zset] %q\n", p.db, key)
+	p.server.stdlog.Debug("db=%d [zset] %q", p.db, key)
 }
