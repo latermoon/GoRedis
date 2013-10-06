@@ -3,12 +3,12 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/leveltool"
+	"./libs/log4go"
 	"./libs/uuid"
 	"./monitor"
 	. "./storage"
 	"container/list"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 )
@@ -60,6 +60,7 @@ type GoRedisServer struct {
 	// logger
 	statusLogger *monitor.StatusLogger
 	syncMonitor  *monitor.StatusLogger
+	stdlog       log4go.Logger
 	// 从库
 	uid              string // 实例id
 	slavelist        *list.List
@@ -71,35 +72,46 @@ type GoRedisServer struct {
 	aoftableMutex sync.Mutex
 }
 
+/*
+	server := NewGoRedisServer(directory)
+	server.Init()
+	server.Listen(host)
+*/
 func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server = &GoRedisServer{}
 	// set as itself
 	server.SetHandler(server)
 	// default datasource
 	server.directory = directory
+	server.needSyncCmdTable = make(map[string]bool)
+	server.slavelist = list.New()
+	server.aoftable = make(map[string]*leveltool.LevelList) // aof
+	for _, cmd := range needSyncCmds {
+		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
+	}
+	// counter
+	server.cmdCounters = monitor.NewCounters()
+	server.syncCounters = monitor.NewCounters()
+	return
+}
+
+func (server *GoRedisServer) Init() {
+	server.initLogger()
+	server.stdlog.Info("========================================")
+	server.stdlog.Info("server init ...")
+	// leveldb
 	var e1 error
 	server.datasource, e1 = NewLevelDBDataSource(server.directory + "/db0")
 	if e1 != nil {
 		panic(e1)
 	}
 	// server.datasource = NewMemoryDataSource()
-	// counter
-	server.cmdCounters = monitor.NewCounters()
-	server.syncCounters = monitor.NewCounters()
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")
 	// slave
-	fmt.Println("uid", server.UID())
-	server.slavelist = list.New()
+	server.stdlog.Info("init uid %s", server.UID())
 	server.initSlaveSessions()
-	server.needSyncCmdTable = make(map[string]bool)
-	for _, cmd := range needSyncCmds {
-		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
-	}
-	// aof
-	server.aoftable = make(map[string]*leveltool.LevelList)
-	return
 }
 
 func (server *GoRedisServer) Listen(host string) {
@@ -122,12 +134,28 @@ func (server *GoRedisServer) UID() (uid string) {
 	return server.uid
 }
 
+func (server *GoRedisServer) StdLog() log4go.Logger {
+	return server.stdlog
+}
+
+func (server *GoRedisServer) initLogger() {
+	level := log4go.DEBUG
+	// console
+	server.stdlog = make(log4go.Logger)
+	server.stdlog.AddFilter("stdout", level, log4go.NewConsoleLogWriter())
+	// file
+	filelog := log4go.NewFileLogWriter(server.directory+"/stdout.log", false)
+	server.stdlog.AddFilter("file", level, filelog)
+	// package内的全局变量，方便调用
+	stdlog = server.stdlog
+}
+
 // 初始化从库
 func (server *GoRedisServer) initSlaveSessions() {
 	slavesEntry := server.slavesEntry()
+	server.stdlog.Info("init slaves: %s", slavesEntry.Keys())
 	for _, slaveuid := range slavesEntry.Keys() {
 		uid := slaveuid.(string)
-		fmt.Println("init slave", uid)
 		slaveSession := NewSlaveSession(server, nil, uid)
 		server.slavelist.PushBack(slaveSession)
 		slaveSession.ContinueAof()

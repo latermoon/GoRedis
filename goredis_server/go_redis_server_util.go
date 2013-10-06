@@ -3,7 +3,6 @@ package goredis_server
 import (
 	// . "../goredis"
 	. "./storage"
-	"fmt"
 	"strconv"
 )
 
@@ -13,7 +12,6 @@ func (server *GoRedisServer) formatFloat(f float64) string {
 
 func (server *GoRedisServer) slavesEntry() (entry *SetEntry) {
 	entry = server.getConfigEntry("slaves", EntryTypeSet).(*SetEntry)
-	fmt.Println("slaves", entry.Keys())
 	return
 }
 
