@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -21,6 +22,10 @@ func NewLevelDBDataSource(path string) (l *LevelDBDataSource, err error) {
 	l = &LevelDBDataSource{}
 	l.ro = &opt.ReadOptions{}
 	l.wo = &opt.WriteOptions{}
+	options := &opt.Options{}
+	options.SetFlag(opt.OFCreateIfMissing)
+	options.SetWriteBuffer(40 << 20)
+	options.SetMaxOpenFiles(20000) // one open file per 2MB of working set
 	l.db, err = leveldb.OpenFile(path, &opt.Options{Flag: opt.OFCreateIfMissing})
 	return
 }
@@ -79,6 +84,29 @@ func (l *LevelDBDataSource) Set(key string, entry Entry) (err error) {
 		copy(buf[1:], bs)
 		err = l.db.Put([]byte(key), buf, l.wo)
 	}
+	return
+}
+
+func (l *LevelDBDataSource) MSet(keyentry ...interface{}) (err error) {
+	if len(keyentry)%2 != 0 {
+		err = errors.New("bad key value pair ...")
+		return
+	}
+	batch := new(leveldb.Batch)
+	for i := 0; i < len(keyentry); i += 2 {
+		key := keyentry[i].([]byte)
+		entry := keyentry[i+1].(Entry)
+		bs, e1 := entry.Encode()
+		if e1 == nil {
+			buf := make([]byte, len(bs)+1)
+			copy(buf, []byte{byte(entry.Type())})
+			copy(buf[1:], bs)
+			batch.Put(key, buf)
+		} else {
+			return e1
+		}
+	}
+	err = l.db.Write(batch, l.wo)
 	return
 }
 
