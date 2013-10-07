@@ -2,8 +2,8 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"./libs/golog"
 	"./libs/leveltool"
-	"./libs/log4go"
 	"./libs/uuid"
 	"./monitor"
 	. "./storage"
@@ -60,7 +60,7 @@ type GoRedisServer struct {
 	// logger
 	statusLogger *monitor.StatusLogger
 	syncMonitor  *monitor.StatusLogger
-	stdlog       log4go.Logger
+	stdlog       *golog.Logger
 	// 从库
 	uid              string // 实例id
 	slavelist        *list.List
@@ -134,18 +134,13 @@ func (server *GoRedisServer) UID() (uid string) {
 	return server.uid
 }
 
-func (server *GoRedisServer) StdLog() log4go.Logger {
+func (server *GoRedisServer) StdLog() *golog.Logger {
 	return server.stdlog
 }
 
 func (server *GoRedisServer) initLogger() {
-	level := log4go.DEBUG
-	// console
-	server.stdlog = make(log4go.Logger)
-	server.stdlog.AddFilter("stdout", level, log4go.NewConsoleLogWriter())
-	// file
-	filelog := log4go.NewFileLogWriter(server.directory+"/stdout.log", false)
-	server.stdlog.AddFilter("file", level, filelog)
+	out := golog.NewConsoleAndFileWriter(server.directory + "/stdout.log")
+	server.stdlog = golog.New(out, golog.DEBUG)
 	// package内的全局变量，方便调用
 	stdlog = server.stdlog
 }

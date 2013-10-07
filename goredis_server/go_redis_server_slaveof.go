@@ -14,7 +14,9 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 	// connect master
 	host := cmd.StringAtIndex(1)
 	port := cmd.StringAtIndex(2)
-	conn, err := net.Dial("tcp", host+":"+port)
+
+	hostPort := host + ":" + port
+	conn, err := net.Dial("tcp", hostPort)
 	reply = ReplySwitch(err, StatusReply("OK"))
 	if err != nil {
 		return
@@ -25,14 +27,46 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 	return
 }
 
+// 获取redis info
+func (server *GoRedisServer) detectRedisInfo(session *Session, section string) (info string, err error) {
+	cmdinfo := NewCommand([]byte("INFO"), []byte(section))
+	session.WriteCommand(cmdinfo)
+	var reply *Reply
+	reply, err = session.ReadReply()
+	if err == nil {
+		switch reply.Value.(type) {
+		case string:
+			info = reply.Value.(string)
+		case []byte:
+			info = string(reply.Value.([]byte))
+		default:
+			info = reply.String()
+		}
+	}
+	return
+}
+
 // -ERR wrong number of arguments for 'sync' command
 func (server *GoRedisServer) slaveOf(session *Session) {
-	cmdsync := NewCommand([]byte("SYNC"), []byte("uid"), []byte(server.UID()))
-	// cmdsync := NewCommand([]byte("SYNC"))
+	// 检查是goredis还是官方redis
+	info, e1 := server.detectRedisInfo(session, "server")
+	if e1 != nil {
+		server.stdlog.Error("[%s] slave of error %s", session.RemoteAddr(), e1)
+		return
+	}
+	isGoRedis := strings.Index(info, "goredis_version") > 0
+
+	var cmdsync *Command
+	if isGoRedis {
+		// 如果是GoRedis，需要发送自身uid，实现增量同步
+		cmdsync = NewCommand([]byte("SYNC"), []byte("uid"), []byte(server.UID()))
+	} else {
+		cmdsync = NewCommand([]byte("SYNC"))
+	}
+
 	session.WriteCommand(cmdsync)
 
 	// 这里代码有有点乱，可优化
-
 	for {
 		c, err := session.PeekByte()
 		if err != nil {
