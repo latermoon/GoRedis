@@ -23,13 +23,21 @@ const (
 type Logger struct {
 	out   io.Writer
 	mu    sync.Mutex
-	Level level
+	level level
 }
 
 func New(out io.Writer, lvl Level) (logger *Logger) {
 	logger = &Logger{}
-	logger.Level = lvl
+	logger.level = lvl
 	return
+}
+
+func (l *Logger) SetLevel(lvl Level) {
+	l.level = lvl
+}
+
+func (l *Logger) Level() Level {
+	return l.level
 }
 
 func (l *Logger) Log(lvl Level, v ...interface{}) {
