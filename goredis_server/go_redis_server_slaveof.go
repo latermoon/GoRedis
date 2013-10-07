@@ -100,6 +100,10 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 			}
 		} else if c == '$' {
 			server.stdlog.Info("read rdb %s", session.RemoteAddr())
+			// e2 := session.ReadRDB()
+			// if e2 != nil {
+			// 	panic(e2)
+			// }
 			session.ReadByte()
 			rdbsize, e3 := session.ReadLineInteger()
 			if e3 != nil {
@@ -121,8 +125,9 @@ func (server *GoRedisServer) slaveOf(session *Session) {
 
 // 第三方rdb解释函数
 type rdbDecoder struct {
-	db int
-	i  int
+	db       int
+	i        int
+	keyCount int
 	rdb.NopDecoder
 	server *GoRedisServer
 	// 数据缓冲区
@@ -136,6 +141,7 @@ type rdbDecoder struct {
 func newDecoder(server *GoRedisServer) (dec *rdbDecoder) {
 	dec = &rdbDecoder{}
 	dec.server = server
+	dec.keyCount = 0
 	return
 }
 
@@ -152,77 +158,82 @@ func (p *rdbDecoder) EndRDB() {
 }
 
 func (p *rdbDecoder) Set(key, value []byte, expiry int64) {
-	p.stringEntry = NewStringEntry(string(value))
-	p.server.datasource.Set(string(key), p.stringEntry)
+	p.keyCount++
+	// p.stringEntry = NewStringEntry(string(value))
+	// p.server.datasource.Set(string(key), p.stringEntry)
 	p.server.syncCounters.Get("total").Incr(1)
 	p.server.syncCounters.Get("string").Incr(1)
-	p.server.stdlog.Debug("db=%d [string] %q -> %q", p.db, key, value)
+	p.server.stdlog.Debug("%d. db=%d [string] %q -> %q", p.keyCount, p.db, key, value)
 }
 
 func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
+	p.keyCount++
 	p.hashEntry = NewHashEntry()
 }
 
 func (p *rdbDecoder) Hset(key, field, value []byte) {
-	p.hashEntry.Set(string(field), string(value))
+	// p.hashEntry.Set(string(field), string(value))
 	//fmt.Printf("db=%d %q . %q -> %q\n", p.db, key, field, value)
 }
 
 func (p *rdbDecoder) EndHash(key []byte) {
-	p.server.datasource.Set(string(key), p.hashEntry)
+	// p.server.datasource.Set(string(key), p.hashEntry)
 	p.server.syncCounters.Get("total").Incr(1)
 	p.server.syncCounters.Get("hash").Incr(1)
-	p.server.stdlog.Debug("db=%d [hash] %q", p.db, key)
+	p.server.stdlog.Debug("%d. db=%d [hash] %q", p.keyCount, p.db, key)
 }
 
 func (p *rdbDecoder) StartSet(key []byte, cardinality, expiry int64) {
+	p.keyCount++
 	p.setEntry = NewSetEntry()
 }
 
 func (p *rdbDecoder) Sadd(key, member []byte) {
-	p.setEntry.Put(string(member))
+	// p.setEntry.Put(string(member))
 	//fmt.Printf("db=%d %q { %q }\n", p.db, key, member)
 }
 
 func (p *rdbDecoder) EndSet(key []byte) {
-	p.server.datasource.Set(string(key), p.setEntry)
+	// p.server.datasource.Set(string(key), p.setEntry)
 	p.server.syncCounters.Get("total").Incr(1)
 	p.server.syncCounters.Get("set").Incr(1)
-	p.server.stdlog.Debug("db=%d [set] %q", p.db, key)
+	p.server.stdlog.Debug("%d. db=%d [set] %q", p.keyCount, p.db, key)
 }
 
 func (p *rdbDecoder) StartList(key []byte, length, expiry int64) {
+	p.keyCount++
 	p.listEntry = NewListEntry()
 	p.i = 0
 }
 
 func (p *rdbDecoder) Rpush(key, value []byte) {
-	p.listEntry.List().RPush(string(value))
+	// p.listEntry.List().RPush(string(value))
 	//fmt.Printf("db=%d %q[%d] ->\n", p.db, key, p.i)
 	p.i++
 }
 
 func (p *rdbDecoder) EndList(key []byte) {
-	p.server.datasource.Set(string(key), p.listEntry)
+	// p.server.datasource.Set(string(key), p.listEntry)
 	p.server.syncCounters.Get("total").Incr(1)
 	p.server.syncCounters.Get("list").Incr(1)
-	p.server.stdlog.Debug("db=%d [list] %q", p.db, key)
+	p.server.stdlog.Debug("%d. db=%d [list] %q", p.keyCount, p.db, key)
 }
 
 func (p *rdbDecoder) StartZSet(key []byte, cardinality, expiry int64) {
+	p.keyCount++
 	p.zsetEntry = NewSortedSetEntry()
 	p.i = 0
 }
 
 func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
-	p.zsetEntry.SortedSet().Add(string(member), score)
+	// p.zsetEntry.SortedSet().Add(string(member), score)
 	//fmt.Printf("db=%d %q[%d] -> {%q, score=%g}\n", p.db, key, p.i, member, score)
 	p.i++
 }
 
 func (p *rdbDecoder) EndZSet(key []byte) {
-	p.server.datasource.Set(string(key), p.zsetEntry)
+	// p.server.datasource.Set(string(key), p.zsetEntry)
 	p.server.syncCounters.Get("total").Incr(1)
 	p.server.syncCounters.Get("zset").Incr(1)
-	p.server.stdlog.Debug("db=%d [zset] %q", p.db, key)
+	p.server.stdlog.Debug("%d. db=%d [zset] %q", p.keyCount, p.db, key)
 }
