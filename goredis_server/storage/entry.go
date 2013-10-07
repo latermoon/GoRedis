@@ -1,9 +1,9 @@
 package storage
 
 import (
+	"../libs/codec"
 	"../libs/sortedset"
 	"errors"
-	"github.com/ugorji/go/codec"
 	"sync"
 )
 
