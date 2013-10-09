@@ -3,7 +3,6 @@ package goredis_server
 import (
 	. "../goredis"
 	. "./storage"
-	"fmt"
 )
 
 // 获取Hash，不存在则自动创建
@@ -49,7 +48,7 @@ func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
 
 	field := cmd.StringAtIndex(2)
 	value := cmd.StringAtIndex(3)
-	fmt.Println("hset", field, value)
+
 	entry.Set(field, value)
 	// update
 	server.datasource.NotifyEntryUpdate(key, entry)

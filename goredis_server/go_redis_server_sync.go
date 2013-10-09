@@ -3,7 +3,6 @@ package goredis_server
 import (
 	. "../goredis"
 	. "./storage"
-	"fmt"
 	"strings"
 )
 
@@ -20,7 +19,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 
 	slave := server.findSlaveById(uid)
 	if slave == nil {
-		fmt.Println("new slave", uid)
+		server.stdlog.Info("[%s] new slave %s", uid, session.RemoteAddr())
 		snapshot, err := server.datasource.(*LevelDBDataSource).DB().GetSnapshot()
 		if err != nil {
 			return ErrorReply(err)
@@ -29,7 +28,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 		server.slavelist.PushBack(slave)
 		go slave.SendSnapshot(snapshot)
 	} else {
-		fmt.Println("slave exist", uid)
+		server.stdlog.Info("[%s] slave already exists", uid)
 		slave.SetSession(session)
 		go slave.ContinueSync()
 	}

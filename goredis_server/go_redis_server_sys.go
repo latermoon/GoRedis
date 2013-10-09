@@ -2,6 +2,7 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"bytes"
 	"fmt"
 )
 
@@ -11,7 +12,14 @@ func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
-	reply = BulkReply("GoRedis by latemroon\n")
+	// section := cmd.StringAtIndex(1)
+	buf := bytes.Buffer{}
+	buf.WriteString("# Server\n")
+	buf.WriteString("goredis_version:0.1\n")
+	buf.WriteString("\n")
+	buf.WriteString("# Clients\n")
+	buf.WriteString("connected_clients:n\n")
+	reply = BulkReply(buf.String())
 	return
 }
 

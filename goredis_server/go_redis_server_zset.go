@@ -5,7 +5,6 @@ package goredis_server
 import (
 	. "../goredis"
 	. "./storage"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -139,9 +138,7 @@ func (server *GoRedisServer) OnZRANGEBYSCORE(cmd *Command) (reply *Reply) {
 			}
 		}
 	}
-	if false {
-		fmt.Println()
-	}
+
 	reply = MultiBulksReply(bulks)
 	return
 }
@@ -156,9 +153,9 @@ func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	} else if entry == nil {
 		return MultiBulksReply([]interface{}{})
 	}
+
 	max, e1 := cmd.FloatAtIndex(2)
 	min, e2 := cmd.FloatAtIndex(3)
-	fmt.Println(key, min, max)
 	if e1 != nil || e2 != nil {
 		return ErrorReply("Bad max/min")
 	}
@@ -173,7 +170,7 @@ func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	// seek to last
 	for iter.Next() {
 	}
-	fmt.Println(iter.Key(), iter.Value())
+
 	// revert
 	for {
 		arr := iter.Value().([]string)
