@@ -24,7 +24,7 @@ func NewLevelDBDataSource(path string) (l *LevelDBDataSource, err error) {
 	l.wo = &opt.WriteOptions{}
 	options := &opt.Options{}
 	options.SetFlag(opt.OFCreateIfMissing)
-	options.SetWriteBuffer(40 << 20)
+	options.SetWriteBuffer(4000 << 20)
 	options.SetMaxOpenFiles(20000) // one open file per 2MB of working set
 	l.db, err = leveldb.OpenFile(path, &opt.Options{Flag: opt.OFCreateIfMissing})
 	return
