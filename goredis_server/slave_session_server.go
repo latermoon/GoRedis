@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-// 指向从库的会话
+// 主从同步中的主库连接
 // new slave: sendSnapshot -> remoteRunloop -> aofRunloop -> aofToRemoteRunloop -> remoteRunloop
 // old slave: aofRunloop -> aofToRemoteRunloop -> remoteRunloop
 type SlaveSession struct {
