@@ -186,9 +186,9 @@ func (l *ListEntry) List() (sl *SafeList) {
 
 func (l *ListEntry) Encode() (bs []byte, err error) {
 	enc := codec.NewEncoderBytes(&bs, &mh)
-	arr := make([]string, 0, l.List().Len())
+	arr := make([]interface{}, 0, l.List().Len())
 	for e := l.List().Front(); e != nil; e = e.Next() {
-		arr = append(arr, e.Value.(string))
+		arr = append(arr, e.Value.(interface{}))
 	}
 	err = enc.Encode(arr)
 	return
@@ -196,7 +196,7 @@ func (l *ListEntry) Encode() (bs []byte, err error) {
 
 func (l *ListEntry) Decode(bs []byte) (err error) {
 	dec := codec.NewDecoderBytes(bs, &mh)
-	arr := make([]string, 0)
+	arr := make([]interface{}, 0)
 	err = dec.Decode(&arr)
 	l.List().RPush(arr...)
 	return

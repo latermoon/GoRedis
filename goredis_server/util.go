@@ -11,6 +11,14 @@ func formatFloat(f float64) string {
 	return strconv.FormatFloat(f, 'g', 12, 64)
 }
 
+func StringToInterfaceSlice(vals []string) (result []interface{}) {
+	result = make([]interface{}, len(vals))
+	for i, val := range vals {
+		result[i] = val
+	}
+	return
+}
+
 func entryToCommand(key []byte, entry Entry) (cmd *Command) {
 	args := make([][]byte, 0, 10)
 

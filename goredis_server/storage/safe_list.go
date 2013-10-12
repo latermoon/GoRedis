@@ -47,7 +47,7 @@ func (sl *SafeList) RPop() (value interface{}) {
 	return
 }
 
-func (sl *SafeList) LPush(values ...string) (length int) {
+func (sl *SafeList) LPush(values ...interface{}) (length int) {
 	sl.mutex.Lock()
 	defer sl.mutex.Unlock()
 	for _, value := range values {
@@ -57,7 +57,7 @@ func (sl *SafeList) LPush(values ...string) (length int) {
 	return
 }
 
-func (sl *SafeList) RPush(values ...string) (length int) {
+func (sl *SafeList) RPush(values ...interface{}) (length int) {
 	sl.mutex.Lock()
 	defer sl.mutex.Unlock()
 	for _, value := range values {
