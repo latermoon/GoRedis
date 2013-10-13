@@ -79,7 +79,8 @@ func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 	}
 
 	values := cmd.StringArgs()[2:]
-	n := entry.List().RPush(values...)
+	objs := StringToInterfaceSlice(values)
+	n := entry.List().RPush(objs...)
 	if n > 0 {
 		server.datasource.NotifyEntryUpdate(key, entry)
 	}
@@ -114,7 +115,8 @@ func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 	}
 
 	values := cmd.StringArgs()[2:]
-	n := entry.List().LPush(values...)
+	objs := StringToInterfaceSlice(values)
+	n := entry.List().LPush(objs...)
 	if n > 0 {
 		server.datasource.NotifyEntryUpdate(key, entry)
 	}
