@@ -1,3 +1,7 @@
+git clone -b GoRedisDev https://github.com/latermoon/GoRedis.git GoRedisDev
+git fetch
+
+
 ### goredis-server config
 
 GoRedis开发进展
