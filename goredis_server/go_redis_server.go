@@ -168,7 +168,7 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 		if padding < 7 {
 			padding = 7
 		}
-		server.statusLogger.Add(monitor.NewCountFormater(server.cmdCounters.Get(cmd), cmd, padding))
+		server.statusLogger.Add(monitor.NewCountFormater(server.cmdCounters.Get(cmd), cmd, padding, "ChangedCount"))
 	}
 	server.statusLogger.Start()
 }
@@ -179,8 +179,10 @@ func (server *GoRedisServer) initSyncMonitor(path string) {
 	server.syncMonitor.Add(monitor.NewTimeFormater("Time", 8))
 	cmds := []string{"total", "string", "hash", "set", "list", "zset", "ping"}
 	for _, cmd := range cmds {
-		server.syncMonitor.Add(monitor.NewCountFormater(server.syncCounters.Get(cmd), cmd, 8))
+		server.syncMonitor.Add(monitor.NewCountFormater(server.syncCounters.Get(cmd), cmd, 8, "ChangedCount"))
 	}
+	// buffer用于显示同步过程中的taskqueue buffer长度
+	server.syncMonitor.Add(monitor.NewCountFormater(server.syncCounters.Get("buffer"), "buffer", 8, "Count"))
 	server.syncMonitor.Start()
 }
 

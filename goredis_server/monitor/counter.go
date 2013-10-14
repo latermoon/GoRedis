@@ -18,6 +18,12 @@ func NewCounter() (c *Counter) {
 	return
 }
 
+func (c *Counter) SetCount(i int) {
+	c.mutex.Lock()
+	c.prevCount, c.count = c.count, i
+	c.mutex.Unlock()
+}
+
 func (c *Counter) Count() int {
 	return c.count
 }

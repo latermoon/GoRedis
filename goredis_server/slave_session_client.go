@@ -87,6 +87,7 @@ func (s *SlaveSessionClient) processRunloop() {
 			sleepCount = 0
 		}
 		// Process
+		s.server.syncCounters.Get("buffer").SetCount(s.taskqueue.Len())
 		// s.server.stdlog.Debug("[%s] slaveof process %s", s.session.RemoteAddr(), obj)
 		switch obj.(type) {
 		case *Command:
