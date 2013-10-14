@@ -67,7 +67,7 @@ func entryToCommand(key []byte, entry Entry) (cmd *Command) {
 		args = append(args, key)
 		sl := entry.(*ListEntry).List()
 		for e := sl.Front(); e != nil; e = e.Next() {
-			args = append(args, []byte(e.Value.(string)))
+			args = append(args, e.Value.([]byte))
 		}
 	default:
 	}
