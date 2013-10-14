@@ -23,7 +23,9 @@ var (
 	mh = codec.MsgpackHandle{}
 )
 
-// ====================Entry====================
+// ========================================
+// Entry
+// ========================================
 // Redis协议基本数据结构
 type Entry interface {
 	Type() EntryType
@@ -31,7 +33,9 @@ type Entry interface {
 	Decode(bs []byte) (err error)
 }
 
-// ====================EntryFactory====================
+// ========================================
+// EntryFactory
+// ========================================
 func NewEmptyEntry(et EntryType) (entry Entry) {
 	switch et {
 	case EntryTypeString:
@@ -50,7 +54,9 @@ func NewEmptyEntry(et EntryType) (entry Entry) {
 	return
 }
 
-// ====================BaseEntry====================
+// ========================================
+// BaseEntry
+// ========================================
 // 基本类型，简化子类代码
 type BaseEntry struct {
 	InnerType EntryType
@@ -70,7 +76,9 @@ func (b *BaseEntry) Type() EntryType {
 	return b.InnerType
 }
 
-// ====================StringEntry====================
+// ========================================
+// StringEntry
+// ========================================
 type StringEntry struct {
 	BaseEntry
 	value interface{}
@@ -128,7 +136,9 @@ func (s *StringEntry) String() (str string) {
 	return
 }
 
-// ====================HashEntry====================
+// ========================================
+// HashEntry
+// ========================================
 type HashEntry struct {
 	BaseEntry
 	table map[string]interface{}
@@ -167,7 +177,9 @@ func (h *HashEntry) Map() map[string]interface{} {
 	return h.table
 }
 
-// ====================ListEntry====================
+// ========================================
+// ListEntry
+// ========================================
 type ListEntry struct {
 	BaseEntry
 	sl *SafeList
@@ -202,7 +214,9 @@ func (l *ListEntry) Decode(bs []byte) (err error) {
 	return
 }
 
-// ====================SetEntry====================
+// ========================================
+// SetEntry
+// ========================================
 type SetEntry struct {
 	BaseEntry
 	table map[string]interface{}
@@ -275,7 +289,9 @@ func (s *SetEntry) Decode(bs []byte) (err error) {
 	return
 }
 
-// ====================SortedSetEntry====================
+// ========================================
+// SortedSetEntry
+// ========================================
 type SortedSetEntry struct {
 	BaseEntry
 	zset *sortedset.SortedSet

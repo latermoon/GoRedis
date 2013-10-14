@@ -86,29 +86,6 @@ func (l *LevelDBDataSource) Set(key string, entry Entry) (err error) {
 	return
 }
 
-func (l *LevelDBDataSource) MSet(keyentry ...interface{}) (err error) {
-	if len(keyentry)%2 != 0 {
-		err = errors.New("bad key value pair ...")
-		return
-	}
-	batch := new(leveldb.Batch)
-	for i := 0; i < len(keyentry); i += 2 {
-		key := keyentry[i].([]byte)
-		entry := keyentry[i+1].(Entry)
-		bs, e1 := entry.Encode()
-		if e1 == nil {
-			buf := make([]byte, len(bs)+1)
-			copy(buf, []byte{byte(entry.Type())})
-			copy(buf[1:], bs)
-			batch.Put(key, buf)
-		} else {
-			return e1
-		}
-	}
-	err = l.db.Write(batch, l.wo)
-	return
-}
-
 func (l *LevelDBDataSource) Keys(pattern string) (keys []string) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()

@@ -7,7 +7,7 @@
 // When an element is accessed it is promoted to the head of the list, and when
 // space is needed the element at the tail of the list (the least recently used
 // element) is evicted.
-package util
+package lrucache
 
 import (
 	"container/list"
