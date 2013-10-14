@@ -170,7 +170,7 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 		}
 		server.statusLogger.Add(monitor.NewCountFormater(server.cmdCounters.Get(cmd), cmd, padding, "ChangedCount"))
 	}
-	server.statusLogger.Start()
+	go server.statusLogger.Start()
 }
 
 // 从库同步监控
@@ -183,7 +183,7 @@ func (server *GoRedisServer) initSyncMonitor(path string) {
 	}
 	// buffer用于显示同步过程中的taskqueue buffer长度
 	server.syncMonitor.Add(monitor.NewCountFormater(server.syncCounters.Get("buffer"), "buffer", 9, "Count"))
-	server.syncMonitor.Start()
+	go server.syncMonitor.Start()
 }
 
 // for CommandHandler
