@@ -105,7 +105,7 @@ func (server *GoRedisServer) Init() {
 	if e1 != nil {
 		panic(e1)
 	}
-	// server.datasource = NewMemoryDataSource()
+	server.datasource = NewBufferDataSource(server.datasource)
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")

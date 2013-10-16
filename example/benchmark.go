@@ -12,8 +12,8 @@ func thread(conn redis.Conn, count int, ch chan int) {
 	t1 := time.Now()
 	for i := 0; i < count; i++ {
 		rndid := 20000000 + rand.Intn(2000000)*10
-		//conn.Do("GET", "user:"+strconv.Itoa(rndid)+":sex")
-		conn.Do("SET", "user:"+strconv.Itoa(rndid)+":sex_f_m", "FM..FM..FM..")
+		conn.Do("GET", "user:"+strconv.Itoa(rndid)+":sex")
+		//conn.Do("SET", "user:"+strconv.Itoa(rndid)+":sex_f_m", "FM..FM..FM..")
 		// if e1 == nil {
 		// 	if reply != nil {
 		// 		fmt.Println(string(reply.([]byte)))
@@ -31,12 +31,16 @@ func main() {
 	//host := ":6379"
 	host := ":1603"
 
-	chanCount := 100
+	chanCount := 1
 	countPerThread := 10000
 	clients := make([]redis.Conn, chanCount)
 	ch := make(chan int, chanCount)
 	for i := 0; i < chanCount; i++ {
-		clients[i], _ = redis.Dial("tcp", host)
+		var err error
+		clients[i], err = redis.Dial("tcp", host)
+		if err != nil {
+			panic(err)
+		}
 	}
 	fmt.Println("start...")
 	t1 := time.Now()
