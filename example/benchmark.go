@@ -11,7 +11,7 @@ import (
 func thread(conn redis.Conn, count int, ch chan int) {
 	t1 := time.Now()
 	for i := 0; i < count; i++ {
-		rndid := 20000000 + rand.Intn(2000000)*10
+		rndid := 20000000 + rand.Intn(2000000)*10 + rand.Intn(2)*2
 		conn.Do("GET", "user:"+strconv.Itoa(rndid)+":sex")
 		//conn.Do("SET", "user:"+strconv.Itoa(rndid)+":sex_f_m", "FM..FM..FM..")
 		// if e1 == nil {
@@ -31,7 +31,7 @@ func main() {
 	//host := ":6379"
 	host := ":1603"
 
-	chanCount := 1
+	chanCount := 50
 	countPerThread := 10000
 	clients := make([]redis.Conn, chanCount)
 	ch := make(chan int, chanCount)

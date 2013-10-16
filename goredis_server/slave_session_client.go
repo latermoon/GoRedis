@@ -4,6 +4,7 @@ import (
 	. "../goredis"
 	"./libs/rdb"
 	. "./storage"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -88,6 +89,10 @@ func (s *SlaveSessionClient) processRunloop() {
 		}
 		// Process
 		s.server.syncCounters.Get("buffer").SetCount(s.taskqueue.Len())
+		if s.taskqueue.Len()%1000000 == 0 {
+			s.server.stdlog.Info("[%s] call CG() @ %d", s.session.RemoteAddr(), s.taskqueue.Len())
+			runtime.GC()
+		}
 		// s.server.stdlog.Debug("[%s] slaveof process %s", s.session.RemoteAddr(), obj)
 		switch obj.(type) {
 		case *Command:
@@ -237,6 +242,8 @@ func (p *rdbDecoder) EndDatabase(n int) {
 }
 
 func (p *rdbDecoder) EndRDB() {
+	p.server.stdlog.Info("[%s] call CG()")
+	runtime.GC()
 	p.server.stdlog.Info("[%s] rdb end, sync %d items", p.slaveClient.session.RemoteAddr(), p.keyCount)
 }
 
