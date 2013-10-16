@@ -13,7 +13,7 @@ import (
 
 // go run goredis-server.go -h localhost -p 1602
 func main() {
-	runtime.GOMAXPROCS(4)
+	runtime.GOMAXPROCS(10)
 	fmt.Println("GoRedis 0.1 by latermoon")
 
 	hostPtr := flag.String("h", "", "Server host")
