@@ -4,7 +4,7 @@ import (
 	"sync"
 )
 
-type LRUDataSource struct {
+type BufferDataSource struct {
 	DataSource
 	// 下层
 	backend DataSource

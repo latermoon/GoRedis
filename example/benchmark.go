@@ -1,18 +1,24 @@
 package main
 
 import (
-	//"encoding/json"
 	"fmt"
 	"github.com/garyburd/redigo/redis"
+	"math/rand"
+	"strconv"
 	"time"
 )
-
-//var profileJson = "501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000"
 
 func thread(conn redis.Conn, count int, ch chan int) {
 	t1 := time.Now()
 	for i := 0; i < count; i++ {
-		conn.Do("GET", "name")
+		rndid := 20000000 + rand.Intn(2000000)*10
+		//conn.Do("GET", "user:"+strconv.Itoa(rndid)+":sex")
+		conn.Do("SET", "user:"+strconv.Itoa(rndid)+":sex_f_m", "FM..FM..FM..")
+		// if e1 == nil {
+		// 	if reply != nil {
+		// 		fmt.Println(string(reply.([]byte)))
+		// 	}
+		// }
 	}
 	ch <- 1
 	t2 := time.Now()
@@ -20,10 +26,12 @@ func thread(conn redis.Conn, count int, ch chan int) {
 }
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
+
 	//host := ":6379"
 	host := ":1603"
 
-	chanCount := 10
+	chanCount := 100
 	countPerThread := 10000
 	clients := make([]redis.Conn, chanCount)
 	ch := make(chan int, chanCount)
