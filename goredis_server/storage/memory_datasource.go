@@ -48,6 +48,6 @@ func (m *MemoryDataSource) Remove(key []byte) (err error) {
 	return
 }
 
-func (m *MemoryDataSource) NotifyEntryUpdate(key []byte, entry Entry) {
+func (m *MemoryDataSource) NotifyUpdate(key []byte, event interface{}) {
 	// do nothing
 }

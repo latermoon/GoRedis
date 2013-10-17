@@ -81,9 +81,7 @@ func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 	values := cmd.Args[2:]
 	objs := BytesToInterfaceSlice(values)
 	n := entry.List().RPush(objs...)
-	if n > 0 {
-		server.datasource.NotifyEntryUpdate(key, entry)
-	}
+	server.datasource.NotifyUpdate(key, cmd)
 	reply = IntegerReply(n)
 	return
 }
@@ -100,9 +98,8 @@ func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 	val := entry.List().LPop()
 	if entry.List().Len() == 0 {
 		server.datasource.Remove(key)
-	} else {
-		server.datasource.NotifyEntryUpdate(key, entry)
 	}
+	server.datasource.NotifyUpdate(key, cmd)
 	reply = BulkReply(val)
 	return
 }
@@ -117,9 +114,7 @@ func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 	values := cmd.Args[2:]
 	objs := BytesToInterfaceSlice(values)
 	n := entry.List().LPush(objs...)
-	if n > 0 {
-		server.datasource.NotifyEntryUpdate(key, entry)
-	}
+	server.datasource.NotifyUpdate(key, cmd)
 	reply = IntegerReply(n)
 	return
 }
@@ -136,9 +131,8 @@ func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
 	val := entry.List().RPop()
 	if entry.List().Len() == 0 {
 		server.datasource.Remove(key)
-	} else {
-		server.datasource.NotifyEntryUpdate(key, entry)
 	}
+	server.datasource.NotifyUpdate(key, cmd)
 	reply = BulkReply(val)
 	return
 }

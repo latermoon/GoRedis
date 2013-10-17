@@ -36,9 +36,7 @@ func (server *GoRedisServer) OnSADD(cmd *Command) (reply *Reply) {
 			n++
 		}
 	}
-	if n > 0 {
-		server.datasource.NotifyEntryUpdate(key, entry)
-	}
+	server.datasource.NotifyUpdate(key, cmd)
 	return IntegerReply(n)
 }
 
@@ -94,10 +92,9 @@ func (server *GoRedisServer) OnSREM(cmd *Command) (reply *Reply) {
 	}
 	if entry.Count() == 0 {
 		server.datasource.Remove(key)
-	} else {
-		if n > 0 {
-			server.datasource.NotifyEntryUpdate(key, entry)
-		}
+	}
+	if n > 0 {
+		server.datasource.NotifyUpdate(key, cmd)
 	}
 	return IntegerReply(n)
 }

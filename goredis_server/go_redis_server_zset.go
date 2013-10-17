@@ -38,6 +38,9 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 	if err != nil {
 		return ErrorReply(err)
 	}
+
+	server.datasource.NotifyUpdate(key, cmd)
+
 	for i := 0; i < count; i += 2 {
 		score, e1 := strconv.ParseFloat(scoreMembers[i], 64)
 		if e1 != nil {
@@ -206,7 +209,7 @@ func (server *GoRedisServer) OnZREM(cmd *Command) (reply *Reply) {
 		}
 	}
 	if n > 0 {
-		server.datasource.NotifyEntryUpdate(key, entry)
+		server.datasource.NotifyUpdate(key, cmd)
 	}
 	reply = IntegerReply(n)
 	return

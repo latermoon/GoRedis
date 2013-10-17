@@ -90,7 +90,9 @@ func (l *LevelDBDataSource) Keys(pattern string) (keys []string) {
 	defer l.mutex.Unlock()
 	keys = make([]string, 0, 100)
 	iter := l.db.NewIterator(l.ro)
-	iter.Seek([]byte(pattern))
+	if pattern != "*" {
+		iter.Seek([]byte(pattern))
+	}
 	for iter.Next() {
 		key := string(iter.Key())
 		if pattern == "*" || strings.HasPrefix(key, pattern) {
@@ -110,8 +112,5 @@ func (l *LevelDBDataSource) Remove(key []byte) (err error) {
 	return
 }
 
-func (l *LevelDBDataSource) NotifyEntryUpdate(key []byte, entry Entry) {
-	go func() {
-		l.Set(key, entry)
-	}()
+func (l *LevelDBDataSource) NotifyUpdate(key []byte, event interface{}) {
 }

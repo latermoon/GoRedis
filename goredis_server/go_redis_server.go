@@ -82,12 +82,11 @@ func (server *GoRedisServer) Init() {
 	server.stdlog.Info("========================================")
 	server.stdlog.Info("server init ...")
 	// leveldb
-	var e1 error
-	server.datasource, e1 = NewLevelDBDataSource(server.directory + "/db0")
+	ldb, e1 := NewLevelDBDataSource(server.directory + "/db0")
 	if e1 != nil {
 		panic(e1)
 	}
-	//server.datasource = NewBufferDataSource(server.datasource)
+	server.datasource = NewBufferDataSource(ldb)
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")

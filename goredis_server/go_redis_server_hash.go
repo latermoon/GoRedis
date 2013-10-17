@@ -51,7 +51,7 @@ func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
 
 	entry.Set(field, value)
 	// update
-	server.datasource.NotifyEntryUpdate(key, entry)
+	server.datasource.NotifyUpdate(key, cmd)
 	return IntegerReply(1)
 }
 
@@ -119,7 +119,7 @@ func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
 		entry.Set(field, val)
 	}
 	// update
-	server.datasource.NotifyEntryUpdate(key, entry)
+	server.datasource.NotifyUpdate(key, cmd)
 	reply = StatusReply("OK")
 	return
 }
@@ -162,11 +162,11 @@ func (server *GoRedisServer) OnHDEL(cmd *Command) (reply *Reply) {
 
 	if len(entry.Map()) == 0 {
 		server.datasource.Remove(key)
-	} else {
-		if n > 0 {
-			server.datasource.NotifyEntryUpdate(key, entry)
-		}
 	}
+	if n > 0 {
+		server.datasource.NotifyUpdate(key, cmd)
+	}
+
 	reply = IntegerReply(n)
 	return
 }
