@@ -38,7 +38,7 @@ func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	val := cmd.StringAtIndex(2)
+	val, _ := cmd.ArgAtIndex(2)
 	entry := NewStringEntry(val)
 	err := server.datasource.Set(key, entry)
 	reply = ReplySwitch(err, StatusReply("OK"))

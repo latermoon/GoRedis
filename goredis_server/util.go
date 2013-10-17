@@ -44,7 +44,7 @@ func entryToCommand(key []byte, entry Entry) (cmd *Command) {
 	case EntryTypeString:
 		args = append(args, []byte("SET"))
 		args = append(args, key)
-		args = append(args, entry.(*StringEntry).Bytes())
+		args = append(args, entry.(*StringEntry).Value())
 	case EntryTypeHash:
 		table := entry.(*HashEntry).Map()
 		args = append(args, []byte("HMSET"))

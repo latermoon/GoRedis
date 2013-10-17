@@ -4,6 +4,7 @@ import (
 	"../libs/codec"
 	"../libs/sortedset"
 	"errors"
+	"fmt"
 	"sync"
 )
 
@@ -86,25 +87,18 @@ func (b *BaseEntry) Size() int {
 // ========================================
 type StringEntry struct {
 	BaseEntry
-	value interface{}
+	value []byte
 }
 
 func NewStringEntry(value interface{}) (e *StringEntry) {
 	e = &StringEntry{}
 	e.InnerType = EntryTypeString
-	e.value = value
+	e.SetValue(value)
 	return
 }
 
 func (s *StringEntry) Encode() (bs []byte, err error) {
-	switch s.value.(type) {
-	case []byte:
-		bs = s.value.([]byte)
-	case string:
-		bs = []byte(s.value.(string))
-	default:
-		err = errors.New("bad string value")
-	}
+	bs = s.value
 	return
 }
 
@@ -114,31 +108,24 @@ func (s *StringEntry) Decode(bs []byte) (err error) {
 }
 
 func (s *StringEntry) SetValue(value interface{}) {
-	s.value = value
+	switch value.(type) {
+	case string:
+		s.value = []byte(value.(string))
+	case []byte:
+		s.value = value.([]byte)
+	case nil:
+		s.value = nil
+	default:
+		panic(fmt.Sprintf("bad string value %s", value))
+	}
 }
 
-func (s *StringEntry) Value() (value interface{}) {
+func (s *StringEntry) Value() (value []byte) {
 	return s.value
 }
 
-func (s *StringEntry) Bytes() (bs []byte) {
-	switch s.value.(type) {
-	case []byte:
-		bs = s.value.([]byte)
-	case string:
-		bs = []byte(s.value.(string))
-	}
-	return
-}
-
-func (s *StringEntry) String() (str string) {
-	switch s.value.(type) {
-	case []byte:
-		str = string(s.value.([]byte))
-	case string:
-		str = s.value.(string)
-	}
-	return
+func (s *StringEntry) String() string {
+	return string(s.value)
 }
 
 // ========================================
