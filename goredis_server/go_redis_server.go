@@ -27,24 +27,6 @@ var entryTypeDesc = map[EntryType]string{
 	EntryTypeSet:       "set",
 	EntryTypeSortedSet: "zset"}
 
-// 命令类型集合
-var cmdCategory = map[string][]string{
-	"string": []string{"GET", "SET", "INCR", "DECR", "INCRBY", "DECRBY", "MSET", "MGET"},
-	"hash":   []string{"HDEL", "HGET", "HSET", "HMGET", "HMSET", "HGETALL", "HINCRBY", "HKEYS", "HLEN"},
-	"list":   []string{"LINDEX", "LLEN", "LPOP", "LPUSH", "LRANGE", "LREM", "RPOP", "RPUSH"},
-	"set":    []string{"SADD", "SCARD", "SISMEMBER", "SMEMBERS", "SREM"},
-	"zset":   []string{"ZADD", "ZCARD", "ZINCRBY", "ZRANGE", "ZRANGEBYSCORE", "ZREM", "ZREMRANGEBYRANK", "ZREMRANGEBYSCORE", "ZREVRANGE", "ZREVRANGEBYSCORE", "ZSCORE"},
-}
-
-// 需要同步到从库的命令
-var needSyncCmds = []string{
-	"SET", "INCR", "DECR", "INCRBY", "DECRBY", "MSET",
-	"HDEL", "HSET", "HMSET", "HINCRBY",
-	"LPOP", "LPUSH", "LREM", "RPOP", "RPUSH",
-	"SADD", "SREM",
-	"ZADD", "ZINCRBY", "ZREM",
-	"DEL"}
-
 var goredisPrefix string = "__goredis:"
 
 // GoRedisServer

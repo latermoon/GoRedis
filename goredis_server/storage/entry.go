@@ -28,6 +28,7 @@ var (
 // ========================================
 // Redis协议基本数据结构
 type Entry interface {
+	Size() int
 	Type() EntryType
 	Encode() (bs []byte, err error)
 	Decode(bs []byte) (err error)
@@ -74,6 +75,10 @@ func (b *BaseEntry) Decode(bs []byte) (err error) {
 
 func (b *BaseEntry) Type() EntryType {
 	return b.InnerType
+}
+
+func (b *BaseEntry) Size() int {
+	return 0
 }
 
 // ========================================
