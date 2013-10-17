@@ -156,8 +156,11 @@ func (h *HashEntry) Decode(bs []byte) (err error) {
 	return
 }
 
-func (h *HashEntry) Get(field string) (val []byte) {
-	val, _ = h.table[field]
+func (h *HashEntry) Get(field string) (val interface{}) {
+	val, ok := h.table[field]
+	if !ok {
+		val = nil
+	}
 	return
 }
 

@@ -260,7 +260,7 @@ func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
 }
 
 func (p *rdbDecoder) Hset(key, field, value []byte) {
-	p.hashEntry.Set(string(field), string(value))
+	p.hashEntry.Set(string(field), value)
 }
 
 // Hash

@@ -3,7 +3,6 @@ package goredis_server
 import (
 	. "../goredis"
 	. "./storage"
-	"fmt"
 	"strconv"
 )
 
@@ -58,16 +57,8 @@ func entryToCommand(key []byte, entry Entry) (cmd *Command) {
 		args = append(args, []byte("HMSET"))
 		args = append(args, key)
 		for field, value := range table {
-			switch value.(type) {
-			case string:
-				args = append(args, []byte(field))
-				args = append(args, []byte(value.(string)))
-			case []byte:
-				args = append(args, []byte(field))
-				args = append(args, value.([]byte))
-			default:
-				fmt.Println("bad hset type", field, value)
-			}
+			args = append(args, []byte(field))
+			args = append(args, value)
 		}
 	case EntryTypeSortedSet:
 		args = append(args, []byte("ZADD"))

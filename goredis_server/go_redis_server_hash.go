@@ -99,7 +99,7 @@ func (server *GoRedisServer) OnHMGET(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
-	keyvals := cmd.StringArgs()[2:]
+	keyvals := cmd.Args[2:]
 	if len(keyvals)%2 != 0 {
 		reply = ErrorReply("Bad field/value paires")
 		return
@@ -114,7 +114,7 @@ func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
 	defer entry.Mutex.Unlock()
 
 	for i := 0; i < len(keyvals); i += 2 {
-		field := keyvals[i]
+		field := string(keyvals[i])
 		val := keyvals[i+1]
 		entry.Set(field, val)
 	}
