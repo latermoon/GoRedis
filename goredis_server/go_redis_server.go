@@ -104,11 +104,11 @@ func (server *GoRedisServer) Listen(host string) {
 func (server *GoRedisServer) UID() (uid string) {
 	if len(server.uid) == 0 {
 		uidkey := "__goredis:uid"
-		entry := server.datasource.Get(uidkey)
+		entry := server.datasource.Get([]byte(uidkey))
 		if entry == nil {
 			server.uid = uuid.UUID(8)
 			entry = NewStringEntry(server.uid)
-			server.datasource.Set(uidkey, entry)
+			server.datasource.Set([]byte(uidkey), entry)
 		} else {
 			server.uid = entry.(*StringEntry).String()
 		}

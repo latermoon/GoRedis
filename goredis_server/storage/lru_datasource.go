@@ -19,18 +19,18 @@ func NewBufferDataSource(innerds DataSource) (ds *BufferDataSource) {
 	return
 }
 
-func (ds *BufferDataSource) Get(key string) (entry Entry) {
+func (ds *BufferDataSource) Get(key []byte) (entry Entry) {
 	ds.mutex.Lock()
 	defer ds.mutex.Unlock()
 	var exist bool
-	if entry, exist = ds.cache[key]; !exist {
+	if entry, exist = ds.cache[string(key)]; !exist {
 		entry = ds.backend.Get(key)
-		ds.cache[key] = entry
+		ds.cache[string(key)] = entry
 	}
 	return
 }
 
-func (ds *BufferDataSource) Set(key string, entry Entry) (err error) {
+func (ds *BufferDataSource) Set(key []byte, entry Entry) (err error) {
 	ds.mutex.Lock()
 	defer ds.mutex.Unlock()
 	err = ds.backend.Set(key, entry)
@@ -44,13 +44,13 @@ func (ds *BufferDataSource) Keys(pattern string) (keys []string) {
 	return
 }
 
-func (ds *BufferDataSource) Remove(key string) (err error) {
+func (ds *BufferDataSource) Remove(key []byte) (err error) {
 	ds.mutex.Lock()
 	defer ds.mutex.Unlock()
 	err = ds.backend.Remove(key)
 	return
 }
 
-func (ds *BufferDataSource) NotifyEntryUpdate(key string, entry Entry) {
+func (ds *BufferDataSource) NotifyEntryUpdate(key []byte, entry Entry) {
 	ds.NotifyEntryUpdate(key, entry)
 }

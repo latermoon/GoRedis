@@ -6,7 +6,7 @@ import (
 )
 
 // 获取SortedSet，不存在则自动创建
-func (server *GoRedisServer) setByKey(key string) (se *SetEntry, err error) {
+func (server *GoRedisServer) setByKey(key []byte) (se *SetEntry, err error) {
 	entry := server.datasource.Get(key)
 	if entry != nil && entry.Type() != EntryTypeSet {
 		err = WrongKindError
@@ -23,7 +23,7 @@ func (server *GoRedisServer) setByKey(key string) (se *SetEntry, err error) {
 // SADD key member [member ...]
 // Add one or more members to a set
 func (server *GoRedisServer) OnSADD(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.setByKey(key)
 	if err != nil {
 		return ErrorReply(err)
@@ -43,7 +43,7 @@ func (server *GoRedisServer) OnSADD(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnSCARD(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.setByKey(key)
 	if err != nil {
 		return ErrorReply(err)
@@ -53,7 +53,7 @@ func (server *GoRedisServer) OnSCARD(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnSISMEMBER(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.setByKey(key)
 	if err != nil {
 		return ErrorReply(err)
@@ -68,7 +68,7 @@ func (server *GoRedisServer) OnSISMEMBER(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnSMEMBERS(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.setByKey(key)
 	if err != nil {
 		return ErrorReply(err)
@@ -79,7 +79,7 @@ func (server *GoRedisServer) OnSMEMBERS(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnSREM(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.setByKey(key)
 	if err != nil {
 		return ErrorReply(err)

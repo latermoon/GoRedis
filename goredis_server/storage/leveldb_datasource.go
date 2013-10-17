@@ -33,15 +33,14 @@ func (l *LevelDBDataSource) DB() *leveldb.DB {
 	return l.db
 }
 
-func (l *LevelDBDataSource) Get(key string) (entry Entry) {
+func (l *LevelDBDataSource) Get(key []byte) (entry Entry) {
 	// l.mutex.Lock()
 	// defer l.mutex.Unlock()
-	bs, e1 := l.db.Get([]byte(key), l.ro)
+	bs, e1 := l.db.Get(key, l.ro)
 	if e1 != nil || len(bs) == 0 {
 		return
 	}
 
-	//fmt.Println("Get Type", bs, string(bs))
 	switch EntryType(bs[0]) {
 	case EntryTypeString:
 		entry = NewStringEntry(nil)
@@ -72,7 +71,7 @@ func (l *LevelDBDataSource) Get(key string) (entry Entry) {
 	}
 	err = s.db.Write(batch, s.wo)
 */
-func (l *LevelDBDataSource) Set(key string, entry Entry) (err error) {
+func (l *LevelDBDataSource) Set(key []byte, entry Entry) (err error) {
 	// l.mutex.Lock()
 	// defer l.mutex.Unlock()
 	var bs []byte
@@ -81,7 +80,7 @@ func (l *LevelDBDataSource) Set(key string, entry Entry) (err error) {
 		buf := make([]byte, len(bs)+1)
 		copy(buf, []byte{byte(entry.Type())})
 		copy(buf[1:], bs)
-		err = l.db.Put([]byte(key), buf, l.wo)
+		err = l.db.Put(key, buf, l.wo)
 	}
 	return
 }
@@ -104,14 +103,14 @@ func (l *LevelDBDataSource) Keys(pattern string) (keys []string) {
 	return
 }
 
-func (l *LevelDBDataSource) Remove(key string) (err error) {
+func (l *LevelDBDataSource) Remove(key []byte) (err error) {
 	// l.mutex.Lock()
 	// defer l.mutex.Unlock()
-	err = l.db.Delete([]byte(key), l.wo)
+	err = l.db.Delete(key, l.wo)
 	return
 }
 
-func (l *LevelDBDataSource) NotifyEntryUpdate(key string, entry Entry) {
+func (l *LevelDBDataSource) NotifyEntryUpdate(key []byte, entry Entry) {
 	go func() {
 		l.Set(key, entry)
 	}()

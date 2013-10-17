@@ -133,14 +133,14 @@ func (s *StringEntry) String() string {
 // ========================================
 type HashEntry struct {
 	BaseEntry
-	table map[string]interface{}
+	table map[string][]byte
 	Mutex sync.Mutex
 }
 
 func NewHashEntry() (e *HashEntry) {
 	e = &HashEntry{}
 	e.InnerType = EntryTypeHash
-	e.table = make(map[string]interface{})
+	e.table = make(map[string][]byte)
 	return
 }
 
@@ -156,16 +156,16 @@ func (h *HashEntry) Decode(bs []byte) (err error) {
 	return
 }
 
-func (h *HashEntry) Get(field string) (val interface{}) {
+func (h *HashEntry) Get(field string) (val []byte) {
 	val, _ = h.table[field]
 	return
 }
 
-func (h *HashEntry) Set(field string, val interface{}) {
+func (h *HashEntry) Set(field string, val []byte) {
 	h.table[field] = val
 }
 
-func (h *HashEntry) Map() map[string]interface{} {
+func (h *HashEntry) Map() map[string][]byte {
 	return h.table
 }
 

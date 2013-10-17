@@ -9,7 +9,7 @@ import (
 )
 
 // 获取String，不存在则自动创建
-func (server *GoRedisServer) stringByKey(key string, create bool) (e *StringEntry, err error) {
+func (server *GoRedisServer) stringByKey(key []byte, create bool) (e *StringEntry, err error) {
 	entry := server.datasource.Get(key)
 	if entry != nil && entry.Type() != EntryTypeString {
 		err = WrongKindError
@@ -25,7 +25,7 @@ func (server *GoRedisServer) stringByKey(key string, create bool) (e *StringEntr
 }
 
 func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.stringByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
@@ -37,7 +37,7 @@ func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	val, _ := cmd.ArgAtIndex(2)
 	entry := NewStringEntry(val)
 	err := server.datasource.Set(key, entry)
@@ -46,7 +46,7 @@ func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
-	keys := cmd.StringArgs()[1:]
+	keys := cmd.Args[1:]
 	vals := make([]interface{}, len(keys))
 	for i, key := range keys {
 		entry, err := server.stringByKey(key, false)
@@ -62,7 +62,7 @@ func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
-	keyvals := cmd.StringArgs()[1:]
+	keyvals := cmd.Args[1:]
 	count := len(keyvals)
 	if count%2 != 0 {
 		return ErrorReply("Bad Argument Count")
@@ -83,7 +83,7 @@ func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
  * TODO 性能需要改进
  * @param chg 增减量，正负数均可
  */
-func (server *GoRedisServer) incrStringEntry(key string, chg int) (newvalue int, err error) {
+func (server *GoRedisServer) incrStringEntry(key []byte, chg int) (newvalue int, err error) {
 	entry := server.datasource.Get(key)
 	if entry == nil {
 		entry = NewStringEntry("0")
@@ -107,7 +107,7 @@ func (server *GoRedisServer) OnINCR(cmd *Command) (reply *Reply) {
 	server.stringMutex.Lock()
 	defer server.stringMutex.Unlock()
 
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	newvalue, err := server.incrStringEntry(key, 1)
 	reply = ReplySwitch(err, IntegerReply(newvalue))
 	return
@@ -117,7 +117,7 @@ func (server *GoRedisServer) OnINCRBY(cmd *Command) (reply *Reply) {
 	server.stringMutex.Lock()
 	defer server.stringMutex.Unlock()
 
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	chg, e1 := strconv.Atoi(cmd.StringAtIndex(2))
 	if e1 != nil {
 		reply = ErrorReply(e1)
@@ -132,7 +132,7 @@ func (server *GoRedisServer) OnDECR(cmd *Command) (reply *Reply) {
 	server.stringMutex.Lock()
 	defer server.stringMutex.Unlock()
 
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	newvalue, err := server.incrStringEntry(key, -1)
 	reply = ReplySwitch(err, IntegerReply(newvalue))
 	return
@@ -142,7 +142,7 @@ func (server *GoRedisServer) OnDECRBY(cmd *Command) (reply *Reply) {
 	server.stringMutex.Lock()
 	defer server.stringMutex.Unlock()
 
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	chg, e1 := strconv.Atoi(cmd.StringAtIndex(2))
 	if e1 != nil {
 		reply = ErrorReply(e1)

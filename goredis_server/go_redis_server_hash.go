@@ -6,7 +6,7 @@ import (
 )
 
 // 获取Hash，不存在则自动创建
-func (server *GoRedisServer) hashByKey(key string, create bool) (hash *HashEntry, err error) {
+func (server *GoRedisServer) hashByKey(key []byte, create bool) (hash *HashEntry, err error) {
 	entry := server.datasource.Get(key)
 	if entry != nil && entry.Type() != EntryTypeHash {
 		err = WrongKindError
@@ -22,7 +22,7 @@ func (server *GoRedisServer) hashByKey(key string, create bool) (hash *HashEntry
 }
 
 func (server *GoRedisServer) OnHGET(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.hashByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
@@ -37,7 +37,7 @@ func (server *GoRedisServer) OnHGET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.hashByKey(key, true)
 	if err != nil {
 		return ErrorReply(err)
@@ -47,7 +47,7 @@ func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
 	defer entry.Mutex.Unlock()
 
 	field := cmd.StringAtIndex(2)
-	value := cmd.StringAtIndex(3)
+	value, _ := cmd.ArgAtIndex(3)
 
 	entry.Set(field, value)
 	// update
@@ -56,7 +56,7 @@ func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnHGETALL(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.hashByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
@@ -78,7 +78,7 @@ func (server *GoRedisServer) OnHGETALL(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnHMGET(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	fields := cmd.StringArgs()[2:]
 	entry, err := server.hashByKey(key, false)
 	if err != nil {
@@ -98,7 +98,7 @@ func (server *GoRedisServer) OnHMGET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	keyvals := cmd.StringArgs()[2:]
 	if len(keyvals)%2 != 0 {
 		reply = ErrorReply("Bad field/value paires")
@@ -125,7 +125,7 @@ func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnHLEN(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.hashByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
@@ -139,7 +139,7 @@ func (server *GoRedisServer) OnHLEN(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnHDEL(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.hashByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
