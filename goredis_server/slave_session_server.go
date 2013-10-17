@@ -191,7 +191,7 @@ func (s *SlaveSession) SendSnapshot(snapshot *leveldb.Snapshot) {
 			s.server.stdlog.Warn("snapshot entry to command error %s, %s", string(iter.Key()), string(iter.Value()))
 			continue
 		}
-		s.server.stdlog.Debug("snapshot send %s", cmd)
+		// s.server.stdlog.Debug("snapshot send %s", cmd)
 		e2 := s.session.WriteCommand(cmd)
 		if e2 != nil {
 			// 销毁整个slave

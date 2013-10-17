@@ -8,7 +8,7 @@ import (
 )
 
 func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
-	keys := cmd.StringArgs()[1:]
+	keys := cmd.Args[1:]
 	n := 0
 	for _, key := range keys {
 		entry := server.datasource.Get(key)
@@ -35,7 +35,7 @@ func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry := server.datasource.Get(key)
 	if entry != nil {
 		if desc, exist := entryTypeDesc[entry.Type()]; exist {
@@ -45,30 +45,18 @@ func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	return StatusReply("none")
 }
 
-// [Custom]，单独保存一个key
-func (server *GoRedisServer) OnSAVEKEY(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
-	entry := server.datasource.Get(key)
-	if entry == nil {
-		return ErrorReply(key + " not exist")
-	}
-	err := server.datasource.Set(key, entry)
-	reply = ReplySwitch(err, StatusReply("OK"))
-	return
-}
-
 // [Custom] 描述一个key
 func (server *GoRedisServer) OnDESC(cmd *Command) (reply *Reply) {
-	keys := cmd.StringArgs()[1:]
+	keys := cmd.Args[1:]
 	bulks := make([]interface{}, 0, len(keys))
 	for _, key := range keys {
 		entry := server.datasource.Get(key)
 		if entry == nil {
-			bulks = append(bulks, key+" [nil]")
+			bulks = append(bulks, string(key)+" [nil]")
 			continue
 		}
 		buf := bytes.Buffer{}
-		buf.WriteString(key + " [" + entryTypeDesc[entry.Type()] + "] ")
+		buf.WriteString(string(key) + " [" + entryTypeDesc[entry.Type()] + "] ")
 
 		switch entry.Type() {
 		case EntryTypeString:
@@ -88,7 +76,7 @@ func (server *GoRedisServer) OnDESC(cmd *Command) (reply *Reply) {
 			buf.WriteString(fmt.Sprintf("%s", entry.(*SetEntry).Keys()))
 		case EntryTypeList:
 			for e := entry.(*ListEntry).List().Front(); e != nil; e = e.Next() {
-				buf.WriteString(e.Value.(string))
+				buf.Write(e.Value.([]byte))
 				buf.WriteString(" ")
 			}
 		default:

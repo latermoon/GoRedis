@@ -4,6 +4,7 @@ import (
 	. "../goredis"
 	"./libs/rdb"
 	. "./storage"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -87,6 +88,11 @@ func (s *SlaveSessionClient) processRunloop() {
 			sleepCount = 0
 		}
 		// Process
+		s.server.syncCounters.Get("buffer").SetCount(s.taskqueue.Len())
+		if s.taskqueue.Len()%1000000 == 0 {
+			s.server.stdlog.Info("[%s] call CG() @ %d", s.session.RemoteAddr(), s.taskqueue.Len())
+			runtime.GC()
+		}
 		// s.server.stdlog.Debug("[%s] slaveof process %s", s.session.RemoteAddr(), obj)
 		switch obj.(type) {
 		case *Command:
@@ -112,7 +118,22 @@ func (s *SlaveSessionClient) processRunloop() {
 		case *keyValuePair:
 			key := obj.(*keyValuePair).Key.([]byte)
 			entry := obj.(*keyValuePair).Value.(Entry)
-			e2 := s.server.datasource.Set(string(key), entry)
+			s.server.syncCounters.Get("total").Incr(1)
+			switch entry.Type() {
+			case EntryTypeString:
+				s.server.syncCounters.Get("string").Incr(1)
+			case EntryTypeHash:
+				s.server.syncCounters.Get("hash").Incr(1)
+			case EntryTypeList:
+				s.server.syncCounters.Get("list").Incr(1)
+			case EntryTypeSet:
+				s.server.syncCounters.Get("set").Incr(1)
+			case EntryTypeSortedSet:
+				s.server.syncCounters.Get("zset").Incr(1)
+			default:
+				s.server.stdlog.Warn("[%s] bad entry type", s.session.RemoteAddr())
+			}
+			e2 := s.server.datasource.Set(key, entry)
 			if e2 != nil {
 				s.server.stdlog.Error("[%s] datasource set error %s", s.session.RemoteAddr(), e2)
 			}
@@ -221,6 +242,8 @@ func (p *rdbDecoder) EndDatabase(n int) {
 }
 
 func (p *rdbDecoder) EndRDB() {
+	p.server.stdlog.Info("[%s] call CG()")
+	runtime.GC()
 	p.server.stdlog.Info("[%s] rdb end, sync %d items", p.slaveClient.session.RemoteAddr(), p.keyCount)
 }
 
@@ -229,8 +252,6 @@ func (p *rdbDecoder) Set(key, value []byte, expiry int64) {
 	p.keyCount++
 	p.stringEntry = NewStringEntry(string(value))
 	p.slaveClient.taskqueue.RPush(&keyValuePair{Key: key, Value: p.stringEntry})
-	p.server.syncCounters.Get("total").Incr(1)
-	p.server.syncCounters.Get("string").Incr(1)
 }
 
 func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
@@ -239,14 +260,12 @@ func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
 }
 
 func (p *rdbDecoder) Hset(key, field, value []byte) {
-	p.hashEntry.Set(string(field), string(value))
+	p.hashEntry.Set(string(field), value)
 }
 
 // Hash
 func (p *rdbDecoder) EndHash(key []byte) {
 	p.slaveClient.taskqueue.RPush(&keyValuePair{Key: key, Value: p.hashEntry})
-	p.server.syncCounters.Get("total").Incr(1)
-	p.server.syncCounters.Get("hash").Incr(1)
 }
 
 func (p *rdbDecoder) StartSet(key []byte, cardinality, expiry int64) {
@@ -261,9 +280,6 @@ func (p *rdbDecoder) Sadd(key, member []byte) {
 // Set
 func (p *rdbDecoder) EndSet(key []byte) {
 	p.slaveClient.taskqueue.RPush(&keyValuePair{Key: key, Value: p.setEntry})
-	p.server.syncCounters.Get("total").Incr(1)
-	p.server.syncCounters.Get("set").Incr(1)
-	// p.server.stdlog.Debug("%d. db=%d [set] %q", p.keyCount, p.db, key)
 }
 
 func (p *rdbDecoder) StartList(key []byte, length, expiry int64) {
@@ -280,8 +296,6 @@ func (p *rdbDecoder) Rpush(key, value []byte) {
 // List
 func (p *rdbDecoder) EndList(key []byte) {
 	p.slaveClient.taskqueue.RPush(&keyValuePair{Key: key, Value: p.listEntry})
-	p.server.syncCounters.Get("total").Incr(1)
-	p.server.syncCounters.Get("list").Incr(1)
 }
 
 func (p *rdbDecoder) StartZSet(key []byte, cardinality, expiry int64) {
@@ -298,6 +312,4 @@ func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
 // ZSet
 func (p *rdbDecoder) EndZSet(key []byte) {
 	p.slaveClient.taskqueue.RPush(&keyValuePair{Key: key, Value: p.zsetEntry})
-	p.server.syncCounters.Get("total").Incr(1)
-	p.server.syncCounters.Get("zset").Incr(1)
 }

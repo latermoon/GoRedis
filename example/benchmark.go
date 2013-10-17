@@ -1,18 +1,30 @@
 package main
 
 import (
-	//"encoding/json"
 	"fmt"
 	"github.com/garyburd/redigo/redis"
+	"math/rand"
+	"strconv"
 	"time"
 )
 
-//var profileJson = "501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000501f8365ccd569a138000000"
-
 func thread(conn redis.Conn, count int, ch chan int) {
 	t1 := time.Now()
+	rndid := 20000000 + rand.Intn(2000000)*10 + rand.Intn(4)
 	for i := 0; i < count; i++ {
-		conn.Do("GET", "name")
+		num := 20000000 + rand.Intn(2000000)*10 + rand.Intn(4)
+		reply, _ := conn.Do("aof_push_async", "user:"+strconv.Itoa(rndid)+":history", strconv.Itoa(num))
+		if reply == nil {
+			fmt.Println(reply)
+		}
+
+		//conn.Do("GET", "user:"+strconv.Itoa(rndid)+":sex")
+		//conn.Do("SET", "user:"+strconv.Itoa(rndid)+":sex_f_m", "FM..FM..FM..")
+		// if e1 == nil {
+		// 	if reply != nil {
+		// 		fmt.Println(string(reply.([]byte)))
+		// 	}
+		// }
 	}
 	ch <- 1
 	t2 := time.Now()
@@ -20,15 +32,21 @@ func thread(conn redis.Conn, count int, ch chan int) {
 }
 
 func main() {
-	//host := ":6379"
-	host := ":1603"
+	rand.Seed(time.Now().UnixNano())
 
-	chanCount := 10
+	//host := ":6379"
+	host := ":1602"
+
+	chanCount := 50
 	countPerThread := 10000
 	clients := make([]redis.Conn, chanCount)
 	ch := make(chan int, chanCount)
 	for i := 0; i < chanCount; i++ {
-		clients[i], _ = redis.Dial("tcp", host)
+		var err error
+		clients[i], err = redis.Dial("tcp", host)
+		if err != nil {
+			panic(err)
+		}
 	}
 	fmt.Println("start...")
 	t1 := time.Now()

@@ -28,19 +28,27 @@ func (f *CommonFormater) Text() string {
 type CountFormater struct {
 	CommonFormater
 	counter *Counter
+	mode    string
 }
 
-func NewCountFormater(counter *Counter, title string, padding int) (f *CountFormater) {
+// 如果mode="Count"，只显示counter.Count(), 如果mode="ChangedCount"，显示counter.ChangedCount()
+func NewCountFormater(counter *Counter, title string, padding int, mode string) (f *CountFormater) {
 	f = &CountFormater{}
 	f.counter = counter
 	f.title = title
 	f.padding = padding
+	f.mode = mode
 	return
 }
 
 func (f *CountFormater) Text() string {
-	chg := f.counter.ChangedCount()
-	return strconv.Itoa(chg)
+	if f.mode == "ChangedCount" {
+		chg := f.counter.ChangedCount()
+		return strconv.Itoa(chg)
+	} else {
+		// default: "Count"
+		return strconv.Itoa(f.counter.Count())
+	}
 }
 
 // ==========TimeFormater==========
