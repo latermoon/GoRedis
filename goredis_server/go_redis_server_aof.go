@@ -3,6 +3,7 @@ package goredis_server
 /*
 自定义aof指令集，用于实现海量日志存储
 aof_push key value [value ...]    <IntegerReply: length>
+aof_push_async key value [value ...]    <StatusReply: OK>
 aof_pop key    <BulkReply: nil>
 aof_index key index    <BulkReply: nil>
 aof_range key start end    <MultiBulksReply: nil>
@@ -28,7 +29,7 @@ func (server *GoRedisServer) aoflistByKey(key string, create bool) (lst *levelto
 	return
 }
 
-// 异步插入
+// 异步插入 aof_push_async
 func (server *GoRedisServer) OnAOF_PUSH_ASYNC(cmd *Command) (reply *Reply) {
 	go func() {
 		server.OnAOF_PUSH(cmd)

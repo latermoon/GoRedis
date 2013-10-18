@@ -61,8 +61,8 @@ func (ds *BufferDataSource) Get(key []byte) (entry Entry) {
 	return
 }
 
+// 实时保存string，其余只保持在内存，string以外的更新，必须依赖NotifyUpdate(...)
 func (ds *BufferDataSource) Set(key []byte, entry Entry) (err error) {
-	// 实时保存string
 	if entry.Type() == EntryTypeString {
 		err = ds.ldb.Set(key, entry)
 	} else {
