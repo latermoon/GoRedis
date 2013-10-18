@@ -6,7 +6,7 @@ import (
 )
 
 // 获取List，不存在则自动创建
-func (server *GoRedisServer) listByKey(key string, create bool) (lst *ListEntry, err error) {
+func (server *GoRedisServer) listByKey(key []byte, create bool) (lst *ListEntry, err error) {
 	entry := server.datasource.Get(key)
 	if entry != nil && entry.Type() != EntryTypeList {
 		err = WrongKindError
@@ -22,7 +22,7 @@ func (server *GoRedisServer) listByKey(key string, create bool) (lst *ListEntry,
 }
 
 func (server *GoRedisServer) OnLLEN(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.listByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
@@ -35,7 +35,7 @@ func (server *GoRedisServer) OnLLEN(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.listByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
@@ -53,7 +53,7 @@ func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.listByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
@@ -72,24 +72,22 @@ func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.listByKey(key, true)
 	if err != nil {
 		return ErrorReply(err)
 	}
 
-	values := cmd.StringArgs()[2:]
-	objs := StringToInterfaceSlice(values)
+	values := cmd.Args[2:]
+	objs := BytesToInterfaceSlice(values)
 	n := entry.List().RPush(objs...)
-	if n > 0 {
-		server.datasource.NotifyEntryUpdate(key, entry)
-	}
+	server.datasource.NotifyUpdate(key, cmd)
 	reply = IntegerReply(n)
 	return
 }
 
 func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.listByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
@@ -100,32 +98,29 @@ func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 	val := entry.List().LPop()
 	if entry.List().Len() == 0 {
 		server.datasource.Remove(key)
-	} else {
-		server.datasource.NotifyEntryUpdate(key, entry)
 	}
+	server.datasource.NotifyUpdate(key, cmd)
 	reply = BulkReply(val)
 	return
 }
 
 func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.listByKey(key, true)
 	if err != nil {
 		return ErrorReply(err)
 	}
 
-	values := cmd.StringArgs()[2:]
-	objs := StringToInterfaceSlice(values)
+	values := cmd.Args[2:]
+	objs := BytesToInterfaceSlice(values)
 	n := entry.List().LPush(objs...)
-	if n > 0 {
-		server.datasource.NotifyEntryUpdate(key, entry)
-	}
+	server.datasource.NotifyUpdate(key, cmd)
 	reply = IntegerReply(n)
 	return
 }
 
 func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	entry, err := server.listByKey(key, false)
 	if err != nil {
 		return ErrorReply(err)
@@ -136,9 +131,8 @@ func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
 	val := entry.List().RPop()
 	if entry.List().Len() == 0 {
 		server.datasource.Remove(key)
-	} else {
-		server.datasource.NotifyEntryUpdate(key, entry)
 	}
+	server.datasource.NotifyUpdate(key, cmd)
 	reply = BulkReply(val)
 	return
 }

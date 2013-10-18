@@ -10,6 +10,7 @@ import (
 
 func thread(conn redis.Conn, count int, ch chan int) {
 	t1 := time.Now()
+
 	for i := 0; i < count; i++ {
 		rndid := 20000000 + rand.Intn(2000000)*10 + rand.Intn(10)
 		remoteid := strconv.Itoa(rndid)
@@ -18,6 +19,12 @@ func thread(conn redis.Conn, count int, ch chan int) {
 		conn.Do("GET", "user:"+remoteid+":cflag")
 		conn.Do("GET", "user:"+remoteid+":sessionid")
 		conn.Do("GET", "user:"+remoteid+":uid")
+		// num := 20000000 + rand.Intn(2000000)*10 + rand.Intn(4)
+		// reply, _ := conn.Do("aof_push_async", "user:"+strconv.Itoa(rndid)+":history", strconv.Itoa(num))
+		// if reply == nil {
+		// 	fmt.Println(reply)
+		// }
+
 		//conn.Do("SET", "user:"+strconv.Itoa(rndid)+":sex_f_m", "FM..FM..FM..")
 		// if e1 == nil {
 		// 	if reply != nil {
@@ -34,7 +41,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	//host := ":6379"
-	host := ":1603"
+	host := ":1602"
 
 	chanCount := 50
 	countPerThread := 10000

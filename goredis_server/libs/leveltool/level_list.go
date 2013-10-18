@@ -118,7 +118,8 @@ func (l *LevelList) Push(value []byte) (e *Element, err error) {
 func (l *LevelList) Pop() (e *Element, err error) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	if l.Len() == 0 {
+
+	if l.len() == 0 {
 		return nil, nil
 	}
 	idx := l.start
@@ -127,14 +128,26 @@ func (l *LevelList) Pop() (e *Element, err error) {
 	if err != nil {
 		return nil, err
 	}
+	// 只剩下一个元素时，清除start、end
+	shouldReset := l.len() == 1
 	// 更新左游标，并删除数据
 	batch := new(leveldb.Batch)
-	batch.Put(l.startkey(), int64ToBytes(l.start+1))
+	if shouldReset {
+		batch.Delete(l.startkey())
+		batch.Delete(l.endkey())
+	} else {
+		batch.Put(l.startkey(), int64ToBytes(l.start+1))
+	}
 	batch.Delete(l.idxkey(idx))
 	err = l.db.Write(batch, l.wo)
 	if err == nil {
 		// 删除成功
-		l.start++
+		if shouldReset {
+			l.start = 0
+			l.end = -1
+		} else {
+			l.start++
+		}
 	} else {
 		return nil, err
 	}
@@ -142,7 +155,10 @@ func (l *LevelList) Pop() (e *Element, err error) {
 }
 
 func (l *LevelList) Index(i int64) (e *Element, err error) {
-	if i < 0 || i >= l.Len() {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	if i < 0 || i >= l.len() {
 		return nil, nil
 	}
 	idx := l.start + i
@@ -154,6 +170,12 @@ func (l *LevelList) Index(i int64) (e *Element, err error) {
 	return
 }
 
-func (l *LevelList) Len() int64 {
+func (l *LevelList) len() int64 {
 	return l.end - l.start + 1
+}
+
+func (l *LevelList) Len() int64 {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	return l.len()
 }

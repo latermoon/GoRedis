@@ -2,10 +2,10 @@ package storage
 
 // 数据源接口
 type DataSource interface {
-	Get(key string) (entry Entry)
-	Set(key string, entry Entry) (err error)
+	Get(key []byte) (entry Entry)
+	Set(key []byte, entry Entry) (err error)
 	Keys(pattern string) (keys []string)
-	Remove(key string) (err error)
+	Remove(key []byte) (err error)
 	// 通知数据源，某个条目更新了
-	NotifyEntryUpdate(key string, entry Entry)
+	NotifyUpdate(key []byte, event interface{})
 }

@@ -40,6 +40,15 @@ func (cmd *Command) StringAtIndex(i int) string {
 	return string(cmd.Args[i])
 }
 
+func (cmd *Command) ArgAtIndex(i int) (arg []byte, err error) {
+	if i >= len(cmd.Args) {
+		err = errors.New("Argument out of range")
+		return
+	}
+	arg = cmd.Args[i]
+	return
+}
+
 func (cmd *Command) IntAtIndex(i int) (n int, err error) {
 	if i >= len(cmd.Args) {
 		err = errors.New("Argument out of range")

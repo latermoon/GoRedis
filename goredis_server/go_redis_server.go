@@ -27,24 +27,6 @@ var entryTypeDesc = map[EntryType]string{
 	EntryTypeSet:       "set",
 	EntryTypeSortedSet: "zset"}
 
-// 命令类型集合
-var cmdCategory = map[string][]string{
-	"string": []string{"GET", "SET", "INCR", "DECR", "INCRBY", "DECRBY", "MSET", "MGET"},
-	"hash":   []string{"HDEL", "HGET", "HSET", "HMGET", "HMSET", "HGETALL", "HINCRBY", "HKEYS", "HLEN"},
-	"list":   []string{"LINDEX", "LLEN", "LPOP", "LPUSH", "LRANGE", "LREM", "RPOP", "RPUSH"},
-	"set":    []string{"SADD", "SCARD", "SISMEMBER", "SMEMBERS", "SREM"},
-	"zset":   []string{"ZADD", "ZCARD", "ZINCRBY", "ZRANGE", "ZRANGEBYSCORE", "ZREM", "ZREMRANGEBYRANK", "ZREMRANGEBYSCORE", "ZREVRANGE", "ZREVRANGEBYSCORE", "ZSCORE"},
-}
-
-// 需要同步到从库的命令
-var needSyncCmds = []string{
-	"SET", "INCR", "DECR", "INCRBY", "DECRBY", "MSET",
-	"HDEL", "HSET", "HMSET", "HINCRBY",
-	"LPOP", "LPUSH", "LREM", "RPOP", "RPUSH",
-	"SADD", "SREM",
-	"ZADD", "ZINCRBY", "ZREM",
-	"DEL"}
-
 var goredisPrefix string = "__goredis:"
 
 // GoRedisServer
@@ -100,12 +82,11 @@ func (server *GoRedisServer) Init() {
 	server.stdlog.Info("========================================")
 	server.stdlog.Info("server init ...")
 	// leveldb
-	var e1 error
-	server.datasource, e1 = NewLevelDBDataSource(server.directory + "/db0")
+	ldb, e1 := NewLevelDBDataSource(server.directory + "/db0")
 	if e1 != nil {
 		panic(e1)
 	}
-	//server.datasource = NewBufferDataSource(server.datasource)
+	server.datasource = NewBufferDataSource(ldb)
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")
@@ -122,11 +103,11 @@ func (server *GoRedisServer) Listen(host string) {
 func (server *GoRedisServer) UID() (uid string) {
 	if len(server.uid) == 0 {
 		uidkey := "__goredis:uid"
-		entry := server.datasource.Get(uidkey)
+		entry := server.datasource.Get([]byte(uidkey))
 		if entry == nil {
 			server.uid = uuid.UUID(8)
 			entry = NewStringEntry(server.uid)
-			server.datasource.Set(uidkey, entry)
+			server.datasource.Set([]byte(uidkey), entry)
 		} else {
 			server.uid = entry.(*StringEntry).String()
 		}

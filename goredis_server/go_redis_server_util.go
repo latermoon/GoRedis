@@ -25,7 +25,7 @@ func (server *GoRedisServer) snapshotSentCallback(session *SlaveSession) {
 }
 
 func (server *GoRedisServer) getConfigEntry(key string, et EntryType) (entry Entry) {
-	dbkey := goredisPrefix + key
+	dbkey := []byte(goredisPrefix + key)
 	entry = server.datasource.Get(dbkey)
 	if entry == nil {
 		entry = NewEmptyEntry(et)
@@ -35,6 +35,6 @@ func (server *GoRedisServer) getConfigEntry(key string, et EntryType) (entry Ent
 }
 
 func (server *GoRedisServer) setConfigEntry(key string, entry Entry) {
-	dbkey := goredisPrefix + key
+	dbkey := []byte(goredisPrefix + key)
 	server.datasource.Set(dbkey, entry)
 }

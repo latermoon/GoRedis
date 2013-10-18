@@ -133,7 +133,7 @@ func (s *SlaveSessionClient) processRunloop() {
 			default:
 				s.server.stdlog.Warn("[%s] bad entry type", s.session.RemoteAddr())
 			}
-			e2 := s.server.datasource.Set(string(key), entry)
+			e2 := s.server.datasource.Set(key, entry)
 			if e2 != nil {
 				s.server.stdlog.Error("[%s] datasource set error %s", s.session.RemoteAddr(), e2)
 			}
@@ -260,7 +260,7 @@ func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
 }
 
 func (p *rdbDecoder) Hset(key, field, value []byte) {
-	p.hashEntry.Set(string(field), string(value))
+	p.hashEntry.Set(string(field), value)
 }
 
 // Hash
