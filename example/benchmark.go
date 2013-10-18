@@ -11,8 +11,13 @@ import (
 func thread(conn redis.Conn, count int, ch chan int) {
 	t1 := time.Now()
 	for i := 0; i < count; i++ {
-		rndid := 20000000 + rand.Intn(2000000)*10 + rand.Intn(4)
-		conn.Do("GET", "user:"+strconv.Itoa(rndid)+":sex")
+		rndid := 20000000 + rand.Intn(2000000)*10 + rand.Intn(10)
+		remoteid := strconv.Itoa(rndid)
+		conn.Do("GET", "user:"+remoteid+":sex")
+		conn.Do("GET", "user:"+remoteid+":password")
+		conn.Do("GET", "user:"+remoteid+":cflag")
+		conn.Do("GET", "user:"+remoteid+":sessionid")
+		conn.Do("GET", "user:"+remoteid+":uid")
 		//conn.Do("SET", "user:"+strconv.Itoa(rndid)+":sex_f_m", "FM..FM..FM..")
 		// if e1 == nil {
 		// 	if reply != nil {
