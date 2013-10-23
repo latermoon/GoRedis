@@ -30,6 +30,16 @@ func NewBufferDataSource(ldb *LevelDBDataSource) (ds *BufferDataSource) {
 	return
 }
 
+// 检查上次退出未保存的日志数据，并持久化
+func (ds *BufferDataSource) CheckUnsavedLog() {
+	for ds.aof.Len() > 0 {
+		elem, _ := ds.aof.Pop()
+		bs := elem.Value.([]byte)
+		cmd := ds.decodeCommand(bs)
+		fmt.Println(cmd)
+	}
+}
+
 // 将aof保持到ldb
 func (ds *BufferDataSource) aofSaveRunloop() {
 	for {
@@ -39,7 +49,8 @@ func (ds *BufferDataSource) aofSaveRunloop() {
 		}
 		elem, _ := ds.aof.Pop()
 		bs := elem.Value.([]byte)
-		fmt.Println("aof pop", string(bs))
+		cmd := ds.decodeCommand(bs)
+		fmt.Println("aof pop", cmd)
 	}
 }
 
@@ -84,5 +95,16 @@ func (ds *BufferDataSource) Remove(key []byte) (err error) {
 
 func (ds *BufferDataSource) NotifyUpdate(key []byte, event interface{}) {
 	cmd := event.(*Command)
-	ds.aof.Push(cmd.Bytes())
+	ds.aof.Push(ds.encodeCommand(cmd))
+}
+
+// ==========
+func (ds *BufferDataSource) encodeCommand(cmd *Command) (bs []byte) {
+
+	return
+}
+
+func (ds *BufferDataSource) decodeCommand(bs []byte) (cmd *Command) {
+
+	return
 }

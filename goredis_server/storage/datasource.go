@@ -6,6 +6,6 @@ type DataSource interface {
 	Set(key []byte, entry Entry) (err error)
 	Keys(pattern string) (keys []string)
 	Remove(key []byte) (err error)
-	// 通知数据源，某个条目更新了
+	// 通知数据源，某个条目内容更新了
 	NotifyUpdate(key []byte, event interface{})
 }
