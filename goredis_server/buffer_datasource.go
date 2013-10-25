@@ -6,6 +6,7 @@ import (
 	"./libs/leveltool"
 	lru "./libs/lrucache"
 	. "./storage"
+	"errors"
 	"github.com/syndtr/goleveldb/leveldb"
 	"strings"
 	"sync"
@@ -32,6 +33,7 @@ func NewBufferDataSource(ldb *LevelDBDataSource) (ds *BufferDataSource) {
 	ds.ldb = ldb
 	ds.cache = lru.NewLRUCache(100000)
 	ds.aof = leveltool.NewLevelList(ldb.DB(), "__goredis:cmdaof")
+	ds.mergeCache = make(map[string]Entry)
 	// go ds.aofSaveRunloop()
 	return
 }
@@ -39,12 +41,13 @@ func NewBufferDataSource(ldb *LevelDBDataSource) (ds *BufferDataSource) {
 // 检查上次退出未保存的日志数据，并持久化
 func (ds *BufferDataSource) CheckUnsavedLog() {
 	count := ds.aof.Len()
-	ds.mergeLog(int(count))
+	if count > 0 {
+		ds.mergeLog(int(count))
+	}
 }
 
 // 将log中的command合并到数据库
 func (ds *BufferDataSource) mergeLog(count int) {
-	cache := make(map[string]Entry)
 	for i := 0; i < count; i++ {
 		elem, _ := ds.aof.Pop()
 		if elem == nil {
@@ -55,38 +58,85 @@ func (ds *BufferDataSource) mergeLog(count int) {
 		if err != nil {
 			stdlog.Error("[BufferDataSource] bad cmd %s, %s", cmd, err)
 		} else {
-			stdlog.Info("[BufferDataSource] save log <%s>", cmd)
+			stdlog.Info("[BufferDataSource] merge log <%s>", cmd)
 		}
 		cmdName := strings.ToUpper(cmd.Name())
 		switch cmdName {
 		case "DEL":
 			keys := cmd.Args[1:]
 			for _, key := range keys {
+				delete(ds.mergeCache, string(key))
 				ds.ldb.Remove(key)
 			}
 		case "HSET":
-			key, _ := cmd.ArgAtIndex(1)
+			key := cmd.StringAtIndex(1)
+			entry, e1 := ds.getEntryFromTmpCache(key, EntryTypeHash)
+			if e1 != nil {
+				stdlog.Warn("%s %s", e1, key)
+				continue
+			}
 			field := cmd.StringAtIndex(2)
 			value, _ := cmd.ArgAtIndex(3)
+			entry.(*HashEntry).Set(field, value)
 		case "HMSET":
+			key := cmd.StringAtIndex(1)
+			entry, e1 := ds.getEntryFromTmpCache(key, EntryTypeHash)
+			if e1 != nil {
+				stdlog.Warn("%s %s", e1, key)
+				continue
+			}
+			keyvals := cmd.Args[2:]
+			for i := 0; i < len(keyvals); i += 2 {
+				field := string(keyvals[i])
+				val := keyvals[i+1]
+				entry.(*HashEntry).Set(field, val)
+			}
 		case "HDEL":
+			key := cmd.StringAtIndex(1)
+			entry, e1 := ds.getEntryFromTmpCache(key, EntryTypeHash)
+			if e1 != nil {
+				stdlog.Warn("%s %s", e1, key)
+				continue
+			}
+			fields := cmd.StringArgs()[2:]
+			n := 0
+			for _, field := range fields {
+				_, exist := entry.(*HashEntry).Map()[field]
+				if exist {
+					delete(entry.(*HashEntry).Map(), field)
+					n++
+				}
+			}
+
+			if len(entry.(*HashEntry).Map()) == 0 {
+				delete(ds.mergeCache, key)
+				ds.ldb.Remove([]byte(key))
+			}
 		default:
 			stdlog.Warn("[BufferDataSource] ignore <%s>", cmd)
 		}
 	}
+	// 序列化
+	stdlog.Info("[BufferDataSource] save %d items, %d logs", len(ds.mergeCache), count)
+	for key, entry := range ds.mergeCache {
+		ds.ldb.Set([]byte(key), entry)
+	}
+	stdlog.Info("[BufferDataSource] done")
 }
 
-func (ds *BufferDataSource) getEntryFromCache(key []byte, et EntryType) (entry Entry) {
+// 从临时缓存里获取，再从ldb中取，没有的话再创建
+func (ds *BufferDataSource) getEntryFromTmpCache(key string, et EntryType) (entry Entry, err error) {
 	var exist bool
-	entry, exist = ds.mergeCache[string(key)]
+	entry, exist = ds.mergeCache[key]
 	if !exist {
-		switch et {
-		case EntryTypeString:
-		case EntryTypeHash:
-		case EntryTypeList:
-		case EntryTypeSet:
-		case EntryTypeSortedSet:
+		entry = ds.ldb.Get([]byte(key))
+		// hash是异步的，set是同步的，如果一个key之前是hash，后来改为string，就会导致类型不一致
+		if entry != nil && entry.Type() != et {
+			err = errors.New("wrong entry type, might replace by string")
+		} else if entry == nil {
+			entry = NewEmptyEntry(et)
 		}
+		ds.mergeCache[key] = entry
 	}
 	return
 }
