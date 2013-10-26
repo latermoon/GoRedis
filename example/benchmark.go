@@ -10,15 +10,21 @@ import (
 
 func thread(conn redis.Conn, count int, ch chan int) {
 	t1 := time.Now()
-	rndid := 20000000 + rand.Intn(2000000)*10 + rand.Intn(4)
-	for i := 0; i < count; i++ {
-		num := 20000000 + rand.Intn(2000000)*10 + rand.Intn(4)
-		reply, _ := conn.Do("aof_push_async", "user:"+strconv.Itoa(rndid)+":history", strconv.Itoa(num))
-		if reply == nil {
-			fmt.Println(reply)
-		}
 
-		//conn.Do("GET", "user:"+strconv.Itoa(rndid)+":sex")
+	for i := 0; i < count; i++ {
+		rndid := 20000000 + rand.Intn(2000000)*10 + rand.Intn(10)
+		remoteid := strconv.Itoa(rndid)
+		conn.Do("GET", "user:"+remoteid+":sex")
+		conn.Do("GET", "user:"+remoteid+":password")
+		conn.Do("GET", "user:"+remoteid+":cflag")
+		conn.Do("GET", "user:"+remoteid+":sessionid")
+		conn.Do("GET", "user:"+remoteid+":uid")
+		// num := 20000000 + rand.Intn(2000000)*10 + rand.Intn(4)
+		// reply, _ := conn.Do("aof_push_async", "user:"+strconv.Itoa(rndid)+":history", strconv.Itoa(num))
+		// if reply == nil {
+		// 	fmt.Println(reply)
+		// }
+
 		//conn.Do("SET", "user:"+strconv.Itoa(rndid)+":sex_f_m", "FM..FM..FM..")
 		// if e1 == nil {
 		// 	if reply != nil {

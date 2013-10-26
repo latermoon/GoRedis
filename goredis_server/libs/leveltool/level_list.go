@@ -76,6 +76,7 @@ func (l *LevelList) idxkey(idx int64) []byte {
 	return l.ldbKey("idx:" + strconv.FormatInt(idx, 10))
 }
 
+// 获取配置里整形值
 func (l *LevelList) ldbGetInt64(key string, defaultValue int64) int64 {
 	data, err := l.db.Get(l.ldbKey(key), l.ro)
 	if err != nil {
