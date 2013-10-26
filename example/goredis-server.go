@@ -21,10 +21,18 @@ func main() {
 	flag.Parse()
 
 	runtime.GOMAXPROCS(*procsPtr)
+
+	// db parent directory
+	dbhome := "/data"
+	finfo, e1 := os.Stat(dbhome)
+	if os.IsNotExist(e1) || !finfo.IsDir() {
+		dbhome = "/tmp"
+	}
 	host := fmt.Sprintf("%s:%d", *hostPtr, *portPtr)
-	directory := fmt.Sprintf("/tmp/goredis_%d/", *portPtr)
+	directory := fmt.Sprintf("%s/goredis_%d/", dbhome, *portPtr)
 	os.MkdirAll(directory, os.ModePerm)
 
+	// start ...
 	server := goredis_server.NewGoRedisServer(directory)
 	server.Init()
 	server.Listen(host)
