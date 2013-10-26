@@ -35,7 +35,7 @@ type GoRedisServer struct {
 	RedisServer
 	// 数据源
 	directory  string
-	datasource DataSource
+	datasource GoRedisDataSource
 	// counters
 	cmdCounters  *monitor.Counters
 	syncCounters *monitor.Counters

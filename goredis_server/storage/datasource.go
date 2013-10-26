@@ -1,6 +1,16 @@
 package storage
 
-// 数据源接口
+import (
+	"github.com/syndtr/goleveldb/leveldb"
+)
+
+// 扩展数据源接口，带有leveldb特性
+type GoRedisDataSource interface {
+	DataSource
+	DB() *leveldb.DB
+}
+
+// 基础数据源接口
 type DataSource interface {
 	Get(key []byte) (entry Entry)
 	Set(key []byte, entry Entry) (err error)

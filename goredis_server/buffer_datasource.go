@@ -20,7 +20,7 @@ var (
 // 带缓存的数据源，解决更新复杂数据的性能问题
 // 对string直接操作leveldb，其他数据类型改为异步aof更新
 type BufferDataSource struct {
-	DataSource
+	GoRedisDataSource
 	ldb        *LevelDBDataSource   // leveldb持久化层
 	cache      *lru.LRUCache        // LRU缓存层
 	aof        *leveltool.LevelList // AOF队列

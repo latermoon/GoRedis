@@ -10,7 +10,7 @@ import (
 
 // 使用LevelDB做数据源
 type LevelDBDataSource struct {
-	DataSource
+	GoRedisDataSource
 	db    *leveldb.DB
 	ro    *opt.ReadOptions
 	wo    *opt.WriteOptions
