@@ -37,12 +37,13 @@ type GoRedisServer struct {
 	directory  string
 	datasource GoRedisDataSource
 	// counters
-	cmdCounters  *monitor.Counters
-	syncCounters *monitor.Counters
+	cmdCounters     *monitor.Counters
+	cmdCateCounters *monitor.Counters // 指令集统计
+	syncCounters    *monitor.Counters
 	// logger
-	statusLogger *monitor.StatusLogger
-	syncMonitor  *monitor.StatusLogger
-	stdlog       *golog.Logger
+	cmdMonitor  *monitor.StatusLogger
+	syncMonitor *monitor.StatusLogger
+	stdlog      *golog.Logger
 	// 从库
 	uid              string // 实例id
 	slavelist        *list.List
@@ -73,6 +74,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	}
 	// counter
 	server.cmdCounters = monitor.NewCounters()
+	server.cmdCateCounters = monitor.NewCounters()
 	server.syncCounters = monitor.NewCounters()
 	return
 }
@@ -145,17 +147,19 @@ func (server *GoRedisServer) initSlaveSessions() {
 // 命令执行监控
 func (server *GoRedisServer) initCommandMonitor(path string) {
 	// monitor
-	server.statusLogger = monitor.NewStatusLogger(path)
-	server.statusLogger.Add(monitor.NewTimeFormater("Time", 8))
-	cmds := []string{"TOTAL", "GET", "SET", "HSET", "HGET", "HGETALL", "INCR", "DEL", "ZADD"}
-	for _, cmd := range cmds {
-		padding := len(cmd) + 1
+	server.cmdMonitor = monitor.NewStatusLogger(path)
+	server.cmdMonitor.Add(monitor.NewTimeFormater("time", 8))
+	server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCounters.Get("total"), "total", 7, "ChangedCount"))
+	// key, string, hash, list, ...
+	for _, cate := range CommandCategoryList {
+		cateName := string(cate)
+		padding := len(cateName) + 1
 		if padding < 7 {
 			padding = 7
 		}
-		server.statusLogger.Add(monitor.NewCountFormater(server.cmdCounters.Get(cmd), cmd, padding, "ChangedCount"))
+		server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCateCounters.Get(cateName), cateName, padding, "ChangedCount"))
 	}
-	go server.statusLogger.Start()
+	go server.cmdMonitor.Start()
 }
 
 // 从库同步监控
@@ -176,7 +180,9 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) {
 	go func() {
 		cmdName := strings.ToUpper(cmd.Name())
 		server.cmdCounters.Get(cmdName).Incr(1)
-		server.cmdCounters.Get("TOTAL").Incr(1)
+		cate := GetCommandCategory(cmdName)
+		server.cmdCateCounters.Get(string(cate)).Incr(1)
+		server.cmdCounters.Get("total").Incr(1)
 
 		// 同步到从库
 		if _, ok := server.needSyncCmdTable[cmdName]; ok {
