@@ -89,10 +89,10 @@ func (server *GoRedisServer) Init() {
 		panic(e1)
 	}
 	// buffer
-	bufdatasource := NewBufferDataSource(ldb)
-	bufdatasource.CheckUnsavedLog() // 检查是否有未保存的aoflog
+	// bufdatasource := NewBufferDataSource(ldb)
+	// bufdatasource.CheckUnsavedLog() // 检查是否有未保存的aoflog
 	// bind datasource
-	server.datasource = bufdatasource
+	server.datasource = ldb
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")

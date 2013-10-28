@@ -29,6 +29,9 @@ type LRUCache struct {
 
 	// How many bytes we are limiting the cache to.
 	capacity uint64
+
+	// by latermoon
+	ItemRemoved func(v Value)
 }
 
 // Values that go into LRUCache need to satisfy this interface.
@@ -50,9 +53,10 @@ type entry struct {
 
 func NewLRUCache(capacity uint64) *LRUCache {
 	return &LRUCache{
-		list:     list.New(),
-		table:    make(map[string]*list.Element),
-		capacity: capacity,
+		list:        list.New(),
+		table:       make(map[string]*list.Element),
+		capacity:    capacity,
+		ItemRemoved: func(v Value) {},
 	}
 }
 
@@ -193,5 +197,7 @@ func (lru *LRUCache) checkCapacity() {
 		lru.list.Remove(delElem)
 		delete(lru.table, delValue.key)
 		lru.size -= uint64(delValue.size)
+		// invoke
+		lru.ItemRemoved(delValue.value)
 	}
 }

@@ -13,9 +13,9 @@ func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnGC(cmd *Command) (reply *Reply) {
-	server.stdlog.Info("[%s] GC() start ...")
+	server.stdlog.Info("GC() start ...")
 	runtime.GC()
-	server.stdlog.Info("[%s] GC() finish")
+	server.stdlog.Info("GC() finish")
 	reply = StatusReply("OK")
 	return
 }

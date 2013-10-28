@@ -7,3 +7,19 @@
 [16815] 07 Oct 18:29:24.064 # Client addr=10.80.102.91:26127 fd=725 name= age=357 idle=357 flags=S db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=16376 oll=3195 omem=80765752 events=rw cmd=sync scheduled to be closed ASAP for overcoming of output buffer limits.
 [16815] 07 Oct 18:30:01.514 * Background saving started by pid 10630
 [16815] 07 Oct 18:30:45.858 * Background saving terminated with success
+
+
+## Commands
+
+### string
+set/get
+incr/decr
+
+### hash
+hset/hmset
+
+### geo
+geo_set user_f15m lat,lng {momoid:'100422', sex:'M', time:'2013-10-28 00:21:09', lat:39.043, lng:119.640, acc:65}
+geo_prev user_f15m lat,lng {index:0}
+geo_next user_f15m lat,lng 100
+
