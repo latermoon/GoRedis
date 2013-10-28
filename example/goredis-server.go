@@ -17,7 +17,7 @@ func main() {
 
 	hostPtr := flag.String("h", "", "Server host")
 	portPtr := flag.Int("p", 1602, "Server port")
-	procsPtr := flag.Int("procs", 4, "GOMAXPROCS")
+	procsPtr := flag.Int("procs", 8, "GOMAXPROCS")
 	flag.Parse()
 
 	runtime.GOMAXPROCS(*procsPtr)
@@ -31,6 +31,7 @@ func main() {
 
 	directory := fmt.Sprintf("%s/goredis_%d/", dbhome, *portPtr)
 	os.MkdirAll(directory, os.ModePerm)
+	fmt.Println("dbhome:", directory)
 
 	host := fmt.Sprintf("%s:%d", *hostPtr, *portPtr)
 

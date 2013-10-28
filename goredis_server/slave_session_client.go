@@ -89,10 +89,6 @@ func (s *SlaveSessionClient) processRunloop() {
 		}
 		// Process
 		s.server.syncCounters.Get("buffer").SetCount(s.taskqueue.Len())
-		if s.taskqueue.Len()%1000000 == 0 {
-			s.server.stdlog.Info("[%s] call GC() @ %d", s.session.RemoteAddr(), s.taskqueue.Len())
-			runtime.GC()
-		}
 		// s.server.stdlog.Debug("[%s] slaveof process %s", s.session.RemoteAddr(), obj)
 		switch obj.(type) {
 		case *Command:

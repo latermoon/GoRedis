@@ -3,11 +3,20 @@ package goredis_server
 import (
 	. "../goredis"
 	"bytes"
+	"runtime"
 	"strconv"
 )
 
 func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
 	reply = StatusReply("PONG")
+	return
+}
+
+func (server *GoRedisServer) OnGC(cmd *Command) (reply *Reply) {
+	server.stdlog.Info("[%s] GC() start ...")
+	runtime.GC()
+	server.stdlog.Info("[%s] GC() finish")
+	reply = StatusReply("OK")
 	return
 }
 
