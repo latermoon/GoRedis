@@ -19,7 +19,8 @@ incr/decr
 hset/hmset
 
 ### geo
-geo_set user_f15m lat,lng {momoid:'100422', sex:'M', time:'2013-10-28 00:21:09', lat:39.043, lng:119.640, acc:65}
-geo_prev user_f15m lat,lng {index:0}
-geo_next user_f15m lat,lng 100
+geo_set user_f15m lat lng {momoid:'100422', sex:'M', time:'2013-10-28 00:21:09', lat:39.043, lng:119.640, acc:65}
+geo_prev user_f15m lat lng {index:0}
+geo_next user_f15m lat lng 100
 
+geo_nearby user_f15m lat lng 
