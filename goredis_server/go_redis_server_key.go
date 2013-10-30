@@ -25,6 +25,7 @@ func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	return
 }
 
+// keys prefix start end
 func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 	pattern := cmd.StringAtIndex(1)
 	keys := server.datasource.Keys(pattern)

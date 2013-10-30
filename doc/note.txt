@@ -24,3 +24,9 @@ geo_prev user_f15m lat lng {index:0}
 geo_next user_f15m lat lng 100
 
 geo_nearby user_f15m lat lng 
+
+### bigz
+user_reg_rank:score:1378000907596:0 = 100422
+user_reg_rank:score:1378000907596:1 = 100422
+user_reg_rank:key:100422 = 1378000907596
+user_reg_rank:key:300000 = 1378000907596
