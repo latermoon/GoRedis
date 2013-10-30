@@ -21,10 +21,10 @@ func NewLevelDBDataSource(path string) (l *LevelDBDataSource, err error) {
 	l = &LevelDBDataSource{}
 	l.ro = &opt.ReadOptions{}
 	l.wo = &opt.WriteOptions{}
-	options := opt.Options{}
-	options.SetFlag(opt.OFCreateIfMissing)
-	options.SetMaxOpenFiles(20000)
-	options.SetWriteBuffer(256 << 20)
+	options := opt.Options{
+		MaxOpenFiles: 20000,
+		WriteBuffer:  256 << 20,
+	}
 	l.db, err = leveldb.OpenFile(path, &options)
 	return
 }
