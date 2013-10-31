@@ -4,6 +4,7 @@ import (
 	. "../goredis"
 	"bytes"
 	"runtime"
+	"sort"
 	"strconv"
 )
 
@@ -27,18 +28,36 @@ func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
 	buf.WriteString("goredis_version:0.1.1\n")
 	buf.WriteString("\n")
 	buf.WriteString("# Command Counter\n")
+	buf.WriteString(server.cmdCateCounterInfo())
+	buf.WriteString("\n")
 	buf.WriteString(server.cmdCounterInfo())
 	buf.WriteString("\n")
 	reply = BulkReply(buf.String())
 	return
 }
 
-func (server *GoRedisServer) cmdCounterInfo() string {
+func (server *GoRedisServer) cmdCateCounterInfo() string {
 	buf := bytes.Buffer{}
 	names := server.cmdCateCounters.CounterNames()
+	sort.Strings(names)
 	for _, name := range names {
 		counter := server.cmdCateCounters.Get(name)
 		buf.WriteString("cc_")
+		buf.WriteString(name)
+		buf.WriteString(":")
+		buf.WriteString(strconv.Itoa(counter.Count()))
+		buf.WriteString("\n")
+	}
+	return buf.String()
+}
+
+func (server *GoRedisServer) cmdCounterInfo() string {
+	buf := bytes.Buffer{}
+	names := server.cmdCounters.CounterNames()
+	sort.Strings(names)
+	for _, name := range names {
+		counter := server.cmdCounters.Get(name)
+		buf.WriteString("cmd_")
 		buf.WriteString(name)
 		buf.WriteString(":")
 		buf.WriteString(strconv.Itoa(counter.Count()))
