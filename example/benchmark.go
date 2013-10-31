@@ -5,14 +5,27 @@ import (
 	"github.com/latermoon/redigo/redis"
 	"math/rand"
 	"strconv"
+	"sync"
 	"time"
 )
+
+var i int = 0
+var mu sync.Mutex
+
+func incrCounter() {
+	mu.Lock()
+	defer mu.Unlock()
+	i++
+	if i%100000 == 0 {
+		fmt.Println("access count:", i)
+	}
+}
 
 func thread(conn redis.Conn, count int, ch chan int) {
 	t1 := time.Now()
 
 	for i := 0; i < count; i++ {
-		rndid := 10000000 + rand.Intn(50000000)
+		rndid := 1000000 + rand.Intn(75000000)
 		remoteid := strconv.Itoa(rndid)
 		conn.Do("GET", "user:"+remoteid+":profile")
 		// conn.Do("GET", "user:"+remoteid+":password")
@@ -31,6 +44,7 @@ func thread(conn redis.Conn, count int, ch chan int) {
 		// 		fmt.Println(string(reply.([]byte)))
 		// 	}
 		// }
+		incrCounter()
 	}
 	ch <- 1
 	t2 := time.Now()
@@ -44,7 +58,7 @@ func main() {
 	host := ":17600"
 
 	chanCount := 50
-	countPerThread := 10000
+	countPerThread := 2000000 * 10
 	clients := make([]redis.Conn, chanCount)
 	ch := make(chan int, chanCount)
 	for i := 0; i < chanCount; i++ {
