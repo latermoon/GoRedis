@@ -26,7 +26,14 @@ geo_next user_f15m lat lng 100
 geo_nearby user_f15m lat lng 
 
 ### bigz
+bigz_add key score member [score member ...]
+bigz_score key
+bigz_rangebyscore key min max
+bigz_rem key member [member ...]
+
+user_reg_rank:count = 2
 user_reg_rank:score:1378000907596:0 = 100422
-user_reg_rank:score:1378000907596:1 = 100422
+user_reg_rank:score:1378000907596:1 = 100423
+user_reg_rank:score:1378000907596:2 = 100428
 user_reg_rank:key:100422 = 1378000907596
 user_reg_rank:key:300000 = 1378000907596
