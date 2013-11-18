@@ -2,23 +2,36 @@ package main
 
 import (
 	"fmt"
-	"github.com/garyburd/redigo/redis"
+	"github.com/latermoon/redigo/redis"
 	"math/rand"
 	"strconv"
+	"sync"
 	"time"
 )
+
+var i int = 0
+var mu sync.Mutex
+
+func incrCounter() {
+	mu.Lock()
+	defer mu.Unlock()
+	i++
+	if i%100000 == 0 {
+		fmt.Println("access count:", i)
+	}
+}
 
 func thread(conn redis.Conn, count int, ch chan int) {
 	t1 := time.Now()
 
 	for i := 0; i < count; i++ {
-		rndid := 20000000 + rand.Intn(2000000)*10 + rand.Intn(10)
+		rndid := 1000000 + rand.Intn(75000000)
 		remoteid := strconv.Itoa(rndid)
-		conn.Do("GET", "user:"+remoteid+":sex")
-		conn.Do("GET", "user:"+remoteid+":password")
-		conn.Do("GET", "user:"+remoteid+":cflag")
-		conn.Do("GET", "user:"+remoteid+":sessionid")
-		conn.Do("GET", "user:"+remoteid+":uid")
+		conn.Do("GET", "user:"+remoteid+":profile")
+		// conn.Do("GET", "user:"+remoteid+":password")
+		// conn.Do("GET", "user:"+remoteid+":cflag")
+		// conn.Do("GET", "user:"+remoteid+":sessionid")
+		// conn.Do("GET", "user:"+remoteid+":uid")
 		// num := 20000000 + rand.Intn(2000000)*10 + rand.Intn(4)
 		// reply, _ := conn.Do("aof_push_async", "user:"+strconv.Itoa(rndid)+":history", strconv.Itoa(num))
 		// if reply == nil {
@@ -31,6 +44,7 @@ func thread(conn redis.Conn, count int, ch chan int) {
 		// 		fmt.Println(string(reply.([]byte)))
 		// 	}
 		// }
+		incrCounter()
 	}
 	ch <- 1
 	t2 := time.Now()
@@ -41,10 +55,10 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	//host := ":6379"
-	host := ":1602"
+	host := ":17600"
 
 	chanCount := 50
-	countPerThread := 10000
+	countPerThread := 2000000 * 10
 	clients := make([]redis.Conn, chanCount)
 	ch := make(chan int, chanCount)
 	for i := 0; i < chanCount; i++ {

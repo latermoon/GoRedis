@@ -10,7 +10,7 @@ import (
 
 // 使用LevelDB做数据源
 type LevelDBDataSource struct {
-	DataSource
+	GoRedisDataSource
 	db    *leveldb.DB
 	ro    *opt.ReadOptions
 	wo    *opt.WriteOptions
@@ -21,10 +21,10 @@ func NewLevelDBDataSource(path string) (l *LevelDBDataSource, err error) {
 	l = &LevelDBDataSource{}
 	l.ro = &opt.ReadOptions{}
 	l.wo = &opt.WriteOptions{}
-	options := opt.Options{}
-	options.SetFlag(opt.OFCreateIfMissing)
-	options.SetMaxOpenFiles(20000)
-	options.SetWriteBuffer(256 << 20)
+	options := opt.Options{
+		MaxOpenFiles: 100000,
+		WriteBuffer:  256 << 20,
+	}
 	l.db, err = leveldb.OpenFile(path, &options)
 	return
 }

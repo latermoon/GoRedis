@@ -12,12 +12,12 @@ type EntryType int
 
 // 数据类型
 const (
-	EntryTypeUnknown   = 0
-	EntryTypeString    = 1
-	EntryTypeHash      = 2
-	EntryTypeList      = 3
-	EntryTypeSet       = 4
-	EntryTypeSortedSet = 5
+	EntryTypeUnknown   EntryType = 0
+	EntryTypeString    EntryType = 1
+	EntryTypeHash      EntryType = 2
+	EntryTypeList      EntryType = 3
+	EntryTypeSet       EntryType = 4
+	EntryTypeSortedSet EntryType = 5
 )
 
 var (

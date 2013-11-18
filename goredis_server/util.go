@@ -4,15 +4,47 @@ import (
 	. "../goredis"
 	. "./storage"
 	"strconv"
+	"strings"
 )
 
-// 命令类型集合
-var cmdCategory = map[string][]string{
-	"string": []string{"GET", "SET", "INCR", "DECR", "INCRBY", "DECRBY", "MSET", "MGET"},
-	"hash":   []string{"HDEL", "HGET", "HSET", "HMGET", "HMSET", "HGETALL", "HINCRBY", "HKEYS", "HLEN"},
-	"list":   []string{"LINDEX", "LLEN", "LPOP", "LPUSH", "LRANGE", "LREM", "RPOP", "RPUSH"},
-	"set":    []string{"SADD", "SCARD", "SISMEMBER", "SMEMBERS", "SREM"},
-	"zset":   []string{"ZADD", "ZCARD", "ZINCRBY", "ZRANGE", "ZRANGEBYSCORE", "ZREM", "ZREMRANGEBYRANK", "ZREMRANGEBYSCORE", "ZREVRANGE", "ZREVRANGEBYSCORE", "ZSCORE"},
+// 指令集名称 CommandCategory
+type CCate string
+
+const (
+	CCateKey         CCate = "key"
+	CCateString      CCate = "string"
+	CCateHash        CCate = "hash"
+	CCateList        CCate = "list"
+	CCateSet         CCate = "set"
+	CCateSortedSet   CCate = "zset"
+	CCateAof         CCate = "aof"
+	CCatePubSub      CCate = "pubsub"
+	CCateTransaction CCate = "trans"
+	CCateScript      CCate = "script"
+	CCateConnection  CCate = "conn"
+	CCateServer      CCate = "server"
+	CCateUnknown     CCate = "unknown"
+)
+
+var CommandCategoryList = []CCate{CCateKey, CCateString, CCateHash, CCateList, CCateSet, CCateSortedSet, CCateAof, CCatePubSub, CCateTransaction, CCateScript, CCateConnection, CCateServer, CCateUnknown}
+
+// 指令所属类别
+var ccatemap map[string]CCate
+
+// 指令集命令列表
+var ccatemaplist = map[CCate][]string{
+	CCateKey:         []string{"DEL", "DUMP", "EXISTS", "EXPIRE", "EXPIREAT", "KEYS", "MIGRATE", "MOVE", "OBJECT", "PERSIST", "PEXPIRE", "PEXPIREAT", "PTTL", "RANDOMKEY", "RENAME", "RENAMENX", "RESTORE", "SORT", "TTL", "TYPE"},
+	CCateString:      []string{"APPEND", "BITCOUNT", "BITOP", "DECR", "DECRBY", "GET", "GETBIT", "GETRANGE", "GETSET", "INCR", "INCRBY", "INCRBYFLOAT", "MGET", "MSET", "MSETNX", "PSETEX", "SET", "SETBIT", "SETEX", "SETNX", "SETRANGE", "STRLEN"},
+	CCateHash:        []string{"HDEL", "HEXISTS", "HGET", "HGETALL", "HINCRBY", "HINCRBYFLOAT", "HKEYS", "HLEN", "HMGET", "HMSET", "HSET", "HSETNX", "HVALS"},
+	CCateList:        []string{"BLPOP", "BRPOP", "BRPOPLPUSH", "LINDEX", "LINSERT", "LLEN", "LPOP", "LPUSH", "LPUSHX", "LRANGE", "LREM", "LSET", "LTRIM", "RPOP", "RPOPLRUSH", "RPUSH", "RPUSHX"},
+	CCateSet:         []string{"SADD", "SCARD", "SDIFF", "SDIFFSTORE", "SINTER", "SINTERSTORE", "SISMEMBER", "SMEMBERS", "SMOVE", "SPOP", "SRANDMEMBER", "SREM", "SUNION", "SUNIONSTORE"},
+	CCateSortedSet:   []string{"ZADD", "ZCARD", "ZCOUNT", "ZINCRBY", "ZINTERSTORE", "ZRANGE", "ZRANGEBYSCORE", "ZRANK", "ZREM", "ZREMRANGEBYRANK", "ZREMRANGEBYSCORE", "ZREVRANGE", "ZREVRANGEBYSCORE", "ZREVRANK", "ZSCORE", "ZUNIONSTORE"},
+	CCateAof:         []string{"AOF_PUSH", "AOF_PUSH_ASYNC", "AOF_POP", "AOF_INDEX", "AOF_RANGE", "AOF_LEN"},
+	CCatePubSub:      []string{"PSUBSCRIBE", "PUBSUB", "PUBLISH", "PUNSUBSCRIBE", "SUBSCRIBE", "UNSUBSCRIBE"},
+	CCateTransaction: []string{"DISCARD", "EXEC", "MULTI", "UNWATCH", "WATCH"},
+	CCateScript:      []string{"EVAL", "EVALSHA", "SCRIPT"},
+	CCateConnection:  []string{"AUTH", "ECHO", "PING", "QUIT", "SELECT"},
+	CCateServer:      []string{"BGREWRITEAOF", "BGSAVE", "CLIENT", "CONFIG", "DBSIZE", "DEBUG", "FLUSHALL", "FLUSHDB", "INFO", "LASTSAVE", "MONITOR", "SAVE", "SHUTDOWM", "SLAVEOF", "SLOWLOG", "SYNC", "TIME"},
 }
 
 // 需要同步到从库的命令
@@ -23,6 +55,29 @@ var needSyncCmds = []string{
 	"SADD", "SREM",
 	"ZADD", "ZINCRBY", "ZREM",
 	"DEL"}
+
+func init() {
+	// 填充
+	ccatemap = make(map[string]CCate)
+	for cate, cmds := range ccatemaplist {
+		for _, cmd := range cmds {
+			// ccatemap["GET"] = CCateString
+			// ccatemap["SET"] = CCateString
+			// ccatemap["LPUSH"] = CCateList
+			ccatemap[cmd] = cate
+		}
+	}
+}
+
+// 返回一个指令所属的分类
+func GetCommandCategory(cmd string) (cate CCate) {
+	var exist bool
+	cate, exist = ccatemap[strings.ToUpper(cmd)]
+	if !exist {
+		cate = CCateUnknown
+	}
+	return
+}
 
 func formatFloat(f float64) string {
 	return strconv.FormatFloat(f, 'g', 12, 64)

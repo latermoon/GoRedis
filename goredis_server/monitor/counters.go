@@ -33,10 +33,10 @@ func (c *Counters) Get(name string) (counter *Counter) {
 	return
 }
 
-func (c *Counters) Counters() (counters []*Counter) {
-	counters = make([]*Counter, 0, len(c.table))
-	for _, val := range c.table {
-		counters = append(counters, val)
+func (c *Counters) CounterNames() (names []string) {
+	names = make([]string, 0, len(c.table))
+	for key, _ := range c.table {
+		names = append(names, key)
 	}
 	return
 }

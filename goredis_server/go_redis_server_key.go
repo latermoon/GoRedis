@@ -5,6 +5,7 @@ import (
 	. "./storage"
 	"bytes"
 	"fmt"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
@@ -24,6 +25,7 @@ func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	return
 }
 
+// keys prefix start end
 func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 	pattern := cmd.StringAtIndex(1)
 	keys := server.datasource.Keys(pattern)
@@ -32,6 +34,17 @@ func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 		bulks = append(bulks, key)
 	}
 	return MultiBulksReply(bulks)
+}
+
+func (server *GoRedisServer) OnKEYCOUNT(cmd *Command) (reply *Reply) {
+	db := server.datasource.DB()
+	iter := db.NewIterator(&opt.ReadOptions{})
+	count := 0
+	for iter.Next() {
+		count++
+	}
+	iter.Release()
+	return IntegerReply(count)
 }
 
 func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {

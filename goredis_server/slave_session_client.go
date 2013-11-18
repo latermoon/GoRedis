@@ -89,10 +89,6 @@ func (s *SlaveSessionClient) processRunloop() {
 		}
 		// Process
 		s.server.syncCounters.Get("buffer").SetCount(s.taskqueue.Len())
-		if s.taskqueue.Len()%1000000 == 0 {
-			s.server.stdlog.Info("[%s] call CG() @ %d", s.session.RemoteAddr(), s.taskqueue.Len())
-			runtime.GC()
-		}
 		// s.server.stdlog.Debug("[%s] slaveof process %s", s.session.RemoteAddr(), obj)
 		switch obj.(type) {
 		case *Command:
@@ -101,17 +97,10 @@ func (s *SlaveSessionClient) processRunloop() {
 			_ = s.server.InvokeCommandHandler(s.session, cmd)
 			s.server.syncCounters.Get("total").Incr(1)
 			cmdName := strings.ToUpper(cmd.Name())
+			cate := GetCommandCategory(cmdName)
+			// incr counter
+			s.server.syncCounters.Get(string(cate)).Incr(1)
 			switch cmdName {
-			case "SET":
-				s.server.syncCounters.Get("string").Incr(1)
-			case "HSET":
-				s.server.syncCounters.Get("hash").Incr(1)
-			case "SADD":
-				s.server.syncCounters.Get("set").Incr(1)
-			case "RPUSH":
-				s.server.syncCounters.Get("list").Incr(1)
-			case "ZADD":
-				s.server.syncCounters.Get("zset").Incr(1)
 			case "PING":
 				s.server.syncCounters.Get("ping").Incr(1)
 			}
