@@ -16,8 +16,8 @@ import (
 )
 
 func (server *GoRedisServer) aoflistByKey(key string, create bool) (lst *leveltool.LevelList) {
-	server.aoftableMutex.Lock()
-	defer server.aoftableMutex.Unlock()
+	server.levelMutex.Lock()
+	defer server.levelMutex.Unlock()
 
 	var exist bool
 	lst, exist = server.aoftable[key]
