@@ -4,6 +4,7 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"./libs/leveltool"
 	. "./storage"
 	"strconv"
 	"strings"
@@ -23,6 +24,15 @@ func (server *GoRedisServer) sortedSetByKey(key []byte, create bool) (sse *Sorte
 		server.datasource.Set(key, sse)
 	}
 	return
+}
+
+// bzadd zzz 1000 100422
+func (server *GoRedisServer) OnBZADD(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	elem := leveltool.NewZSetElem(cmd.Args[2], cmd.Args[3])
+	zset := leveltool.NewLevelSortedSet(server.datasource.DB(), "__zset:"+key)
+	zset.Add(elem)
+	return StatusReply(cmd.String())
 }
 
 // ZADD key score member [score member ...]

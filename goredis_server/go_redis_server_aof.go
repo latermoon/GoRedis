@@ -23,7 +23,7 @@ func (server *GoRedisServer) aoflistByKey(key string, create bool) (lst *levelto
 	lst, exist = server.aoftable[key]
 	if !exist {
 		// 使用levellist实现
-		lst = leveltool.NewLevelList(server.datasource.(*BufferDataSource).DB(), "__aof:"+key)
+		lst = leveltool.NewLevelList(server.datasource.DB(), "__aof:"+key)
 		server.aoftable[key] = lst
 	}
 	return

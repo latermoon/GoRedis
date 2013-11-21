@@ -15,6 +15,10 @@
 set/get
 incr/decr
 
+### key
+key_next
+key_prev
+
 ### hash
 hset/hmset
 

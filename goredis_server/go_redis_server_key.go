@@ -8,32 +8,10 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
-func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
-	keys := cmd.Args[1:]
-	n := 0
-	for _, key := range keys {
-		entry := server.datasource.Get(key)
-		if entry != nil {
-			err := server.datasource.Remove(key)
-			if err != nil {
-				fmt.Println(err)
-			}
-			n++
-		}
-	}
-	reply = IntegerReply(n)
-	return
-}
-
-// keys prefix start end
+// 在数据量大的情况下，keys基本没有意义
+// 取消keys，使用key_next或者key_prev来分段扫描全部key
 func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
-	pattern := cmd.StringAtIndex(1)
-	keys := server.datasource.Keys(pattern)
-	bulks := make([]interface{}, 0, len(keys))
-	for _, key := range keys {
-		bulks = append(bulks, key)
-	}
-	return MultiBulksReply(bulks)
+	return ErrorReply("keys is not supported, use key_next/key_prev instead")
 }
 
 // 找出下一个key
@@ -49,12 +27,16 @@ func (server *GoRedisServer) OnKEY_NEXT(cmd *Command) (reply *Reply) {
 		if err != nil {
 			return ErrorReply(err)
 		}
+		if count < 1 || count > 10000 {
+			return ErrorReply("count range: 1 < count < 10000")
+		}
 	}
-	if count < 1 || count > 10000 {
-		return ErrorReply("count range: 1 < count < 10000")
+	withtype := false
+	if len(cmd.Args) > 3 {
+		withtype = cmd.StringAtIndex(3) == "withtype"
 	}
 	// search
-	bulks := server.keySearch(seekkey, "next", count)
+	bulks := server.keySearch(seekkey, "next", count, withtype)
 	return MultiBulksReply(bulks)
 }
 
@@ -69,19 +51,23 @@ func (server *GoRedisServer) OnKEY_PREV(cmd *Command) (reply *Reply) {
 		if err != nil {
 			return ErrorReply(err)
 		}
+		if count < 1 || count > 10000 {
+			return ErrorReply("count range: 1 < count < 10000")
+		}
 	}
-	if count < 1 || count > 10000 {
-		return ErrorReply("count range: 1 < count < 10000")
+	withtype := false
+	if len(cmd.Args) > 3 {
+		withtype = cmd.StringAtIndex(3) == "withtype"
 	}
 	// search
-	bulks := server.keySearch(seekkey, "prev", count)
+	bulks := server.keySearch(seekkey, "prev", count, withtype)
 	return MultiBulksReply(bulks)
 }
 
 // 搜索并返回key和类型
 // @param direction "prev" or else for "next"
 // @return bulks bulks[0]=key, bulks[1]=type, bulks[2]=key2, ...
-func (server *GoRedisServer) keySearch(seekkey []byte, direction string, count int) (bulks []interface{}) {
+func (server *GoRedisServer) keySearch(seekkey []byte, direction string, count int, withtype bool) (bulks []interface{}) {
 	db := server.datasource.DB()
 	ro := &opt.ReadOptions{}
 	// seek
@@ -91,15 +77,21 @@ func (server *GoRedisServer) keySearch(seekkey []byte, direction string, count i
 	// search direction
 	searchPrev := direction == "prev"
 	// result
-	bulks = make([]interface{}, 0, count*2)
+	bufsize := count
+	if withtype {
+		bufsize = bufsize * 2
+	}
+	bulks = make([]interface{}, 0, bufsize)
 	if !searchPrev {
 		if bytes.Compare(iter.Key(), seekkey) != 0 {
 			bulks = append(bulks, copyBytes(iter.Key()))
-			bs := iter.Value()[0] // 第一个字节
-			bulks = append(bulks, EntryTypeDescription(EntryType(bs)))
+			if withtype {
+				bs := iter.Value()[0] // 第一个字节
+				bulks = append(bulks, EntryTypeDescription(EntryType(bs)))
+			}
 		}
 	}
-	for len(bulks) < count {
+	for len(bulks) < bufsize {
 		if searchPrev && !iter.Prev() {
 			break
 		}
@@ -107,21 +99,29 @@ func (server *GoRedisServer) keySearch(seekkey []byte, direction string, count i
 			break
 		}
 		bulks = append(bulks, copyBytes(iter.Key()))
-		bs := iter.Value()[0] // 第一个字节
-		bulks = append(bulks, EntryTypeDescription(EntryType(bs)))
+		if withtype {
+			bs := iter.Value()[0] // 第一个字节
+			bulks = append(bulks, EntryTypeDescription(EntryType(bs)))
+		}
 	}
 	return
 }
 
-func (server *GoRedisServer) OnKEYCOUNT(cmd *Command) (reply *Reply) {
-	db := server.datasource.DB()
-	iter := db.NewIterator(&opt.ReadOptions{})
-	count := 0
-	for iter.Next() {
-		count++
+func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
+	keys := cmd.Args[1:]
+	n := 0
+	for _, key := range keys {
+		entry := server.datasource.Get(key)
+		if entry != nil {
+			err := server.datasource.Remove(key)
+			if err != nil {
+				fmt.Println(err)
+			}
+			n++
+		}
 	}
-	iter.Release()
-	return IntegerReply(count)
+	reply = IntegerReply(n)
+	return
 }
 
 func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {

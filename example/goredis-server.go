@@ -12,6 +12,7 @@ import (
 )
 
 // go run goredis-server.go -h localhost -p 1602
+// go run goredis-server.go -procs 8 -p 17600
 func main() {
 	fmt.Println("GoRedis 0.1.1 by latermoon")
 
