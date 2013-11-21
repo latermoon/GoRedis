@@ -36,6 +36,83 @@ func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 	return MultiBulksReply(bulks)
 }
 
+// 找出下一个key
+// @return ["user:100422:name", "string", "user:100428:name", "string", "user:100422:setting", "hash", ...]
+func (server *GoRedisServer) OnKEY_NEXT(cmd *Command) (reply *Reply) {
+	seekkey, err := cmd.ArgAtIndex(1)
+	if err != nil {
+		return ErrorReply(err)
+	}
+	count := 1
+	if len(cmd.Args) > 2 {
+		count, err = cmd.IntAtIndex(2)
+		if err != nil {
+			return ErrorReply(err)
+		}
+	}
+	if count < 1 || count > 10000 {
+		return ErrorReply("count range: 1 < count < 10000")
+	}
+	// search
+	bulks := server.keySearch(seekkey, "next", count)
+	return MultiBulksReply(bulks)
+}
+
+func (server *GoRedisServer) OnKEY_PREV(cmd *Command) (reply *Reply) {
+	seekkey, err := cmd.ArgAtIndex(1)
+	if err != nil {
+		return ErrorReply(err)
+	}
+	count := 1
+	if len(cmd.Args) > 2 {
+		count, err = cmd.IntAtIndex(2)
+		if err != nil {
+			return ErrorReply(err)
+		}
+	}
+	if count < 1 || count > 10000 {
+		return ErrorReply("count range: 1 < count < 10000")
+	}
+	// search
+	bulks := server.keySearch(seekkey, "prev", count)
+	return MultiBulksReply(bulks)
+}
+
+// 搜索并返回key和类型
+// @param direction "prev" or else for "next"
+// @return bulks bulks[0]=key, bulks[1]=type, bulks[2]=key2, ...
+func (server *GoRedisServer) keySearch(seekkey []byte, direction string, count int) (bulks []interface{}) {
+	db := server.datasource.DB()
+	ro := &opt.ReadOptions{}
+	// seek
+	iter := db.NewIterator(ro)
+	defer iter.Release()
+	iter.Seek(seekkey)
+	// search direction
+	searchPrev := direction == "prev"
+	// result
+	bulks = make([]interface{}, 0, count*2)
+	if !searchPrev {
+		if bytes.Compare(iter.Key(), seekkey) != 0 {
+			bulks = append(bulks, copyBytes(iter.Key()))
+			bs := iter.Value()[0] // 第一个字节
+			bulks = append(bulks, EntryTypeDescription(EntryType(bs)))
+		}
+	}
+	for len(bulks) < count {
+		if searchPrev && !iter.Prev() {
+			break
+		}
+		if !searchPrev && !iter.Next() {
+			break
+		}
+		bulks = append(bulks, copyBytes(iter.Key()))
+		bs := iter.Value()[0] // 第一个字节
+		bulks = append(bulks, EntryTypeDescription(EntryType(bs)))
+	}
+	return
+}
+
 func (server *GoRedisServer) OnKEYCOUNT(cmd *Command) (reply *Reply) {
 	db := server.datasource.DB()
 	iter := db.NewIterator(&opt.ReadOptions{})

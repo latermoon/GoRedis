@@ -7,6 +7,15 @@ import (
 	"strings"
 )
 
+// 数据类型描述
+var entryTypeDesc = map[EntryType]string{
+	EntryTypeUnknown:   "unknown",
+	EntryTypeString:    "string",
+	EntryTypeHash:      "hash",
+	EntryTypeList:      "list",
+	EntryTypeSet:       "set",
+	EntryTypeSortedSet: "zset"}
+
 // 指令集名称 CommandCategory
 type CCate string
 
@@ -79,8 +88,23 @@ func GetCommandCategory(cmd string) (cate CCate) {
 	return
 }
 
+func EntryTypeDescription(et EntryType) (s string) {
+	var exist bool
+	s, exist = entryTypeDesc[et]
+	if !exist {
+		s = entryTypeDesc[EntryTypeUnknown]
+	}
+	return
+}
+
 func formatFloat(f float64) string {
 	return strconv.FormatFloat(f, 'g', 12, 64)
+}
+
+func copyBytes(src []byte) (dst []byte) {
+	dst = make([]byte, len(src))
+	copy(dst, src)
+	return
 }
 
 func BytesToInterfaceSlice(vals [][]byte) (result []interface{}) {

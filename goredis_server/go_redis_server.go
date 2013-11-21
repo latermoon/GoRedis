@@ -18,15 +18,6 @@ var (
 	WrongKindReply = ErrorReply(WrongKindError)
 )
 
-// 数据类型描述
-var entryTypeDesc = map[EntryType]string{
-	EntryTypeUnknown:   "unknown",
-	EntryTypeString:    "string",
-	EntryTypeHash:      "hash",
-	EntryTypeList:      "list",
-	EntryTypeSet:       "set",
-	EntryTypeSortedSet: "zset"}
-
 var goredisPrefix string = "__goredis:"
 
 // GoRedisServer
