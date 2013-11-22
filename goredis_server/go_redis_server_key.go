@@ -110,13 +110,13 @@ func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
-	entry := server.datasource.Get(key)
-	if entry != nil {
-		if desc, exist := entryTypeDesc[entry.Type()]; exist {
-			return StatusReply(desc)
-		}
+	t := server.levelKey.TypeOf(key)
+	if len(t) > 0 {
+		reply = StatusReply(t)
+	} else {
+		reply = StatusReply("none")
 	}
-	return StatusReply("none")
+	return
 }
 
 // [Custom] 描述一个key

@@ -46,6 +46,7 @@ type GoRedisServer struct {
 	zsettable   map[string]*leveltool.LevelSortedSet
 	hashtable   map[string]*leveltool.LevelHash
 	levelString *leveltool.LevelString
+	levelKey    *leveltool.LevelKey
 	levelMutex  sync.Mutex
 }
 
@@ -91,6 +92,7 @@ func (server *GoRedisServer) Init() {
 	server.zsettable = make(map[string]*leveltool.LevelSortedSet)         // zset
 	server.hashtable = make(map[string]*leveltool.LevelHash)              // hash
 	server.levelString = leveltool.NewLevelString(server.datasource.DB()) // string
+	server.levelKey = leveltool.NewLevelKey(server.datasource.DB())       // key
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")
