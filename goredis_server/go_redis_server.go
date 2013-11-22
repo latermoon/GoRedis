@@ -42,10 +42,11 @@ type GoRedisServer struct {
 	// locks
 	stringMutex sync.Mutex
 	// leveltool
-	listtable  map[string]*leveltool.LevelList
-	zsettable  map[string]*leveltool.LevelSortedSet
-	hashtable  map[string]*leveltool.LevelHash
-	levelMutex sync.Mutex
+	listtable   map[string]*leveltool.LevelList
+	zsettable   map[string]*leveltool.LevelSortedSet
+	hashtable   map[string]*leveltool.LevelHash
+	levelString *leveltool.LevelString
+	levelMutex  sync.Mutex
 }
 
 /*
@@ -61,9 +62,6 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.directory = directory
 	server.needSyncCmdTable = make(map[string]bool)
 	server.slavelist = list.New()
-	server.listtable = make(map[string]*leveltool.LevelList)      // list
-	server.zsettable = make(map[string]*leveltool.LevelSortedSet) // zset
-	server.hashtable = make(map[string]*leveltool.LevelHash)      // hash
 	for _, cmd := range needSyncCmds {
 		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
 	}
@@ -88,6 +86,11 @@ func (server *GoRedisServer) Init() {
 	// bufdatasource.CheckUnsavedLog() // 检查是否有未保存的aoflog
 	// bind datasource
 	server.datasource = ldb
+	// level
+	server.listtable = make(map[string]*leveltool.LevelList)              // list
+	server.zsettable = make(map[string]*leveltool.LevelSortedSet)         // zset
+	server.hashtable = make(map[string]*leveltool.LevelHash)              // hash
+	server.levelString = leveltool.NewLevelString(server.datasource.DB()) // string
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")
