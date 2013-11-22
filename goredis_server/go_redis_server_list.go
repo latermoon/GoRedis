@@ -13,7 +13,7 @@ func (server *GoRedisServer) listByKey(key string, create bool) (lst *leveltool.
 	lst, exist = server.listtable[key]
 	if !exist {
 		// 使用levellist实现
-		lst = leveltool.NewLevelList(server.datasource.DB(), "__list:"+key)
+		lst = leveltool.NewLevelList(server.datasource.DB(), key)
 		server.listtable[key] = lst
 	}
 	return

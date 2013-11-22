@@ -12,7 +12,7 @@ func (server *GoRedisServer) hashByKey(key string) (hash *leveltool.LevelHash) {
 	var exist bool
 	hash, exist = server.hashtable[key]
 	if !exist {
-		hash = leveltool.NewLevelHash(server.datasource.DB(), "__hash:"+key)
+		hash = leveltool.NewLevelHash(server.datasource.DB(), key)
 		server.hashtable[key] = hash
 	}
 	return

@@ -5,21 +5,22 @@ package leveltool
 
 1、数据结构
 要提供序号访问，就不能删除中间的元素
-[prefix]:_start = 1004 (int64)
-[prefix]:_end = 1008 (int64)
-[prefix]:idx:1004 = hello ([]byte)
-[prefix]:idx:1005 = hello
-[prefix]:idx:1006 = hello
-[prefix]:idx:1007 = hello
-[prefix]:idx:1008 = hello
+__key:[key]:list = 1004,1008
+__list:[key]:idx:1004 = hello ([]byte)
+__list:[key]:idx:1005 = hello
+__list:[key]:idx:1006 = hello
+__list:[key]:idx:1007 = hello
+__list:[key]:idx:1008 = hello
 */
 // 本页面命名注意，idx都表示大于l.start的那个索引序号，而不是0开始的数组序号
 
 import (
-	"encoding/binary"
+	"bytes"
+	// "fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -31,78 +32,71 @@ type Element struct {
 // 类似双向链表，右进左出，可以通过索引查找
 // 海量存储，占用内存小
 type LevelList struct {
-	db *leveldb.DB
-	ro *opt.ReadOptions
-	wo *opt.WriteOptions
-	// key前缀
-	prefix string
+	db       *leveldb.DB
+	ro       *opt.ReadOptions
+	wo       *opt.WriteOptions
+	entryKey string
 	// 游标控制
 	start int64
 	end   int64
-	mutex sync.Mutex
+	mu    sync.Mutex
 }
 
-func NewLevelList(db *leveldb.DB, prefix string) (lst *LevelList) {
-	lst = &LevelList{}
-	lst.db = db
-	lst.ro = &opt.ReadOptions{}
-	lst.wo = &opt.WriteOptions{}
-	lst.prefix = prefix
-	lst.start = lst.ldbGetInt64("_start", 0)
-	lst.end = lst.ldbGetInt64("_end", -1)
+func NewLevelList(db *leveldb.DB, entryKey string) (l *LevelList) {
+	l = &LevelList{}
+	l.db = db
+	l.ro = &opt.ReadOptions{}
+	l.wo = &opt.WriteOptions{}
+	l.entryKey = entryKey
+	l.start = 0
+	l.end = -1
+	l.initStartEnd()
 	return
 }
 
-func (l *LevelList) ldbKey(key string) []byte {
-	return []byte(l.prefix + ":" + key)
-}
-
-func (l *LevelList) startkey() []byte {
-	return l.ldbKey("_start")
-}
-
-func (l *LevelList) endkey() []byte {
-	return l.ldbKey("_end")
-}
-
-func (l *LevelList) idxkey(idx int64) []byte {
-	return l.ldbKey("idx:" + strconv.FormatInt(idx, 10))
-}
-
-// 获取配置里整形值
-func (l *LevelList) ldbGetInt64(key string, defaultValue int64) int64 {
-	data, err := l.db.Get(l.ldbKey(key), l.ro)
+func (l *LevelList) initStartEnd() {
+	data, err := l.db.Get(l.infoKey(), l.ro)
 	if err != nil {
-		return defaultValue
+		return
 	}
-	return bytesToInt64(data)
+	pairs := bytes.Split(data, []byte(","))
+	if len(pairs) < 2 {
+		return
+	}
+	l.start, _ = strconv.ParseInt(string(pairs[0]), 10, 64)
+	l.end, _ = strconv.ParseInt(string(pairs[1]), 10, 64)
 }
 
-// 数据转换
-func int64ToBytes(i int64) []byte {
-	var buf = make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, uint64(i))
-	return buf
+// __key:[entry key]:list =
+func (l *LevelList) infoKey() []byte {
+	return []byte(strings.Join([]string{KEY_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, LIST_SUFFIX}, ""))
 }
 
-// 数据转换
-func bytesToInt64(buf []byte) int64 {
-	return int64(binary.BigEndian.Uint64(buf))
+func (l *LevelList) infoValue() []byte {
+	s := strconv.FormatInt(l.start, 10)
+	e := strconv.FormatInt(l.end, 10)
+	return []byte(s + "," + e)
+}
+
+// __list:[key]:idx:1005 = hello
+func (l *LevelList) idxKey(idx int64) []byte {
+	idxStr := strconv.FormatInt(idx, 10)
+	return []byte(strings.Join([]string{LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "idx", ":", idxStr}, ""))
 }
 
 func (l *LevelList) Push(value []byte) (e *Element, err error) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
 	// 添加数据并更新右游标
-	idx := l.end + 1
+	l.end++
 	batch := new(leveldb.Batch)
-	batch.Put(l.idxkey(idx), value)
-	batch.Put(l.endkey(), int64ToBytes(idx))
+	batch.Put(l.idxKey(l.end), value)
+	batch.Put(l.infoKey(), l.infoValue())
 	err = l.db.Write(batch, l.wo)
-	if err == nil {
-		// 写入成功
-		l.end++
+	if err != nil {
+		// 回退
+		l.end--
 	}
 	e = &Element{}
 	e.Value = value
@@ -110,54 +104,53 @@ func (l *LevelList) Push(value []byte) (e *Element, err error) {
 }
 
 func (l *LevelList) Pop() (e *Element, err error) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
 	if l.len() == 0 {
 		return nil, nil
 	}
+	// backup
+	oldstart, oldend := l.start, l.end
+
+	// get
 	idx := l.start
 	e = &Element{}
-	e.Value, err = l.db.Get(l.idxkey(idx), l.ro)
+	e.Value, err = l.db.Get(l.idxKey(idx), l.ro)
 	if err != nil {
 		return nil, err
 	}
-	// 只剩下一个元素时，清除start、end
+	// 只剩下一个元素时，删除infoKey(0)
 	shouldReset := l.len() == 1
-	// 更新左游标，并删除数据
+	// 删除数据, 更新左游标
 	batch := new(leveldb.Batch)
+	batch.Delete(l.idxKey(idx))
 	if shouldReset {
-		batch.Delete(l.startkey())
-		batch.Delete(l.endkey())
+		l.start = 0
+		l.end = -1
+		batch.Delete(l.infoKey())
 	} else {
-		batch.Put(l.startkey(), int64ToBytes(l.start+1))
+		l.start++
+		batch.Put(l.infoKey(), l.infoValue())
 	}
-	batch.Delete(l.idxkey(idx))
 	err = l.db.Write(batch, l.wo)
-	if err == nil {
-		// 删除成功
-		if shouldReset {
-			l.start = 0
-			l.end = -1
-		} else {
-			l.start++
-		}
-	} else {
-		return nil, err
+	if err != nil {
+		// 回退
+		l.start, l.end = oldstart, oldend
 	}
 	return
 }
 
 func (l *LevelList) Index(i int64) (e *Element, err error) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
 	if i < 0 || i >= l.len() {
 		return nil, nil
 	}
 	idx := l.start + i
 	e = &Element{}
-	e.Value, err = l.db.Get(l.idxkey(idx), l.ro)
+	e.Value, err = l.db.Get(l.idxKey(idx), l.ro)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +162,7 @@ func (l *LevelList) len() int64 {
 }
 
 func (l *LevelList) Len() int64 {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	return l.len()
 }
