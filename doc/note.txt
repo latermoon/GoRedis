@@ -1,39 +1,71 @@
-如果Redis从库同步速度太慢，“overcoming of output buffer limits”，Master会断开连接。
+## Data
+"__goredis:slaves"
+"__goredis:uid"
 
-[16815] 07 Oct 18:23:27.121 * Slave ask for synchronization
-[16815] 07 Oct 18:23:27.121 * Starting BGSAVE for SYNC
-[16815] 07 Oct 18:23:27.259 * Background saving started by pid 9437
-[16815] 07 Oct 18:24:10.091 * Background saving terminated with success
-[16815] 07 Oct 18:29:24.064 # Client addr=10.80.102.91:26127 fd=725 name= age=357 idle=357 flags=S db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=16376 oll=3195 omem=80765752 events=rw cmd=sync scheduled to be closed ASAP for overcoming of output buffer limits.
-[16815] 07 Oct 18:30:01.514 * Background saving started by pid 10630
-[16815] 07 Oct 18:30:45.858 * Background saving terminated with success
+"__key|name|string" = "latermoon"
+"__key|age|string" = "27"
+"__key|user:100422:setting|hash" = [count]
+"__key|paul|list" = [start, 3, end, 4]
+"__key|_kikc_momoid_|set" = [count]
 
+
+"__hash|user:100422:setting|field|ok"
+"__list:paul:idx:3" = 100423
+"__list:paul:idx:4" = 100428
+"__set:_kikc_momoid_:field:100422" = true
+"__set:_kikc_momoid_:field:100423" = true
+"__set:_kikc_momoid_:field:100428" = true
+
+
+ 4) "__list[paul]idx#1"
+ 5) "__list[paul]idx#10"
+ 6) "__list[paul]idx#11"
+ 7) "__list[paul]idx#2"
+ 8) "__list[paul]idx#3"
+ 9) "__list[paul]idx#4"
+10) "__list[paul]idx#5"
+11) "__list[paul]idx#6"
+12) "__list[paul]idx#7"
+13) "__list[paul]idx#8"
+14) "__list[paul]idx#9"
 
 ## Commands
+http://redis.io/commands
 
-### string
-set/get
-incr/decr
+### string 
+get/set/mget/mset
+incr/decr/incrby/decrby
+NOTSUPPORTED(append/bitcount/bitop/getbit/getrange/getset/incrbyfloat/msetnx/psetex/setbit/setex/setnx/setrange/strlen)
+
+### key
+del key [key ...]
+key_next prefix [count]
+key_prev prefix [count]
+type key
+NOTSUPPORTED()
 
 ### hash
-hset/hmset
+hget/hset/hmget/hmset
+hgetall
+hlen
+hdel
+NOTSUPPORTED(hexists/hincrby/hincrbyfloat/hkeys/hsetnx/hvals/hscan)
 
-### geo
-geo_set user_f15m lat lng {momoid:'100422', sex:'M', time:'2013-10-28 00:21:09', lat:39.043, lng:119.640, acc:65}
-geo_prev user_f15m lat lng {index:0}
-geo_next user_f15m lat lng 100
-geo_nearby user_f15m lat lng 
+### list
+lpush/lpop/rpush/rpop
+lindex
+lrange
+llen
+NOTSUPPORTED(blpop/brpop/brpoplpush/linsert/lpushx/lrem/lset/ltrim/rpoplpush/rpushx)
 
+### zset 
+zadd
+zrange/zrangebyscore
+zrem/zremrangebyrank/zremrangebyscore
+zcard/zscore
+NOTSUPPORTED(zcount/zincrby/zinterstore/zrank/...)
 
-### bigz
-bigz_add key score member [score member ...]
-bigz_score key
-bigz_rangebyscore key min max
-bigz_rem key member [member ...]
-
-user_reg_rank:count = 2
-user_reg_rank:score:1378000907596:0 = 100422
-user_reg_rank:score:1378000907596:2 = 100428
-
-user_reg_rank:key:100422 = 1378000907596
-user_reg_rank:key:300000 = 1378000907596
+zadd aaa 1002 a 100 b 1005 c 20 d 10043 e
+zremrangebyscore aaa 10 1002
+zremrangebyrank aaa 0 2
+key_next "__zset" 100

@@ -2,62 +2,47 @@ package goredis_server
 
 import (
 	. "../goredis"
-	. "./storage"
+	"./libs/leveltool"
 )
 
-// 获取SortedSet，不存在则自动创建
-func (server *GoRedisServer) setByKey(key []byte) (se *SetEntry, err error) {
-	entry := server.datasource.Get(key)
-	if entry != nil && entry.Type() != EntryTypeSet {
-		err = WrongKindError
-		return
+// 获取Set
+func (server *GoRedisServer) setByKey(key string) (hash *leveltool.LevelHash) {
+	server.levelMutex.Lock()
+	defer server.levelMutex.Unlock()
+	var exist bool
+	hash, exist = server.hashtable[key]
+	if !exist {
+		hash = leveltool.NewLevelHash(server.datasource.DB(), "__set:"+key)
+		server.hashtable[key] = hash
 	}
-	if entry == nil {
-		entry = NewSetEntry()
-		server.datasource.Set(key, entry)
-	}
-	se = entry.(*SetEntry)
 	return
 }
 
 // SADD key member [member ...]
 // Add one or more members to a set
 func (server *GoRedisServer) OnSADD(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.setByKey(key)
-	if err != nil {
-		return ErrorReply(err)
-	}
-	members := cmd.StringArgs()[2:]
+	key := cmd.StringAtIndex(1)
+	members := cmd.Args[2:]
+	hash := server.setByKey(key)
 	n := 0
 	for _, member := range members {
-		ok := entry.Put(member)
-		if ok {
-			n++
-		}
+		n += hash.Set(member, []byte("true"))
 	}
-	server.datasource.NotifyUpdate(key, cmd)
 	return IntegerReply(n)
 }
 
 func (server *GoRedisServer) OnSCARD(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.setByKey(key)
-	if err != nil {
-		return ErrorReply(err)
-	}
-	n := entry.Count()
+	key := cmd.StringAtIndex(1)
+	hash := server.setByKey(key)
+	n := hash.Count()
 	return IntegerReply(n)
 }
 
 func (server *GoRedisServer) OnSISMEMBER(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.setByKey(key)
-	if err != nil {
-		return ErrorReply(err)
-	}
-	member := cmd.StringAtIndex(2)
-	if entry.Contains(member) {
+	key := cmd.StringAtIndex(1)
+	member, _ := cmd.ArgAtIndex(2)
+	hash := server.setByKey(key)
+	if hash.Exist(member) {
 		reply = IntegerReply(1)
 	} else {
 		reply = IntegerReply(0)
@@ -66,35 +51,21 @@ func (server *GoRedisServer) OnSISMEMBER(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnSMEMBERS(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.setByKey(key)
-	if err != nil {
-		return ErrorReply(err)
+	key := cmd.StringAtIndex(1)
+	hash := server.setByKey(key)
+	elems := hash.GetAll(1000)
+	keys := make([]interface{}, 0, len(elems))
+	for _, elem := range elems {
+		keys = append(keys, elem.Key)
 	}
-	keys := entry.Keys()
 	reply = MultiBulksReply(keys)
 	return
 }
 
 func (server *GoRedisServer) OnSREM(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.setByKey(key)
-	if err != nil {
-		return ErrorReply(err)
-	}
-	members := cmd.StringArgs()[2:]
-	n := 0
-	for _, member := range members {
-		ok := entry.Remove(member)
-		if ok {
-			n++
-		}
-	}
-	if entry.Count() == 0 {
-		server.datasource.Remove(key)
-	}
-	if n > 0 {
-		server.datasource.NotifyUpdate(key, cmd)
-	}
+	key := cmd.StringAtIndex(1)
+	members := cmd.Args[2:]
+	hash := server.setByKey(key)
+	n := hash.Remove(members...)
 	return IntegerReply(n)
 }

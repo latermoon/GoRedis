@@ -4,43 +4,24 @@ package goredis_server
 
 import (
 	. "../goredis"
-	. "./storage"
 	"strconv"
 )
 
-// 获取String，不存在则自动创建
-func (server *GoRedisServer) stringByKey(key []byte, create bool) (e *StringEntry, err error) {
-	entry := server.datasource.Get(key)
-	if entry != nil && entry.Type() != EntryTypeString {
-		err = WrongKindError
-		return
-	}
-	if entry != nil {
-		e = entry.(*StringEntry)
-	} else if create {
-		e = NewStringEntry(nil)
-		server.datasource.Set(key, e)
-	}
-	return
-}
-
 func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.stringByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return BulkReply(nil)
+	value := server.levelString.Get(key)
+	if value == nil {
+		reply = BulkReply(nil)
+	} else {
+		reply = BulkReply(value)
 	}
-	reply = BulkReply(entry.Value())
 	return
 }
 
 func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
 	val, _ := cmd.ArgAtIndex(2)
-	entry := NewStringEntry(val)
-	err := server.datasource.Set(key, entry)
+	err := server.levelString.Set(key, val)
 	reply = ReplySwitch(err, StatusReply("OK"))
 	return
 }
@@ -49,12 +30,11 @@ func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
 	keys := cmd.Args[1:]
 	vals := make([]interface{}, len(keys))
 	for i, key := range keys {
-		entry, err := server.stringByKey(key, false)
-		if err != nil || entry == nil {
+		value := server.levelString.Get(key)
+		if value == nil {
 			vals[i] = nil
-			continue
 		} else {
-			vals[i] = entry.Value()
+			vals[i] = value
 		}
 	}
 	reply = MultiBulksReply(vals)
@@ -70,9 +50,7 @@ func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
 	for i := 0; i < count; i += 2 {
 		key := keyvals[i]
 		val := keyvals[i+1]
-		// 不做类型检查，其他数据会被string覆盖
-		entry := NewStringEntry(val)
-		server.datasource.Set(key, entry)
+		server.levelString.Set(key, val)
 	}
 	reply = StatusReply("OK")
 	return
@@ -84,22 +62,19 @@ func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
  * @param chg 增减量，正负数均可
  */
 func (server *GoRedisServer) incrStringEntry(key []byte, chg int) (newvalue int, err error) {
-	entry := server.datasource.Get(key)
-	if entry == nil {
-		entry = NewStringEntry("0")
-	} else if entry.Type() != EntryTypeString {
-		err = WrongKindError
-		return
-	}
-	// incr
+	value := server.levelString.Get(key)
 	var oldvalue int
-	oldvalue, err = strconv.Atoi(entry.(*StringEntry).String())
-	if err != nil {
-		return
+	if value == nil {
+		oldvalue = 0
+	} else {
+		oldvalue, err = strconv.Atoi(string(value))
+		if err != nil {
+			return
+		}
 	}
+	// update
 	newvalue = oldvalue + chg
-	entry.(*StringEntry).SetValue(strconv.Itoa(newvalue))
-	server.datasource.Set(key, entry)
+	err = server.levelString.Set(key, []byte(strconv.Itoa(newvalue)))
 	return
 }
 

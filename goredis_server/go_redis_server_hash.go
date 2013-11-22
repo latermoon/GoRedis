@@ -2,94 +2,64 @@ package goredis_server
 
 import (
 	. "../goredis"
-	. "./storage"
+	"./libs/leveltool"
 )
 
-// 获取Hash，不存在则自动创建
-func (server *GoRedisServer) hashByKey(key []byte, create bool) (hash *HashEntry, err error) {
-	entry := server.datasource.Get(key)
-	if entry != nil && entry.Type() != EntryTypeHash {
-		err = WrongKindError
-		return
-	}
-	if entry != nil {
-		hash = entry.(*HashEntry)
-	} else if create {
-		hash = NewHashEntry()
-		server.datasource.Set(key, hash)
+// 获取Hash
+func (server *GoRedisServer) hashByKey(key string) (hash *leveltool.LevelHash) {
+	server.levelMutex.Lock()
+	defer server.levelMutex.Unlock()
+	var exist bool
+	hash, exist = server.hashtable[key]
+	if !exist {
+		hash = leveltool.NewLevelHash(server.datasource.DB(), key)
+		server.hashtable[key] = hash
 	}
 	return
 }
 
 func (server *GoRedisServer) OnHGET(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.hashByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return BulkReply(nil)
+	key := cmd.StringAtIndex(1)
+	field, _ := cmd.ArgAtIndex(2)
+	hash := server.hashByKey(key)
+	val := hash.Get(field)
+	if val == nil {
+		reply = BulkReply(nil)
+	} else {
+		reply = BulkReply(val)
 	}
-
-	field := cmd.StringAtIndex(2)
-	val := entry.Get(field)
-	reply = BulkReply(val)
 	return
 }
 
 func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.hashByKey(key, true)
-	if err != nil {
-		return ErrorReply(err)
-	}
-
-	entry.Mutex.Lock()
-	defer entry.Mutex.Unlock()
-
-	field := cmd.StringAtIndex(2)
+	key := cmd.StringAtIndex(1)
+	hash := server.hashByKey(key)
+	field, _ := cmd.ArgAtIndex(2)
 	value, _ := cmd.ArgAtIndex(3)
-
-	entry.Set(field, value)
-	// update
-	server.datasource.NotifyUpdate(key, cmd)
+	hash.Set(field, value)
 	return IntegerReply(1)
 }
 
 func (server *GoRedisServer) OnHGETALL(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.hashByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return MultiBulksReply([]interface{}{})
-	}
-
-	entry.Mutex.Lock()
-	defer entry.Mutex.Unlock()
-
-	// response
-	keyvals := make([]interface{}, 0, len(entry.Map())*2)
-	for key, val := range entry.Map() {
-		keyvals = append(keyvals, key)
-		keyvals = append(keyvals, val)
+	key := cmd.StringAtIndex(1)
+	hash := server.hashByKey(key)
+	elems := hash.GetAll(1000)
+	keyvals := make([]interface{}, 0, len(elems)*2)
+	for _, elem := range elems {
+		keyvals = append(keyvals, elem.Key)
+		keyvals = append(keyvals, elem.Value)
 	}
 	reply = MultiBulksReply(keyvals)
 	return
 }
 
 func (server *GoRedisServer) OnHMGET(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	fields := cmd.StringArgs()[2:]
-	entry, err := server.hashByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return MultiBulksReply(make([]interface{}, len(fields)))
-	}
-
-	keyvals := make([]interface{}, 0, len(fields))
+	key := cmd.StringAtIndex(1)
+	hash := server.hashByKey(key)
+	fields := cmd.Args[2:]
+	keyvals := make([]interface{}, 0, len(fields)*2)
 	for _, field := range fields {
-		val := entry.Get(field)
+		val := hash.Get(field)
 		keyvals = append(keyvals, field)
 		keyvals = append(keyvals, val)
 	}
@@ -98,75 +68,31 @@ func (server *GoRedisServer) OnHMGET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
+	key := cmd.StringAtIndex(1)
 	keyvals := cmd.Args[2:]
 	if len(keyvals)%2 != 0 {
 		reply = ErrorReply("Bad field/value paires")
 		return
 	}
-
-	entry, err := server.hashByKey(key, true)
-	if err != nil {
-		return ErrorReply(err)
-	}
-
-	entry.Mutex.Lock()
-	defer entry.Mutex.Unlock()
-
-	for i := 0; i < len(keyvals); i += 2 {
-		field := string(keyvals[i])
-		val := keyvals[i+1]
-		entry.Set(field, val)
-	}
-	// update
-	server.datasource.NotifyUpdate(key, cmd)
+	hash := server.hashByKey(key)
+	hash.Set(keyvals...)
 	reply = StatusReply("OK")
 	return
 }
 
 func (server *GoRedisServer) OnHLEN(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.hashByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return IntegerReply(0)
-	}
-
-	length := len(entry.Map())
+	key := cmd.StringAtIndex(1)
+	hash := server.hashByKey(key)
+	length := hash.Count()
 	reply = IntegerReply(length)
 	return
 }
 
 func (server *GoRedisServer) OnHDEL(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.hashByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return IntegerReply(0)
-	}
-
-	entry.Mutex.Lock()
-	defer entry.Mutex.Unlock()
-
-	fields := cmd.StringArgs()[2:]
-	n := 0
-	for _, field := range fields {
-		_, exist := entry.Map()[field]
-		if exist {
-			delete(entry.Map(), field)
-			n++
-		}
-	}
-
-	if len(entry.Map()) == 0 {
-		server.datasource.Remove(key)
-	}
-	if n > 0 {
-		server.datasource.NotifyUpdate(key, cmd)
-	}
-
+	key := cmd.StringAtIndex(1)
+	hash := server.hashByKey(key)
+	fields := cmd.Args[2:]
+	n := hash.Remove(fields...)
 	reply = IntegerReply(n)
 	return
 }
