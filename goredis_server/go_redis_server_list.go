@@ -2,137 +2,109 @@ package goredis_server
 
 import (
 	. "../goredis"
-	. "./storage"
+	"./libs/leveltool"
 )
 
-// 获取List，不存在则自动创建
-func (server *GoRedisServer) listByKey(key []byte, create bool) (lst *ListEntry, err error) {
-	entry := server.datasource.Get(key)
-	if entry != nil && entry.Type() != EntryTypeList {
-		err = WrongKindError
-		return
-	}
-	if entry != nil {
-		lst = entry.(*ListEntry)
-	} else if create {
-		lst = NewListEntry()
-		server.datasource.Set(key, lst)
-	}
-	return
-}
+func (server *GoRedisServer) listByKey(key string, create bool) (lst *leveltool.LevelList) {
+	server.levelMutex.Lock()
+	defer server.levelMutex.Unlock()
 
-func (server *GoRedisServer) OnLLEN(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.listByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return IntegerReply(0)
+	var exist bool
+	lst, exist = server.listtable[key]
+	if !exist {
+		// 使用levellist实现
+		lst = leveltool.NewLevelList(server.datasource.DB(), "__list:"+key)
+		server.listtable[key] = lst
 	}
-	n := entry.List().Len()
-	reply = IntegerReply(n)
-	return
-}
-
-func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.listByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return BulkReply(nil)
-	}
-
-	index, e1 := cmd.IntAtIndex(2)
-	if e1 != nil {
-		return ErrorReply(e1)
-	}
-	val := entry.List().Index(index)
-	reply = BulkReply(val)
-	return
-}
-
-func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.listByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return MultiBulksReply([]interface{}{})
-	}
-
-	start, e1 := cmd.IntAtIndex(2)
-	end, e2 := cmd.IntAtIndex(3)
-	if e1 != nil || e2 != nil {
-		return ErrorReply("Bad start/end")
-	}
-	vals := entry.List().Range(start, end)
-	reply = MultiBulksReply(vals)
 	return
 }
 
 func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.listByKey(key, true)
-	if err != nil {
-		return ErrorReply(err)
+	key := cmd.StringAtIndex(1)
+	vals := cmd.Args[2:]
+	lst := server.listByKey(key, true)
+	for _, val := range vals {
+		lst.Push(val)
 	}
-
-	values := cmd.Args[2:]
-	objs := BytesToInterfaceSlice(values)
-	n := entry.List().RPush(objs...)
-	server.datasource.NotifyUpdate(key, cmd)
-	reply = IntegerReply(n)
-	return
+	length := int(lst.Len())
+	return IntegerReply(length)
 }
 
 func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.listByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
+	key := cmd.StringAtIndex(1)
+	lst := server.listByKey(key, false)
+	if lst == nil {
 		return BulkReply(nil)
 	}
-
-	val := entry.List().LPop()
-	if entry.List().Len() == 0 {
-		server.datasource.Remove(key)
+	elem, err := lst.Pop()
+	if err != nil {
+		return ErrorReply(err)
 	}
-	server.datasource.NotifyUpdate(key, cmd)
-	reply = BulkReply(val)
+	reply = BulkReply(elem.Value.([]byte))
 	return
 }
 
-func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.listByKey(key, true)
-	if err != nil {
-		return ErrorReply(err)
+func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	lst := server.listByKey(key, false)
+	if lst == nil {
+		return BulkReply(nil)
 	}
+	idx, err := cmd.IntAtIndex(2)
+	if err != nil {
+		return ErrorReply("bad index")
+	}
+	elem, e2 := lst.Index(int64(idx))
+	if e2 != nil {
+		return ErrorReply(e2)
+	} else if elem == nil {
+		return BulkReply(nil)
+	}
+	reply = BulkReply(elem.Value.([]byte))
+	return
+}
 
-	values := cmd.Args[2:]
-	objs := BytesToInterfaceSlice(values)
-	n := entry.List().LPush(objs...)
-	server.datasource.NotifyUpdate(key, cmd)
+func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	lst := server.listByKey(key, false)
+	if lst == nil {
+		return MultiBulksReply([]interface{}{})
+	}
+	start, e1 := cmd.IntAtIndex(2)
+	end, e2 := cmd.IntAtIndex(3)
+	if e1 != nil || e2 != nil {
+		return ErrorReply("bad start/end")
+	} else if start < 0 {
+		return ErrorReply("start > end")
+	} else if end != -1 && start > end {
+		return ErrorReply("start > end")
+	}
+	// 初始缓冲
+	buflen := end - start + 1
+	if end <= 0 || end > 100 {
+		buflen = 100
+	}
+	bulks := make([]interface{}, 0, buflen)
+	for i := start; end == -1 || i <= end; i++ {
+		elem, e2 := lst.Index(int64(i))
+		if e2 != nil {
+			return ErrorReply(e2)
+		} else if elem == nil {
+			break
+		}
+		bulks = append(bulks, elem.Value.([]byte))
+	}
+	reply = MultiBulksReply(bulks)
+	return
+}
+
+func (server *GoRedisServer) OnLLEN(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	lst := server.listByKey(key, false)
+	if lst == nil {
+		return IntegerReply(0)
+	}
+	n := int(lst.Len())
 	reply = IntegerReply(n)
-	return
-}
-
-func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.listByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return BulkReply(nil)
-	}
-
-	val := entry.List().RPop()
-	if entry.List().Len() == 0 {
-		server.datasource.Remove(key)
-	}
-	server.datasource.NotifyUpdate(key, cmd)
-	reply = BulkReply(val)
 	return
 }

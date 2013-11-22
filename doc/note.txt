@@ -10,34 +10,42 @@
 
 
 ## Commands
+http://redis.io/commands
 
-### string
-set/get
-incr/decr
+### string 
+get/set/mget/mset
+incr/decr/incrby/decrby
+NOTSUPPORTED(append/bitcount/bitop/getbit/getrange/getset/incrbyfloat/msetnx/psetex/setbit/setex/setnx/setrange/strlen)
 
 ### key
-key_next
-key_prev
+del key [key ...]
+key_next prefix [count]
+key_prev prefix [count]
+type key
+NOTSUPPORTED()
 
 ### hash
-hset/hmset
+hget/hset/hmget/hmset
+hgetall
+hlen
+hdel
+NOTSUPPORTED(hexists/hincrby/hincrbyfloat/hkeys/hsetnx/hvals/hscan)
 
-### geo
-geo_set user_f15m lat lng {momoid:'100422', sex:'M', time:'2013-10-28 00:21:09', lat:39.043, lng:119.640, acc:65}
-geo_prev user_f15m lat lng {index:0}
-geo_next user_f15m lat lng 100
-geo_nearby user_f15m lat lng 
+### list
+lpush/lpop/rpush/rpop
+lindex
+lrange
+llen
+NOTSUPPORTED(blpop/brpop/brpoplpush/linsert/lpushx/lrem/lset/ltrim/rpoplpush/rpushx)
 
+### zset 
+zadd
+zrange/zrangebyscore
+zrem/zremrangebyrank/zremrangebyscore
+zcard/zscore
+NOTSUPPORTED(zcount/zincrby/zinterstore/zrank/...)
 
-### bigz
-bigz_add key score member [score member ...]
-bigz_score key
-bigz_rangebyscore key min max
-bigz_rem key member [member ...]
-
-user_reg_rank:count = 2
-user_reg_rank:score:1378000907596:0 = 100422
-user_reg_rank:score:1378000907596:2 = 100428
-
-user_reg_rank:key:100422 = 1378000907596
-user_reg_rank:key:300000 = 1378000907596
+zadd aaa 1002 a 100 b 1005 c 20 d 10043 e
+zremrangebyscore aaa 10 1002
+zremrangebyrank aaa 0 2
+key_next "__zset" 100

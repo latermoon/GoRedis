@@ -5,25 +5,9 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/leveltool"
-	. "./storage"
+	// . "./storage"
 	"strings"
 )
-
-// 获取SortedSet，不存在则自动创建
-func (server *GoRedisServer) sortedSetByKey(key []byte, create bool) (sse *SortedSetEntry, err error) {
-	entry := server.datasource.Get(key)
-	if entry != nil && entry.Type() != EntryTypeSortedSet {
-		err = WrongKindError
-		return
-	}
-	if entry != nil {
-		sse = entry.(*SortedSetEntry)
-	} else if create {
-		sse = NewSortedSetEntry()
-		server.datasource.Set(key, sse)
-	}
-	return
-}
 
 func (server *GoRedisServer) zsetByKey(key string) (zset *leveltool.LevelSortedSet) {
 	server.levelMutex.Lock()
@@ -127,25 +111,28 @@ func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	return
 }
 
+// ZREM key member [member ...]
+// Remove one or more members from a sorted set
 func (server *GoRedisServer) OnZREM(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.sortedSetByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return IntegerReply(0)
+	key := cmd.StringAtIndex(1)
+	members := cmd.Args[2:]
+	zset := server.zsetByKey(key)
+	n := zset.Remove(members...)
+	reply = IntegerReply(n)
+	return
+}
+
+// ZREMRANGEBYRANK key start stop
+// Remove all members in a sorted set within the given indexes
+func (server *GoRedisServer) OnZREMRANGEBYRANK(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	start, e1 := cmd.IntAtIndex(2)
+	stop, e2 := cmd.IntAtIndex(3)
+	if e1 != nil || e2 != nil {
+		return ErrorReply("Bad start/stop")
 	}
-	members := cmd.StringArgs()[2:]
-	n := 0
-	for _, member := range members {
-		ok := entry.SortedSet().Remove(member)
-		if ok {
-			n++
-		}
-	}
-	if n > 0 {
-		server.datasource.NotifyUpdate(key, cmd)
-	}
+	zset := server.zsetByKey(key)
+	n := zset.RemoveByIndex(start, stop)
 	reply = IntegerReply(n)
 	return
 }
@@ -153,19 +140,14 @@ func (server *GoRedisServer) OnZREM(cmd *Command) (reply *Reply) {
 // ZREMRANGEBYSCORE key min max
 // Remove all members in a sorted set within the given scores
 func (server *GoRedisServer) OnZREMRANGEBYSCORE(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	entry, err := server.sortedSetByKey(key, false)
-	if err != nil {
-		return ErrorReply(err)
-	} else if entry == nil {
-		return IntegerReply(0)
-	}
-	min, e1 := cmd.FloatAtIndex(2)
-	max, e2 := cmd.FloatAtIndex(3)
+	key := cmd.StringAtIndex(1)
+	min, e1 := cmd.ArgAtIndex(2)
+	max, e2 := cmd.ArgAtIndex(3)
 	if e1 != nil || e2 != nil {
 		return ErrorReply("Bad min/max")
 	}
-	n := entry.SortedSet().RemoveByScore(min, max)
+	zset := server.zsetByKey(key)
+	n := zset.RemoveByScore(min, max)
 	reply = IntegerReply(n)
 	return
 }

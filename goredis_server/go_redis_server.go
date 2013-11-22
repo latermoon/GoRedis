@@ -42,7 +42,7 @@ type GoRedisServer struct {
 	// locks
 	stringMutex sync.Mutex
 	// leveltool
-	aoftable   map[string]*leveltool.LevelList
+	listtable  map[string]*leveltool.LevelList
 	zsettable  map[string]*leveltool.LevelSortedSet
 	levelMutex sync.Mutex
 }
@@ -60,7 +60,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.directory = directory
 	server.needSyncCmdTable = make(map[string]bool)
 	server.slavelist = list.New()
-	server.aoftable = make(map[string]*leveltool.LevelList)       // aof
+	server.listtable = make(map[string]*leveltool.LevelList)      // list
 	server.zsettable = make(map[string]*leveltool.LevelSortedSet) // zset
 	for _, cmd := range needSyncCmds {
 		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
