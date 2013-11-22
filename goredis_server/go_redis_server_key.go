@@ -2,9 +2,11 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"./libs/leveltool"
 	. "./storage"
 	"bytes"
 	"fmt"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
@@ -67,43 +69,25 @@ func (server *GoRedisServer) OnKEY_PREV(cmd *Command) (reply *Reply) {
 // 搜索并返回key和类型
 // @param direction "prev" or else for "next"
 // @return bulks bulks[0]=key, bulks[1]=type, bulks[2]=key2, ...
-func (server *GoRedisServer) keySearch(seekkey []byte, direction string, count int, withtype bool) (bulks []interface{}) {
+func (server *GoRedisServer) keySearch(prefix []byte, direction string, count int, withtype bool) (bulks []interface{}) {
 	db := server.datasource.DB()
 	ro := &opt.ReadOptions{}
-	// seek
 	iter := db.NewIterator(ro)
 	defer iter.Release()
-	iter.Seek(seekkey)
-	// search direction
-	searchPrev := direction == "prev"
-	// result
+	// buffer
 	bufsize := count
 	if withtype {
 		bufsize = bufsize * 2
 	}
+	// enumerate
 	bulks = make([]interface{}, 0, bufsize)
-	if !searchPrev {
-		if bytes.Compare(iter.Key(), seekkey) != 0 {
-			bulks = append(bulks, copyBytes(iter.Key()))
-			if withtype {
-				bs := iter.Value()[0] // 第一个字节
-				bulks = append(bulks, EntryTypeDescription(EntryType(bs)))
-			}
-		}
-	}
-	for len(bulks) < bufsize {
-		if searchPrev && !iter.Prev() {
-			break
-		}
-		if !searchPrev && !iter.Next() {
-			break
-		}
+	leveltool.PrefixEnumerate(iter, prefix, func(i int, iter iterator.Iterator, quit *bool) {
 		bulks = append(bulks, copyBytes(iter.Key()))
 		if withtype {
 			bs := iter.Value()[0] // 第一个字节
 			bulks = append(bulks, EntryTypeDescription(EntryType(bs)))
 		}
-	}
+	}, direction)
 	return
 }
 
