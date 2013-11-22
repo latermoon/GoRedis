@@ -3,10 +3,9 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/leveltool"
-	// . "./storage"
 )
 
-// 获取Hash，不存在则自动创建
+// 获取Hash
 func (server *GoRedisServer) hashByKey(key string) (hash *leveltool.LevelHash) {
 	server.levelMutex.Lock()
 	defer server.levelMutex.Unlock()
