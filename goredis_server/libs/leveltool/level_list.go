@@ -166,3 +166,19 @@ func (l *LevelList) Len() int64 {
 	defer l.mu.Unlock()
 	return l.len()
 }
+
+func (l *LevelList) Drop() (n int) {
+	if l.Len() == 0 {
+		return
+	}
+	batch := new(leveldb.Batch)
+	for idx := l.start; idx <= l.end; idx++ {
+		batch.Delete(l.idxKey(idx))
+	}
+	batch.Delete(l.infoKey())
+	err := l.db.Write(batch, l.wo)
+	if err == nil {
+		n = 1
+	}
+	return
+}

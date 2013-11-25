@@ -150,3 +150,13 @@ func (l *LevelHash) Count() (n int) {
 	}, "next")
 	return
 }
+
+func (l *LevelHash) Drop() (n int) {
+	iter := l.db.NewIterator(l.ro)
+	defer iter.Release()
+	batch := new(leveldb.Batch)
+	PrefixEnumerate(iter, l.fieldPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
+		batch.Delete(copyBytes(iter.Key()))
+	}, "next")
+	err := l
+}

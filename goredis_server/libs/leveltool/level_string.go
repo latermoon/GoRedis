@@ -33,6 +33,16 @@ func (l *LevelString) Get(key []byte) (value []byte) {
 	return
 }
 
+func (l *LevelString) Delete(key []byte) (n int) {
+	sk := l.stringKey(key)
+	val := l.Get(sk)
+	if val != nil {
+		l.db.Delete(sk, l.wo)
+		n = 1
+	}
+	return
+}
+
 func (l *LevelString) Set(key []byte, value []byte) (err error) {
 	err = l.db.Put(l.stringKey(key), value, l.wo)
 	return
