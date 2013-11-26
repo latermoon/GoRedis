@@ -1,9 +1,10 @@
 package leveltool
 
 /*
-prefix:field:name = latermoon
-prefix:field:age = 27
-prefix:field:sex = M
+__key[profile]hash = ""
+__hash[profile]name = latermoon
+__hash[profile]age = 27
+__hash[profile]sex = M
 */
 
 import (
@@ -37,6 +38,10 @@ func NewLevelHash(db *leveldb.DB, entryKey string) (l *LevelHash) {
 	l.ro = &opt.ReadOptions{}
 	l.wo = &opt.WriteOptions{}
 	return
+}
+
+func (l *LevelHash) Size() int {
+	return 0
 }
 
 func (l *LevelHash) infoKey() []byte {
@@ -80,9 +85,9 @@ func (l *LevelHash) Set(fieldVals ...[]byte) (n int) {
 		fieldkey := l.fieldKey(fieldVals[i])
 		val := fieldVals[i+1]
 		batch.Put(fieldkey, val)
-		batch.Put(l.infoKey(), l.infoValue())
 		n++
 	}
+	batch.Put(l.infoKey(), l.infoValue())
 	l.db.Write(batch, l.wo)
 	return
 }
@@ -148,5 +153,18 @@ func (l *LevelHash) Count() (n int) {
 			return
 		}
 	}, "next")
+	return
+}
+
+func (l *LevelHash) Drop() (n int) {
+	iter := l.db.NewIterator(l.ro)
+	defer iter.Release()
+	batch := new(leveldb.Batch)
+	PrefixEnumerate(iter, l.fieldPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
+		batch.Delete(copyBytes(iter.Key()))
+	}, "next")
+	batch.Delete(l.infoKey())
+	l.db.Write(batch, l.wo)
+	n = 1
 	return
 }

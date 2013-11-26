@@ -2,27 +2,12 @@ package goredis_server
 
 import (
 	. "../goredis"
-	"./libs/leveltool"
 )
-
-func (server *GoRedisServer) listByKey(key string, create bool) (lst *leveltool.LevelList) {
-	server.levelMutex.Lock()
-	defer server.levelMutex.Unlock()
-
-	var exist bool
-	lst, exist = server.listtable[key]
-	if !exist {
-		// 使用levellist实现
-		lst = leveltool.NewLevelList(server.datasource.DB(), key)
-		server.listtable[key] = lst
-	}
-	return
-}
 
 func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	vals := cmd.Args[2:]
-	lst := server.listByKey(key, true)
+	lst := server.keyManager.listByKey(key)
 	for _, val := range vals {
 		lst.Push(val)
 	}
@@ -32,7 +17,7 @@ func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	lst := server.listByKey(key, false)
+	lst := server.keyManager.listByKey(key)
 	if lst == nil {
 		return BulkReply(nil)
 	}
@@ -46,7 +31,7 @@ func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	lst := server.listByKey(key, false)
+	lst := server.keyManager.listByKey(key)
 	if lst == nil {
 		return BulkReply(nil)
 	}
@@ -66,7 +51,7 @@ func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	lst := server.listByKey(key, false)
+	lst := server.keyManager.listByKey(key)
 	if lst == nil {
 		return MultiBulksReply([]interface{}{})
 	}
@@ -100,7 +85,7 @@ func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLLEN(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	lst := server.listByKey(key, false)
+	lst := server.keyManager.listByKey(key)
 	if lst == nil {
 		return IntegerReply(0)
 	}

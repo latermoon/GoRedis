@@ -3,9 +3,6 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/leveltool"
-	. "./storage"
-	"bytes"
-	"fmt"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
@@ -70,7 +67,7 @@ func (server *GoRedisServer) OnKEY_PREV(cmd *Command) (reply *Reply) {
 // @param direction "prev" or else for "next"
 // @return bulks bulks[0]=key, bulks[1]=type, bulks[2]=key2, ...
 func (server *GoRedisServer) keySearch(prefix []byte, direction string, count int, withtype bool) (bulks []interface{}) {
-	db := server.datasource.DB()
+	db := server.DB()
 	ro := &opt.ReadOptions{}
 	iter := db.NewIterator(ro)
 	defer iter.Release()
@@ -94,14 +91,23 @@ func (server *GoRedisServer) keySearch(prefix []byte, direction string, count in
 func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	keys := cmd.Args[1:]
 	n := 0
+	// TODO
 	for _, key := range keys {
-		entry := server.datasource.Get(key)
-		if entry != nil {
-			err := server.datasource.Remove(key)
-			if err != nil {
-				fmt.Println(err)
-			}
-			n++
+		n++
+		t := server.keyManager.levelKey().TypeOf(key)
+		switch t {
+		case "string":
+			server.keyManager.levelString().Delete(key)
+		case "hash":
+			server.keyManager.hashByKey(string(key)).Drop()
+		case "set":
+			server.keyManager.setByKey(string(key)).Drop()
+		case "list":
+			server.keyManager.listByKey(string(key)).Drop()
+		case "zset":
+			server.keyManager.zsetByKey(string(key)).Drop()
+		default:
+			n--
 		}
 	}
 	reply = IntegerReply(n)
@@ -110,55 +116,11 @@ func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
-	entry := server.datasource.Get(key)
-	if entry != nil {
-		if desc, exist := entryTypeDesc[entry.Type()]; exist {
-			return StatusReply(desc)
-		}
+	t := server.keyManager.levelKey().TypeOf(key)
+	if len(t) > 0 {
+		reply = StatusReply(t)
+	} else {
+		reply = StatusReply("none")
 	}
-	return StatusReply("none")
-}
-
-// [Custom] 描述一个key
-func (server *GoRedisServer) OnDESC(cmd *Command) (reply *Reply) {
-	keys := cmd.Args[1:]
-	bulks := make([]interface{}, 0, len(keys))
-	for _, key := range keys {
-		entry := server.datasource.Get(key)
-		if entry == nil {
-			bulks = append(bulks, string(key)+" [nil]")
-			continue
-		}
-		buf := bytes.Buffer{}
-		buf.WriteString(string(key) + " [" + entryTypeDesc[entry.Type()] + "] ")
-
-		switch entry.Type() {
-		case EntryTypeString:
-			buf.WriteString(entry.(*StringEntry).String())
-		case EntryTypeHash:
-			buf.WriteString(fmt.Sprintf("%s", entry.(*HashEntry).Map()))
-		case EntryTypeSortedSet:
-			iter := entry.(*SortedSetEntry).SortedSet().Iterator()
-			for iter.Next() {
-				members := iter.Value().([]string)
-				score := iter.Key().(float64)
-				for _, member := range members {
-					buf.WriteString(fmt.Sprintf("%s(%s) ", member, server.formatFloat(score)))
-				}
-			}
-		case EntryTypeSet:
-			buf.WriteString(fmt.Sprintf("%s", entry.(*SetEntry).Keys()))
-		case EntryTypeList:
-			for e := entry.(*ListEntry).List().Front(); e != nil; e = e.Next() {
-				buf.Write(e.Value.([]byte))
-				buf.WriteString(" ")
-			}
-		default:
-
-		}
-		// append
-		bulks = append(bulks, buf.String())
-	}
-	reply = MultiBulksReply(bulks)
 	return
 }

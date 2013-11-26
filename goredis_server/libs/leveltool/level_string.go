@@ -1,5 +1,10 @@
 package leveltool
 
+/*
+__key:name:string = latermoon
+__key:age:string = 27
+*/
+
 import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -29,6 +34,16 @@ func (l *LevelString) Get(key []byte) (value []byte) {
 	value, err = l.db.Get(l.stringKey(key), l.ro)
 	if err != nil {
 		value = nil
+	}
+	return
+}
+
+func (l *LevelString) Delete(key []byte) (n int) {
+	sk := l.stringKey(key)
+	val := l.Get(sk)
+	if val != nil {
+		l.db.Delete(sk, l.wo)
+		n = 1
 	}
 	return
 }

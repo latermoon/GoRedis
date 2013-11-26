@@ -5,12 +5,12 @@ package leveltool
 
 1、数据结构
 要提供序号访问，就不能删除中间的元素
-__key:[key]:list = 1004,1008
-__list:[key]:idx:1004 = hello ([]byte)
-__list:[key]:idx:1005 = hello
-__list:[key]:idx:1006 = hello
-__list:[key]:idx:1007 = hello
-__list:[key]:idx:1008 = hello
+__key[key]list = 1004,1008
+__list[key]idx:1004 = hello
+__list[key]idx:1005 = hello
+__list[key]idx:1006 = hello
+__list[key]idx:1007 = hello
+__list[key]idx:1008 = hello
 */
 // 本页面命名注意，idx都表示大于l.start的那个索引序号，而不是0开始的数组序号
 
@@ -18,6 +18,7 @@ import (
 	"bytes"
 	// "fmt"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"strconv"
 	"strings"
@@ -50,11 +51,15 @@ func NewLevelList(db *leveldb.DB, entryKey string) (l *LevelList) {
 	l.entryKey = entryKey
 	l.start = 0
 	l.end = -1
-	l.initStartEnd()
+	l.initInfo()
 	return
 }
 
-func (l *LevelList) initStartEnd() {
+func (l *LevelList) Size() int {
+	return 0
+}
+
+func (l *LevelList) initInfo() {
 	data, err := l.db.Get(l.infoKey(), l.ro)
 	if err != nil {
 		return
@@ -76,6 +81,10 @@ func (l *LevelList) infoValue() []byte {
 	s := strconv.FormatInt(l.start, 10)
 	e := strconv.FormatInt(l.end, 10)
 	return []byte(s + "," + e)
+}
+
+func (l *LevelList) keyPrefix() []byte {
+	return []byte(strings.Join([]string{LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT}, ""))
 }
 
 // __list:[key]:idx:1005 = hello
@@ -165,4 +174,17 @@ func (l *LevelList) Len() int64 {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.len()
+}
+
+func (l *LevelList) Drop() (n int) {
+	iter := l.db.NewIterator(l.ro)
+	defer iter.Release()
+	batch := new(leveldb.Batch)
+	PrefixEnumerate(iter, l.keyPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
+		batch.Delete(copyBytes(iter.Key()))
+	}, "next")
+	batch.Delete(l.infoKey())
+	l.db.Write(batch, l.wo)
+	n = 1
+	return
 }

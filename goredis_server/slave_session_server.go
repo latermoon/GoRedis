@@ -3,11 +3,10 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/leveltool"
-	. "./storage"
-	"fmt"
+	// "fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-	"strings"
+	// "strings"
 	"sync"
 )
 
@@ -36,8 +35,7 @@ func NewSlaveSession(server *GoRedisServer, session *Session, uid string) (s *Sl
 	s.uid = uid
 	s.aofEnabled = len(uid) > 0 //存在uid就可以访问本地快照
 	if s.aofEnabled {
-		// TODO aof之后存到另外的路径，节省主库空间
-		s.aoflist = leveltool.NewLevelList(s.server.datasource.(*LevelDBDataSource).DB(), "__goredis:slaveaof:"+s.uid)
+		s.aoflist = leveltool.NewLevelList(s.server.DB(), "__slaveaof:"+s.uid)
 	}
 	return
 }
@@ -175,55 +173,35 @@ func (s *SlaveSession) SendSnapshot(snapshot *leveldb.Snapshot) {
 		snapshot.Release()
 	}()
 
-	for iter.Next() {
-		// 跳过系统数据
-		key := string(iter.Key())
-		if strings.HasPrefix(key, "__goredis:") {
-			continue
-		}
-		entry, e1 := s.toEntry(iter.Value())
-		if e1 != nil {
-			s.server.stdlog.Warn("snapshot fetch entry error %s", e1)
-			continue
-		}
-		cmd := entryToCommand(iter.Key(), entry)
-		if cmd == nil {
-			s.server.stdlog.Warn("snapshot entry to command error %s, %s", string(iter.Key()), string(iter.Value()))
-			continue
-		}
-		// s.server.stdlog.Debug("snapshot send %s", cmd)
-		e2 := s.session.WriteCommand(cmd)
-		if e2 != nil {
-			// 销毁整个slave
-		}
-	}
+	// leveltool.PrefixEnumerate(iter, prefix, func(i int, iter iterator.Iterator, quit *bool) {
+	// })
+
+	// for iter.Next() {
+	// 	// 跳过系统数据
+	// 	key := string(iter.Key())
+	// 	if strings.HasPrefix(key, "__goredis:") {
+	// 		continue
+	// 	}
+	// 	entry, e1 := s.toEntry(iter.Value())
+	// 	if e1 != nil {
+	// 		s.server.stdlog.Warn("snapshot fetch entry error %s", e1)
+	// 		continue
+	// 	}
+	// 	cmd := entryToCommand(iter.Key(), entry)
+	// 	if cmd == nil {
+	// 		s.server.stdlog.Warn("snapshot entry to command error %s, %s", string(iter.Key()), string(iter.Value()))
+	// 		continue
+	// 	}
+	// 	// s.server.stdlog.Debug("snapshot send %s", cmd)
+	// 	e2 := s.session.WriteCommand(cmd)
+	// 	if e2 != nil {
+	// 		// 销毁整个slave
+	// 	}
+	// }
 	// 构建aof
 	if s.AofEnabled() {
 		s.server.snapshotSentCallback(s)
 	}
 	// 开始消费
 	go s.remoteRunloop()
-}
-
-func (s *SlaveSession) toEntry(bs []byte) (entry Entry, err error) {
-	switch EntryType(bs[0]) {
-	case EntryTypeString:
-		entry = NewStringEntry(nil)
-	case EntryTypeHash:
-		entry = NewHashEntry()
-	case EntryTypeSortedSet:
-		entry = NewSortedSetEntry()
-	case EntryTypeSet:
-		entry = NewSetEntry()
-	case EntryTypeList:
-		entry = NewListEntry()
-	default:
-		entry = NewStringEntry(nil)
-	}
-	// 反序列化
-	err = entry.Decode(bs[1:])
-	if err != nil {
-		fmt.Println("decode entry error", err)
-	}
-	return
 }

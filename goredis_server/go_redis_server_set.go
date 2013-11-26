@@ -2,28 +2,14 @@ package goredis_server
 
 import (
 	. "../goredis"
-	"./libs/leveltool"
 )
-
-// 获取Set
-func (server *GoRedisServer) setByKey(key string) (hash *leveltool.LevelHash) {
-	server.levelMutex.Lock()
-	defer server.levelMutex.Unlock()
-	var exist bool
-	hash, exist = server.hashtable[key]
-	if !exist {
-		hash = leveltool.NewLevelHash(server.datasource.DB(), "__set:"+key)
-		server.hashtable[key] = hash
-	}
-	return
-}
 
 // SADD key member [member ...]
 // Add one or more members to a set
 func (server *GoRedisServer) OnSADD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	members := cmd.Args[2:]
-	hash := server.setByKey(key)
+	hash := server.keyManager.setByKey(key)
 	n := 0
 	for _, member := range members {
 		n += hash.Set(member, []byte("true"))
@@ -33,7 +19,7 @@ func (server *GoRedisServer) OnSADD(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnSCARD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	hash := server.setByKey(key)
+	hash := server.keyManager.setByKey(key)
 	n := hash.Count()
 	return IntegerReply(n)
 }
@@ -41,7 +27,7 @@ func (server *GoRedisServer) OnSCARD(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnSISMEMBER(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	member, _ := cmd.ArgAtIndex(2)
-	hash := server.setByKey(key)
+	hash := server.keyManager.setByKey(key)
 	if hash.Exist(member) {
 		reply = IntegerReply(1)
 	} else {
@@ -52,7 +38,7 @@ func (server *GoRedisServer) OnSISMEMBER(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnSMEMBERS(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	hash := server.setByKey(key)
+	hash := server.keyManager.setByKey(key)
 	elems := hash.GetAll(1000)
 	keys := make([]interface{}, 0, len(elems))
 	for _, elem := range elems {
@@ -65,7 +51,7 @@ func (server *GoRedisServer) OnSMEMBERS(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnSREM(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	members := cmd.Args[2:]
-	hash := server.setByKey(key)
+	hash := server.keyManager.setByKey(key)
 	n := hash.Remove(members...)
 	return IntegerReply(n)
 }

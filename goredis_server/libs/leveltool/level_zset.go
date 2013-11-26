@@ -2,18 +2,14 @@ package leveltool
 
 /**
 基于leveldb实现的zset，用于海量存储，并节约内存
-prefix:count = 2
-prefix:score:1378000907596:0 = 100422
-prefix:score:1378000907596:2 = 100428
+__key[user_rank]zset = 2
+__zset[user_rank]score:1378000907596:0 = 100422
+__zset[user_rank]score:1378000907596:2 = 100428
 ...
-prefix:key:100422 = 1378000907596:0
-prefix:key:300000 = 1378000907596:2
+__zset[user_rank]key:100422 = 1378000907596:0
+__zset[user_rank]key:300000 = 1378000907596:2
 ...
 
-prefix:score:0100#0 = a
-prefix:score:0101#0 = b
-prefix:score:0103#0 = c
-prefix:score:1005#0 = d
 */
 
 import (
@@ -33,35 +29,128 @@ type ZSetElem struct {
 	Member []byte
 }
 
+func NewZSetElem(score, member []byte) (elem *ZSetElem) {
+	elem = &ZSetElem{Score: score, Member: member}
+	return
+}
+
 type LevelSortedSet struct {
 	db          *leveldb.DB
 	ro          *opt.ReadOptions
 	wo          *opt.WriteOptions
-	prefix      string
+	entryKey    string
 	totalCount  int
 	mu          sync.Mutex
 	maxScoreLen int
 }
 
-func NewLevelSortedSet(db *leveldb.DB, prefix string) (l *LevelSortedSet) {
+func NewLevelSortedSet(db *leveldb.DB, entryKey string) (l *LevelSortedSet) {
 	l = &LevelSortedSet{}
 	l.db = db
 	l.ro = &opt.ReadOptions{}
 	l.wo = &opt.WriteOptions{}
-	l.prefix = prefix
+	l.entryKey = entryKey
 	l.maxScoreLen = 20 // int64
+	l.initInfo()
+	return
+}
+
+func (l *LevelSortedSet) Size() int {
+	return 0
+}
+
+func (l *LevelSortedSet) initInfo() {
 	// init totalCount
-	data, _ := l.db.Get([]byte(l.countKey()), l.ro)
+	data, _ := l.db.Get([]byte(l.infoKey()), l.ro)
 	if data != nil {
 		l.totalCount, _ = strconv.Atoi(string(data))
 	} else {
 		l.totalCount = 0
 	}
+}
+
+func (l *LevelSortedSet) infoKey() []byte {
+	return []byte(strings.Join([]string{KEY_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, ZSET_SUFFIX}, ""))
+}
+
+func (l *LevelSortedSet) infoValue() []byte {
+	s := strconv.Itoa(l.totalCount)
+	return []byte(s)
+}
+
+// 从 100422 拼出 __zset[user_rank]member#100422
+func (l *LevelSortedSet) memberKey(member []byte) []byte {
+	return []byte(strings.Join([]string{ZSET_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "member", SEP, string(member)}, ""))
+}
+
+// __zset[user_rank]
+func (l *LevelSortedSet) keyPrefix() []byte {
+	return []byte(strings.Join([]string{ZSET_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT}, ""))
+}
+
+// __zset[user_rank]score#
+func (l *LevelSortedSet) scoreKeyPrefix() []byte {
+	return []byte(strings.Join([]string{ZSET_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "score", SEP}, ""))
+}
+
+// __zset[user_rank]score#00000000000000001001#
+func (l *LevelSortedSet) baseScoreKey(score []byte) (key []byte) {
+	zero := strings.Repeat("0", l.maxScoreLen-len(score))
+	return []byte(strings.Join([]string{ZSET_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "score", SEP, zero, string(score), SEP}, ""))
+}
+
+// 从 __zset[user_rank]score#00000000000000001001#2 分解出 00000000000000001001#2
+func (l *LevelSortedSet) scoreKeyWithNoPrefix(scorekey string) (key []byte) {
+	return []byte(scorekey[strings.Index(scorekey, SEP)+1:])
+}
+
+// 从 00000000000000001001#2 拼出 __zset[user_rank]score#00000000000000001001#2
+func (l *LevelSortedSet) joinScoreKeyWithSuffix(suffix []byte) (key []byte) {
+	return []byte(strings.Join([]string{ZSET_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "score", SEP, string(suffix)}, ""))
+}
+
+// 从 __zset[user_rank]score#00000000000000001001#2 分解出 00000000000000001001
+func (l *LevelSortedSet) fullScoreInKey(scorekey []byte) (fullscore []byte) {
+	start := bytes.Index(scorekey, []byte(SEP)) + 1
+	end := bytes.LastIndex(scorekey, []byte(SEP))
+	fullscore = copyBytes(scorekey[start:end])
 	return
 }
 
-func NewZSetElem(score, member []byte) (elem *ZSetElem) {
-	elem = &ZSetElem{Score: score, Member: member}
+// 从 __zset[user_rank]score#00000000000000001001#2 分解出 1001
+func (l *LevelSortedSet) scoreInScoreKey(scorekey []byte) (score []byte) {
+	fullscore := l.fullScoreInKey(scorekey)
+	score = copyBytes(bytes.TrimLeft(fullscore, "0"))
+	return
+}
+
+func (l *LevelSortedSet) Add2(scoreMembers ...[]byte) (n int, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	count := len(scoreMembers)
+	for i := 0; i < count; i += 2 {
+		score := scoreMembers[i]
+		member := scoreMembers[i+1]
+		// update
+		memberkey := l.memberKey(member)
+		exist := l.removeMember(member)
+		if !exist {
+			l.totalCount++
+		}
+		// seek
+		scorekey, _ := l.findScoreKey(score, member)
+		infokey := l.infoKey()
+		// insert
+		batch := new(leveldb.Batch)
+		batch.Put([]byte(scorekey), member)
+		batch.Put(memberkey, l.scoreKeyWithNoPrefix(scorekey))
+		batch.Put(infokey, l.infoValue())
+		err = l.db.Write(batch, l.wo)
+		if err != nil {
+			break
+		}
+		n++
+	}
 	return
 }
 
@@ -77,12 +166,12 @@ func (l *LevelSortedSet) Add(elems ...*ZSetElem) (n int, err error) {
 		}
 		// seek
 		scorekey, _ := l.findScoreKey(elem.Score, elem.Member)
-		countkey := l.countKey()
+		infokey := l.infoKey()
 		// insert
 		batch := new(leveldb.Batch)
 		batch.Put([]byte(scorekey), elem.Member)
-		batch.Put([]byte(memberkey), []byte(l.scoreKeyNoPrefix(scorekey)))
-		batch.Put([]byte(countkey), []byte(strconv.Itoa(l.totalCount)))
+		batch.Put(memberkey, l.scoreKeyWithNoPrefix(scorekey))
+		batch.Put(infokey, l.infoValue())
 		err = l.db.Write(batch, l.wo)
 		if err != nil {
 			break
@@ -97,7 +186,7 @@ func (l *LevelSortedSet) Add(elems ...*ZSetElem) (n int, err error) {
 func (l *LevelSortedSet) findScoreKey(score []byte, member []byte) (key string, idx int) {
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Release()
-	prefix := []byte(l.baseScoreKey(score))
+	prefix := l.baseScoreKey(score)
 	var lastkey []byte
 	var memberExist bool
 	PrefixEnumerate(iter, prefix, func(i int, iter iterator.Iterator, quit *bool) {
@@ -112,7 +201,7 @@ func (l *LevelSortedSet) findScoreKey(score []byte, member []byte) (key string, 
 		// member已存在
 		if memberExist {
 			key = string(lastkey)
-			idx, _ = strconv.Atoi(key[strings.LastIndex(key, "#")+1:])
+			idx, _ = strconv.Atoi(key[strings.LastIndex(key, SEP)+1:])
 		} else {
 			// 在相同score下增加member
 			key, idx = l.incrScoreKey(string(lastkey))
@@ -121,14 +210,13 @@ func (l *LevelSortedSet) findScoreKey(score []byte, member []byte) (key string, 
 		key = string(prefix) + "0"
 		idx = 0
 	}
-
 	return
 }
 
 // @param member 注意这是member，不是memberkey
 func (l *LevelSortedSet) removeMember(member []byte) (ok bool) {
 	memberkey := l.memberKey(member)
-	suffix, err := l.db.Get([]byte(memberkey), l.ro)
+	suffix, err := l.db.Get(memberkey, l.ro)
 	if err != nil {
 		return false
 	}
@@ -136,10 +224,10 @@ func (l *LevelSortedSet) removeMember(member []byte) (ok bool) {
 		return false
 	}
 	// batch remove
-	scorekey := l.joinScoreKeyWithSuffix(string(suffix))
+	scorekey := l.joinScoreKeyWithSuffix(suffix)
 	batch := new(leveldb.Batch)
-	batch.Delete([]byte(memberkey))
-	batch.Delete([]byte(scorekey))
+	batch.Delete(memberkey)
+	batch.Delete(scorekey)
 	err = l.db.Write(batch, l.wo)
 	if err != nil {
 		return false
@@ -155,11 +243,11 @@ func copyBytes(src []byte) (dst []byte) {
 }
 
 func (l *LevelSortedSet) incrScoreKey(scorekey string) (key string, idx int) {
-	pos := strings.LastIndex(scorekey, "#")
+	pos := strings.LastIndex(scorekey, SEP)
 	prefix := scorekey[:pos]
 	idx, _ = strconv.Atoi(scorekey[pos+1:])
 	idx++
-	key = prefix + "#" + strconv.Itoa(idx)
+	key = prefix + SEP + strconv.Itoa(idx)
 	return
 }
 
@@ -172,7 +260,7 @@ func (l *LevelSortedSet) RangeByIndex(start, stop int) (elems []*ZSetElem) {
 	defer iter.Release()
 	elems = make([]*ZSetElem, 0, 10)
 	// enumerate
-	prefix := []byte(l.prefix + ":score:")
+	prefix := l.scoreKeyPrefix()
 	PrefixEnumerate(iter, prefix, func(i int, iter iterator.Iterator, quit *bool) {
 		if i < start {
 			return // return as continue
@@ -193,7 +281,7 @@ func (l *LevelSortedSet) RangeByScore(min, max []byte, limitOffset, limitCount i
 	defer iter.Release()
 	elems = make([]*ZSetElem, 0, 10)
 	// enumerate
-	prefix := []byte(l.prefix + ":score:")
+	prefix := l.scoreKeyPrefix()
 	pmin := []byte(strings.Repeat("0", l.maxScoreLen-len(min)) + string(min))
 	pmax := []byte(strings.Repeat("0", l.maxScoreLen-len(max)) + string(max))
 
@@ -225,12 +313,12 @@ func (l *LevelSortedSet) Remove(members ...[]byte) (n int) {
 		}
 	}
 	l.totalCount -= n
-	countkey := l.countKey()
+	infokey := l.infoKey()
 	// 数量为0时删除count
 	if l.totalCount == 0 {
-		l.db.Delete([]byte(countkey), l.wo)
+		l.db.Delete(infokey, l.wo)
 	} else {
-		l.db.Put([]byte(countkey), []byte(strconv.Itoa(l.totalCount)), l.wo)
+		l.db.Put(infokey, l.infoValue(), l.wo)
 	}
 	return
 }
@@ -241,7 +329,7 @@ func (l *LevelSortedSet) RemoveByIndex(start, stop int) (n int) {
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Release()
 	// enumerate
-	prefix := []byte(l.prefix + ":score:")
+	prefix := l.scoreKeyPrefix()
 	batch := new(leveldb.Batch)
 	n = 0
 	PrefixEnumerate(iter, prefix, func(i int, iter iterator.Iterator, quit *bool) {
@@ -251,18 +339,18 @@ func (l *LevelSortedSet) RemoveByIndex(start, stop int) (n int) {
 			key := copyBytes(iter.Key())
 			memberkey := l.memberKey(iter.Value())
 			batch.Delete(key)
-			batch.Delete([]byte(memberkey))
+			batch.Delete(memberkey)
 			n++
 		} else {
 			*quit = true
 		}
 	}, "next")
 	l.totalCount -= n
-	countkey := l.countKey()
+	infokey := l.infoKey()
 	if l.totalCount == 0 {
-		l.db.Delete([]byte(countkey), l.wo)
+		l.db.Delete(infokey, l.wo)
 	} else {
-		l.db.Put([]byte(countkey), []byte(strconv.Itoa(l.totalCount)), l.wo)
+		l.db.Put(infokey, l.infoValue(), l.wo)
 	}
 	l.db.Write(batch, l.wo)
 	return
@@ -274,7 +362,7 @@ func (l *LevelSortedSet) RemoveByScore(min, max []byte) (n int) {
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Release()
 	// enumerate
-	prefix := []byte(l.prefix + ":score:")
+	prefix := l.scoreKeyPrefix()
 	pmin := []byte(strings.Repeat("0", l.maxScoreLen-len(min)) + string(min))
 	pmax := []byte(strings.Repeat("0", l.maxScoreLen-len(max)) + string(max))
 
@@ -289,18 +377,18 @@ func (l *LevelSortedSet) RemoveByScore(min, max []byte) (n int) {
 			key := copyBytes(iter.Key())
 			memberkey := l.memberKey(iter.Value())
 			batch.Delete(key)
-			batch.Delete([]byte(memberkey))
+			batch.Delete(memberkey)
 			n++
 		} else {
 			*quit = true
 		}
 	}, "next")
 	l.totalCount -= n
-	countkey := l.countKey()
+	infokey := l.infoKey()
 	if l.totalCount == 0 {
-		l.db.Delete([]byte(countkey), l.wo)
+		l.db.Delete(infokey, l.wo)
 	} else {
-		l.db.Put([]byte(countkey), []byte(strconv.Itoa(l.totalCount)), l.wo)
+		l.db.Put(infokey, l.infoValue(), l.wo)
 	}
 	l.db.Write(batch, l.wo)
 	return
@@ -308,11 +396,11 @@ func (l *LevelSortedSet) RemoveByScore(min, max []byte) (n int) {
 
 func (l *LevelSortedSet) Score(member []byte) (score []byte) {
 	memberkey := l.memberKey(member)
-	data, err := l.db.Get([]byte(memberkey), l.ro)
+	data, err := l.db.Get(memberkey, l.ro)
 	if err != nil || data == nil {
 		return
 	}
-	idx := bytes.LastIndex(data, []byte{'#'})
+	idx := bytes.LastIndex(data, []byte(SEP))
 	score = bytes.TrimLeft(data[:idx], "0")
 	return
 }
@@ -321,33 +409,15 @@ func (l *LevelSortedSet) Count() (n int) {
 	return l.totalCount
 }
 
-// ==============================
-func (l *LevelSortedSet) countKey() (key string) {
-	return l.prefix + ":count"
-}
-func (l *LevelSortedSet) baseScoreKey(score []byte) (key string) {
-	zero := strings.Repeat("0", l.maxScoreLen-len(score))
-	return l.prefix + ":score:" + zero + string(score) + "#"
-}
-func (l *LevelSortedSet) scoreKeyNoPrefix(scorekey string) (key string) {
-	return scorekey[len(l.prefix+":score:"):]
-}
-func (l *LevelSortedSet) joinScoreKeyWithSuffix(suffix string) (key string) {
-	return l.prefix + ":score:" + suffix
-}
-func (l *LevelSortedSet) memberKey(member []byte) (key string) {
-	return l.prefix + ":member:" + string(member)
-}
-func (l *LevelSortedSet) fullScoreInKey(scorekey []byte) (fullscore []byte) {
-	start := len([]byte(l.prefix + ":score:"))
-	end := bytes.LastIndex(scorekey, []byte{'#'})
-	fullscore = copyBytes(scorekey[start:end])
+func (l *LevelSortedSet) Drop() (n int) {
+	iter := l.db.NewIterator(l.ro)
+	defer iter.Release()
+	batch := new(leveldb.Batch)
+	PrefixEnumerate(iter, l.keyPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
+		batch.Delete(copyBytes(iter.Key()))
+	}, "next")
+	batch.Delete(l.infoKey())
+	l.db.Write(batch, l.wo)
+	n = 1
 	return
 }
-func (l *LevelSortedSet) scoreInScoreKey(scorekey []byte) (score []byte) {
-	fullscore := l.fullScoreInKey(scorekey)
-	score = copyBytes(bytes.TrimLeft(fullscore, "0"))
-	return
-}
-
-// ==============================
