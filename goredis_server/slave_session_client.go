@@ -4,14 +4,16 @@ import (
 	. "../goredis"
 	"./libs/rdb"
 	"./libs/safelist"
+	"container/list"
 	"runtime"
 	"strings"
 	"time"
 )
 
 type keyValuePair struct {
-	Key   interface{}
-	Value interface{}
+	Key       interface{}
+	Value     interface{}
+	EntryType EntryType
 }
 
 // 主从同步中的从库连接
@@ -206,12 +208,11 @@ type rdbDecoder struct {
 	rdb.NopDecoder
 	server      *GoRedisServer
 	slaveClient *SlaveSessionClient
-	// 数据缓冲区
-	stringEntry *StringEntry
-	hashEntry   *HashEntry
-	setEntry    *SetEntry
-	listEntry   *ListEntry
-	zsetEntry   *SortedSetEntry
+	// 数据缓冲
+	hashEntry map[string][]byte
+	setEntry  map[string]bool
+	listEntry *list.List
+	zsetEntry *list.List
 }
 
 func newDecoder(server *GoRedisServer, slaveClient *SlaveSessionClient) (dec *rdbDecoder) {
@@ -239,66 +240,71 @@ func (p *rdbDecoder) EndRDB() {
 // Set
 func (p *rdbDecoder) Set(key, value []byte, expiry int64) {
 	p.keyCount++
-	p.stringEntry = NewStringEntry(string(value))
-	p.slaveClient.taskqueue.RPush(&keyValuePair{Key: key, Value: p.stringEntry})
+	kv := &keyValuePair{Key: key, Value: value, EntryType: EntryTypeString}
+	p.slaveClient.taskqueue.RPush(kv)
 }
 
 func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
 	p.keyCount++
-	p.hashEntry = NewHashEntry()
+	p.hashEntry = make(map[string][]byte)
 }
 
 func (p *rdbDecoder) Hset(key, field, value []byte) {
-	p.hashEntry.Set(string(field), value)
+	p.hashEntry[string(field)] = value
 }
 
 // Hash
 func (p *rdbDecoder) EndHash(key []byte) {
-	p.slaveClient.taskqueue.RPush(&keyValuePair{Key: key, Value: p.hashEntry})
+	kv := &keyValuePair{Key: key, Value: p.hashEntry, EntryTypeHash}
+	p.slaveClient.taskqueue.RPush(kv)
 }
 
 func (p *rdbDecoder) StartSet(key []byte, cardinality, expiry int64) {
 	p.keyCount++
-	p.setEntry = NewSetEntry()
+	p.setEntry = make(map[string]bool)
 }
 
 func (p *rdbDecoder) Sadd(key, member []byte) {
-	p.setEntry.Put(string(member))
+	p.setEntry[string(key)] = true
 }
 
 // Set
 func (p *rdbDecoder) EndSet(key []byte) {
-	p.slaveClient.taskqueue.RPush(&keyValuePair{Key: key, Value: p.setEntry})
+	kv := &keyValuePair{Key: key, Value: p.setEntry, EntryType: EntryTypeSet}
+	p.slaveClient.taskqueue.RPush(kv)
 }
 
 func (p *rdbDecoder) StartList(key []byte, length, expiry int64) {
 	p.keyCount++
-	p.listEntry = NewListEntry()
+	p.listEntry = list.New()
 	p.i = 0
 }
 
 func (p *rdbDecoder) Rpush(key, value []byte) {
-	p.listEntry.List().RPush(string(value))
+	p.listEntry.PushBack(value)
 	p.i++
 }
 
 // List
 func (p *rdbDecoder) EndList(key []byte) {
-	p.slaveClient.taskqueue.RPush(&keyValuePair{Key: key, Value: p.listEntry})
+	kv := &keyValuePair{Key: key, Value: p.listEntry, EntryType: EntryTypeList}
+	p.slaveClient.taskqueue.RPush(kv)
 }
 
 func (p *rdbDecoder) StartZSet(key []byte, cardinality, expiry int64) {
 	p.keyCount++
-	p.zsetEntry = NewSortedSetEntry()
+	p.zsetEntry = list.New()
 	p.i = 0
 }
 
 func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
-	p.zsetEntry.SortedSet().Add(string(member), score)
+	p.listEntry.PushBack(score)
+	p.listEntry.PushBack(member)
 	p.i++
 }
 
 // ZSet
 func (p *rdbDecoder) EndZSet(key []byte) {
-	p.slaveClient.taskqueue.RPush(&keyValuePair{Key: key, Value: p.zsetEntry})
+	kv := &keyValuePair{Key: key, Value: p.zsetEntry, EntryType: EntryTypeSortedSet}
+	p.slaveClient.taskqueue.RPush(kv)
 }
