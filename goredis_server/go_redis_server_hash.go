@@ -2,26 +2,12 @@ package goredis_server
 
 import (
 	. "../goredis"
-	"./libs/leveltool"
 )
-
-// 获取Hash
-func (server *GoRedisServer) hashByKey(key string) (hash *leveltool.LevelHash) {
-	server.levelMutex.Lock()
-	defer server.levelMutex.Unlock()
-	var exist bool
-	hash, exist = server.hashtable[key]
-	if !exist {
-		hash = leveltool.NewLevelHash(server.datasource.DB(), key)
-		server.hashtable[key] = hash
-	}
-	return
-}
 
 func (server *GoRedisServer) OnHGET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	field, _ := cmd.ArgAtIndex(2)
-	hash := server.hashByKey(key)
+	hash := server.keyManager.hashByKey(key)
 	val := hash.Get(field)
 	if val == nil {
 		reply = BulkReply(nil)
@@ -33,7 +19,7 @@ func (server *GoRedisServer) OnHGET(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	hash := server.hashByKey(key)
+	hash := server.keyManager.hashByKey(key)
 	field, _ := cmd.ArgAtIndex(2)
 	value, _ := cmd.ArgAtIndex(3)
 	hash.Set(field, value)
@@ -42,7 +28,7 @@ func (server *GoRedisServer) OnHSET(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnHGETALL(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	hash := server.hashByKey(key)
+	hash := server.keyManager.hashByKey(key)
 	elems := hash.GetAll(1000)
 	keyvals := make([]interface{}, 0, len(elems)*2)
 	for _, elem := range elems {
@@ -55,7 +41,7 @@ func (server *GoRedisServer) OnHGETALL(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnHMGET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	hash := server.hashByKey(key)
+	hash := server.keyManager.hashByKey(key)
 	fields := cmd.Args[2:]
 	keyvals := make([]interface{}, 0, len(fields)*2)
 	for _, field := range fields {
@@ -74,7 +60,7 @@ func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
 		reply = ErrorReply("Bad field/value paires")
 		return
 	}
-	hash := server.hashByKey(key)
+	hash := server.keyManager.hashByKey(key)
 	hash.Set(keyvals...)
 	reply = StatusReply("OK")
 	return
@@ -82,7 +68,7 @@ func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnHLEN(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	hash := server.hashByKey(key)
+	hash := server.keyManager.hashByKey(key)
 	length := hash.Count()
 	reply = IntegerReply(length)
 	return
@@ -90,7 +76,7 @@ func (server *GoRedisServer) OnHLEN(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnHDEL(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	hash := server.hashByKey(key)
+	hash := server.keyManager.hashByKey(key)
 	fields := cmd.Args[2:]
 	n := hash.Remove(fields...)
 	reply = IntegerReply(n)

@@ -9,7 +9,7 @@ import (
 
 func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
-	value := server.levelString.Get(key)
+	value := server.keyManager.levelString().Get(key)
 	if value == nil {
 		reply = BulkReply(nil)
 	} else {
@@ -21,7 +21,7 @@ func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
 	val, _ := cmd.ArgAtIndex(2)
-	err := server.levelString.Set(key, val)
+	err := server.keyManager.levelString().Set(key, val)
 	reply = ReplySwitch(err, StatusReply("OK"))
 	return
 }
@@ -30,7 +30,7 @@ func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
 	keys := cmd.Args[1:]
 	vals := make([]interface{}, len(keys))
 	for i, key := range keys {
-		value := server.levelString.Get(key)
+		value := server.keyManager.levelString().Get(key)
 		if value == nil {
 			vals[i] = nil
 		} else {
@@ -50,7 +50,7 @@ func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
 	for i := 0; i < count; i += 2 {
 		key := keyvals[i]
 		val := keyvals[i+1]
-		server.levelString.Set(key, val)
+		server.keyManager.levelString().Set(key, val)
 	}
 	reply = StatusReply("OK")
 	return
@@ -62,7 +62,7 @@ func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
  * @param chg 增减量，正负数均可
  */
 func (server *GoRedisServer) incrStringEntry(key []byte, chg int) (newvalue int, err error) {
-	value := server.levelString.Get(key)
+	value := server.keyManager.levelString().Get(key)
 	var oldvalue int
 	if value == nil {
 		oldvalue = 0
@@ -74,7 +74,7 @@ func (server *GoRedisServer) incrStringEntry(key []byte, chg int) (newvalue int,
 	}
 	// update
 	newvalue = oldvalue + chg
-	err = server.levelString.Set(key, []byte(strconv.Itoa(newvalue)))
+	err = server.keyManager.levelString().Set(key, []byte(strconv.Itoa(newvalue)))
 	return
 }
 

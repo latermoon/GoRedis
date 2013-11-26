@@ -5,12 +5,12 @@ package leveltool
 
 1、数据结构
 要提供序号访问，就不能删除中间的元素
-__key:[key]:list = 1004,1008
-__list:[key]:idx:1004 = hello ([]byte)
-__list:[key]:idx:1005 = hello
-__list:[key]:idx:1006 = hello
-__list:[key]:idx:1007 = hello
-__list:[key]:idx:1008 = hello
+__key[key]list = 1004,1008
+__list[key]idx:1004 = hello
+__list[key]idx:1005 = hello
+__list[key]idx:1006 = hello
+__list[key]idx:1007 = hello
+__list[key]idx:1008 = hello
 */
 // 本页面命名注意，idx都表示大于l.start的那个索引序号，而不是0开始的数组序号
 
@@ -50,11 +50,15 @@ func NewLevelList(db *leveldb.DB, entryKey string) (l *LevelList) {
 	l.entryKey = entryKey
 	l.start = 0
 	l.end = -1
-	l.initStartEnd()
+	l.initInfo()
 	return
 }
 
-func (l *LevelList) initStartEnd() {
+func (l *LevelList) Size() int {
+	return 0
+}
+
+func (l *LevelList) initInfo() {
 	data, err := l.db.Get(l.infoKey(), l.ro)
 	if err != nil {
 		return

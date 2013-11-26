@@ -1,9 +1,10 @@
 package leveltool
 
 /*
-prefix:field:name = latermoon
-prefix:field:age = 27
-prefix:field:sex = M
+__key[profile]hash = ""
+__hash[profile]name = latermoon
+__hash[profile]age = 27
+__hash[profile]sex = M
 */
 
 import (
@@ -37,6 +38,10 @@ func NewLevelHash(db *leveldb.DB, entryKey string) (l *LevelHash) {
 	l.ro = &opt.ReadOptions{}
 	l.wo = &opt.WriteOptions{}
 	return
+}
+
+func (l *LevelHash) Size() int {
+	return 0
 }
 
 func (l *LevelHash) infoKey() []byte {
@@ -158,5 +163,5 @@ func (l *LevelHash) Drop() (n int) {
 	PrefixEnumerate(iter, l.fieldPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
 		batch.Delete(copyBytes(iter.Key()))
 	}, "next")
-	err := l
+	return
 }

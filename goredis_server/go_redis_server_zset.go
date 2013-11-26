@@ -5,21 +5,8 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/leveltool"
-	// . "./storage"
 	"strings"
 )
-
-func (server *GoRedisServer) zsetByKey(key string) (zset *leveltool.LevelSortedSet) {
-	server.levelMutex.Lock()
-	defer server.levelMutex.Unlock()
-	var exist bool
-	zset, exist = server.zsettable[key]
-	if !exist {
-		zset = leveltool.NewLevelSortedSet(server.datasource.DB(), "__zset:"+key)
-		server.zsettable[key] = zset
-	}
-	return
-}
 
 // ZADD key score member [score member ...]
 // Add one or more members to a sorted set, or update its score if it already exists
@@ -31,7 +18,7 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 		return ErrorReply("Bad argument count")
 	}
 
-	zset := server.zsetByKey(key)
+	zset := server.keyManager.zsetByKey(key)
 	for i := 0; i < count; i += 2 {
 		elem := leveltool.NewZSetElem(scoreMembers[i], scoreMembers[i+1])
 		zset.Add(elem)
@@ -42,7 +29,7 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnZCARD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	zset := server.zsetByKey(key)
+	zset := server.keyManager.zsetByKey(key)
 	reply = IntegerReply(zset.Count())
 	return
 }
@@ -62,7 +49,7 @@ func (server *GoRedisServer) OnZRANGE(cmd *Command) (reply *Reply) {
 	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
 		withScore = true
 	}
-	zset := server.zsetByKey(key)
+	zset := server.keyManager.zsetByKey(key)
 	// bulks
 	bulks := make([]interface{}, 0, 10) // TODO 优化内存分配
 	elems := zset.RangeByIndex(start, stop)
@@ -90,7 +77,7 @@ func (server *GoRedisServer) OnZRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
 		withScore = true
 	}
-	zset := server.zsetByKey(key)
+	zset := server.keyManager.zsetByKey(key)
 	// bulks
 	bulks := make([]interface{}, 0, 10) // TODO 优化内存分配
 	elems := zset.RangeByScore(min, max, 0, -1)
@@ -116,7 +103,7 @@ func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnZREM(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	members := cmd.Args[2:]
-	zset := server.zsetByKey(key)
+	zset := server.keyManager.zsetByKey(key)
 	n := zset.Remove(members...)
 	reply = IntegerReply(n)
 	return
@@ -131,7 +118,7 @@ func (server *GoRedisServer) OnZREMRANGEBYRANK(cmd *Command) (reply *Reply) {
 	if e1 != nil || e2 != nil {
 		return ErrorReply("Bad start/stop")
 	}
-	zset := server.zsetByKey(key)
+	zset := server.keyManager.zsetByKey(key)
 	n := zset.RemoveByIndex(start, stop)
 	reply = IntegerReply(n)
 	return
@@ -146,7 +133,7 @@ func (server *GoRedisServer) OnZREMRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	if e1 != nil || e2 != nil {
 		return ErrorReply("Bad min/max")
 	}
-	zset := server.zsetByKey(key)
+	zset := server.keyManager.zsetByKey(key)
 	n := zset.RemoveByScore(min, max)
 	reply = IntegerReply(n)
 	return
@@ -164,7 +151,7 @@ func (server *GoRedisServer) OnZREVRANGE(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnZSCORE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	member, _ := cmd.ArgAtIndex(2)
-	zset := server.zsetByKey(key)
+	zset := server.keyManager.zsetByKey(key)
 	score := zset.Score(member)
 	if score == nil {
 		return BulkReply(nil)

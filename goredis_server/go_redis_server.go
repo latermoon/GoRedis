@@ -3,7 +3,6 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/golog"
-	"./libs/leveltool"
 	"./libs/uuid"
 	"./monitor"
 	. "./storage"
@@ -27,6 +26,7 @@ type GoRedisServer struct {
 	// 数据源
 	directory  string
 	datasource GoRedisDataSource
+	keyManager *KeyManager
 	// counters
 	cmdCounters     *monitor.Counters
 	cmdCateCounters *monitor.Counters // 指令集统计
@@ -41,13 +41,6 @@ type GoRedisServer struct {
 	needSyncCmdTable map[string]bool // 需要同步的指令
 	// locks
 	stringMutex sync.Mutex
-	// leveltool
-	listtable   map[string]*leveltool.LevelList
-	zsettable   map[string]*leveltool.LevelSortedSet
-	hashtable   map[string]*leveltool.LevelHash
-	levelString *leveltool.LevelString
-	levelKey    *leveltool.LevelKey
-	levelMutex  sync.Mutex
 }
 
 /*
@@ -87,12 +80,7 @@ func (server *GoRedisServer) Init() {
 	// bufdatasource.CheckUnsavedLog() // 检查是否有未保存的aoflog
 	// bind datasource
 	server.datasource = ldb
-	// level
-	server.listtable = make(map[string]*leveltool.LevelList)              // list
-	server.zsettable = make(map[string]*leveltool.LevelSortedSet)         // zset
-	server.hashtable = make(map[string]*leveltool.LevelHash)              // hash
-	server.levelString = leveltool.NewLevelString(server.datasource.DB()) // string
-	server.levelKey = leveltool.NewLevelKey(server.datasource.DB())       // key
+	server.keyManager = NewKeyManager(server, 1000)
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")

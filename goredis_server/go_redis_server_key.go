@@ -109,7 +109,7 @@ func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
-	t := server.levelKey.TypeOf(key)
+	t := server.keyManager.levelKey().TypeOf(key)
 	if len(t) > 0 {
 		reply = StatusReply(t)
 	} else {

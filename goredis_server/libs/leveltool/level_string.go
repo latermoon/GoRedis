@@ -1,5 +1,10 @@
 package leveltool
 
+/*
+__key:name:string = latermoon
+__key:age:string = 27
+*/
+
 import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
