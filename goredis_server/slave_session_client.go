@@ -3,7 +3,7 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/rdb"
-	. "./storage"
+	"./libs/safelist"
 	"runtime"
 	"strings"
 	"time"
@@ -18,15 +18,15 @@ type keyValuePair struct {
 type SlaveSessionClient struct {
 	session           *Session
 	server            *GoRedisServer
-	taskqueue         *SafeList // 队列存储
-	shouldStopRunloop bool      // 跳出runloop指令
+	taskqueue         *safelist.SafeList // 队列存储
+	shouldStopRunloop bool               // 跳出runloop指令
 }
 
 func NewSlaveSessionClient(server *GoRedisServer, session *Session) (s *SlaveSessionClient) {
 	s = &SlaveSessionClient{}
 	s.server = server
 	s.session = session
-	s.taskqueue = NewSafeList()
+	s.taskqueue = safelist.NewSafeList()
 	return
 }
 

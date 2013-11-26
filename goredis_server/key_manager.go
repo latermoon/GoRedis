@@ -19,8 +19,8 @@ type KeyManager struct {
 func NewKeyManager(server *GoRedisServer, capacity uint64) (km *KeyManager) {
 	km = &KeyManager{}
 	km.server = server
-	km.lstring = leveltool.NewLevelString(server.datasource.DB()) // string
-	km.lkey = leveltool.NewLevelKey(server.datasource.DB())       // key
+	km.lstring = leveltool.NewLevelString(server.DB()) // string
+	km.lkey = leveltool.NewLevelKey(server.DB())       // key
 	km.lruCache = lru.NewLRUCache(10000)
 	return
 }
@@ -39,7 +39,7 @@ func (k *KeyManager) objFromCache(key string, fn func() interface{}) (obj interf
 
 func (k *KeyManager) hashByKey(key string) (item *leveltool.LevelHash) {
 	obj := k.objFromCache(key, func() interface{} {
-		return leveltool.NewLevelHash(k.server.datasource.DB(), key)
+		return leveltool.NewLevelHash(k.server.DB(), key)
 	})
 	item = obj.(*leveltool.LevelHash)
 	return
@@ -51,7 +51,7 @@ func (k *KeyManager) setByKey(key string) (item *leveltool.LevelHash) {
 
 func (k *KeyManager) listByKey(key string) (item *leveltool.LevelList) {
 	obj := k.objFromCache(key, func() interface{} {
-		return leveltool.NewLevelList(k.server.datasource.DB(), key)
+		return leveltool.NewLevelList(k.server.DB(), key)
 	})
 	item = obj.(*leveltool.LevelList)
 	return
@@ -59,7 +59,7 @@ func (k *KeyManager) listByKey(key string) (item *leveltool.LevelList) {
 
 func (k *KeyManager) zsetByKey(key string) (item *leveltool.LevelSortedSet) {
 	obj := k.objFromCache(key, func() interface{} {
-		return leveltool.NewLevelSortedSet(k.server.datasource.DB(), key)
+		return leveltool.NewLevelSortedSet(k.server.DB(), key)
 	})
 	item = obj.(*leveltool.LevelSortedSet)
 	return

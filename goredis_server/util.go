@@ -2,9 +2,20 @@ package goredis_server
 
 import (
 	. "../goredis"
-	. "./storage"
 	"strconv"
 	"strings"
+)
+
+type EntryType int
+
+// 数据类型
+const (
+	EntryTypeUnknown   EntryType = 0
+	EntryTypeString    EntryType = 1
+	EntryTypeHash      EntryType = 2
+	EntryTypeList      EntryType = 3
+	EntryTypeSet       EntryType = 4
+	EntryTypeSortedSet EntryType = 5
 )
 
 // 数据类型描述

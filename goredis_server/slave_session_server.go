@@ -3,7 +3,6 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/leveltool"
-	. "./storage"
 	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"

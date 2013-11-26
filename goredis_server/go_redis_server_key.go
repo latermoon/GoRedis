@@ -3,8 +3,6 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/leveltool"
-	. "./storage"
-	"fmt"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
@@ -69,7 +67,7 @@ func (server *GoRedisServer) OnKEY_PREV(cmd *Command) (reply *Reply) {
 // @param direction "prev" or else for "next"
 // @return bulks bulks[0]=key, bulks[1]=type, bulks[2]=key2, ...
 func (server *GoRedisServer) keySearch(prefix []byte, direction string, count int, withtype bool) (bulks []interface{}) {
-	db := server.datasource.DB()
+	db := server.DB()
 	ro := &opt.ReadOptions{}
 	iter := db.NewIterator(ro)
 	defer iter.Release()
@@ -93,16 +91,7 @@ func (server *GoRedisServer) keySearch(prefix []byte, direction string, count in
 func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	keys := cmd.Args[1:]
 	n := 0
-	for _, key := range keys {
-		entry := server.datasource.Get(key)
-		if entry != nil {
-			err := server.datasource.Remove(key)
-			if err != nil {
-				fmt.Println(err)
-			}
-			n++
-		}
-	}
+	// TODO
 	reply = IntegerReply(n)
 	return
 }

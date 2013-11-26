@@ -2,7 +2,6 @@ package goredis_server
 
 import (
 	. "../goredis"
-	. "./storage"
 	"strings"
 )
 
@@ -20,7 +19,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	slave := server.findSlaveById(uid)
 	if slave == nil {
 		server.stdlog.Info("[%s] new slave %s", uid, session.RemoteAddr())
-		snapshot, err := server.datasource.(*LevelDBDataSource).DB().GetSnapshot()
+		snapshot, err := server.DB().GetSnapshot()
 		if err != nil {
 			return ErrorReply(err)
 		}

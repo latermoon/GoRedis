@@ -3,11 +3,13 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/golog"
+	"./libs/leveltool"
 	"./libs/uuid"
 	"./monitor"
-	. "./storage"
 	"container/list"
 	"errors"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 	"strings"
 	"sync"
 )
@@ -25,8 +27,9 @@ type GoRedisServer struct {
 	RedisServer
 	// 数据源
 	directory  string
-	datasource GoRedisDataSource
+	db         *leveldb.DB
 	keyManager *KeyManager
+	config     *leveltool.LevelConfig
 	// counters
 	cmdCounters     *monitor.Counters
 	cmdCateCounters *monitor.Counters // 指令集统计
@@ -66,27 +69,32 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	return
 }
 
-func (server *GoRedisServer) Init() {
+func (server *GoRedisServer) Init() (err error) {
 	server.initLogger()
 	server.stdlog.Info("========================================")
 	server.stdlog.Info("server init ...")
 	// leveldb
-	ldb, e1 := NewLevelDBDataSource(server.directory + "/db0")
-	if e1 != nil {
-		panic(e1)
+	options := opt.Options{
+		MaxOpenFiles: 100000,
+		WriteBuffer:  256 << 20,
 	}
-	// buffer
-	// bufdatasource := NewBufferDataSource(ldb)
-	// bufdatasource.CheckUnsavedLog() // 检查是否有未保存的aoflog
-	// bind datasource
-	server.datasource = ldb
+	server.db, err = leveldb.OpenFile(server.directory+"/db0", &options)
+	if err != nil {
+		panic(err)
+	}
 	server.keyManager = NewKeyManager(server, 1000)
+	server.config = leveltool.NewLevelConfig(server.db, goredisPrefix+"config:")
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")
 	// slave
 	server.stdlog.Info("init uid %s", server.UID())
 	server.initSlaveSessions()
+	return
+}
+
+func (server *GoRedisServer) DB() (db *leveldb.DB) {
+	return server.db
 }
 
 func (server *GoRedisServer) Listen(host string) {
@@ -96,14 +104,11 @@ func (server *GoRedisServer) Listen(host string) {
 
 func (server *GoRedisServer) UID() (uid string) {
 	if len(server.uid) == 0 {
-		uidkey := "__goredis:uid"
-		entry := server.datasource.Get([]byte(uidkey))
-		if entry == nil {
+		uidkey := "uid"
+		server.uid = server.config.GetString(uidkey)
+		if len(server.uid) == 0 {
 			server.uid = uuid.UUID(8)
-			entry = NewStringEntry(server.uid)
-			server.datasource.Set([]byte(uidkey), entry)
-		} else {
-			server.uid = entry.(*StringEntry).String()
+			server.config.SetString(uidkey, server.uid)
 		}
 	}
 	return server.uid
@@ -122,10 +127,9 @@ func (server *GoRedisServer) initLogger() {
 
 // 初始化从库
 func (server *GoRedisServer) initSlaveSessions() {
-	slavesEntry := server.slavesEntry()
-	server.stdlog.Info("init slaves: %s", slavesEntry.Keys())
-	for _, slaveuid := range slavesEntry.Keys() {
-		uid := slaveuid.(string)
+	m := server.slaveIdMap()
+	server.stdlog.Info("init slaves: %s", m)
+	for uid, _ := range m {
 		slaveSession := NewSlaveSession(server, nil, uid)
 		server.slavelist.PushBack(slaveSession)
 		slaveSession.ContinueAof()

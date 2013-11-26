@@ -1,4 +1,4 @@
-package storage
+package safelist
 
 import (
 	"container/list"
