@@ -14,7 +14,7 @@ __zset[user_rank]key:300000 = 1378000907596:2
 
 import (
 	"bytes"
-	"fmt"
+	// "fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -119,6 +119,36 @@ func (l *LevelSortedSet) scoreInScoreKey(scorekey []byte) (score []byte) {
 	return
 }
 
+func (l *LevelSortedSet) Add2(scoreMembers ...[]byte) (n int, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	count := len(scoreMembers)
+	for i := 0; i < count; i += 2 {
+		score := scoreMembers[i]
+		member := scoreMembers[i+1]
+		// update
+		memberkey := l.memberKey(member)
+		exist := l.removeMember(member)
+		if !exist {
+			l.totalCount++
+		}
+		// seek
+		scorekey, _ := l.findScoreKey(score, member)
+		infokey := l.infoKey()
+		// insert
+		batch := new(leveldb.Batch)
+		batch.Put([]byte(scorekey), member)
+		batch.Put(memberkey, l.scoreKeyWithNoPrefix(scorekey))
+		batch.Put(infokey, l.infoValue())
+		err = l.db.Write(batch, l.wo)
+		if err != nil {
+			break
+		}
+		n++
+	}
+	return
+}
+
 func (l *LevelSortedSet) Add(elems ...*ZSetElem) (n int, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -131,7 +161,6 @@ func (l *LevelSortedSet) Add(elems ...*ZSetElem) (n int, err error) {
 		}
 		// seek
 		scorekey, _ := l.findScoreKey(elem.Score, elem.Member)
-		fmt.Println("add", scorekey, l.scoreKeyWithNoPrefix(scorekey))
 		infokey := l.infoKey()
 		// insert
 		batch := new(leveldb.Batch)
@@ -176,7 +205,6 @@ func (l *LevelSortedSet) findScoreKey(score []byte, member []byte) (key string, 
 		key = string(prefix) + "0"
 		idx = 0
 	}
-	fmt.Println("findScoreKey", string(score), string(member), key, string(prefix))
 	return
 }
 
@@ -212,11 +240,9 @@ func copyBytes(src []byte) (dst []byte) {
 func (l *LevelSortedSet) incrScoreKey(scorekey string) (key string, idx int) {
 	pos := strings.LastIndex(scorekey, SEP)
 	prefix := scorekey[:pos]
-	var err error
-	idx, err = strconv.Atoi(scorekey[pos+1:])
+	idx, _ = strconv.Atoi(scorekey[pos+1:])
 	idx++
 	key = prefix + SEP + strconv.Itoa(idx)
-	fmt.Println("incrScoreKey", scorekey, pos, prefix, idx, key, err)
 	return
 }
 
@@ -376,4 +402,8 @@ func (l *LevelSortedSet) Score(member []byte) (score []byte) {
 
 func (l *LevelSortedSet) Count() (n int) {
 	return l.totalCount
+}
+
+func (l *LevelSortedSet) Drop() (n int) {
+	return
 }

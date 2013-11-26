@@ -85,9 +85,9 @@ func (l *LevelHash) Set(fieldVals ...[]byte) (n int) {
 		fieldkey := l.fieldKey(fieldVals[i])
 		val := fieldVals[i+1]
 		batch.Put(fieldkey, val)
-		batch.Put(l.infoKey(), l.infoValue())
 		n++
 	}
+	batch.Put(l.infoKey(), l.infoValue())
 	l.db.Write(batch, l.wo)
 	return
 }

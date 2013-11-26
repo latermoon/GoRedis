@@ -92,6 +92,24 @@ func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	keys := cmd.Args[1:]
 	n := 0
 	// TODO
+	for _, key := range keys {
+		n++
+		t := server.keyManager.levelKey().TypeOf(key)
+		switch t {
+		case "string":
+			server.keyManager.levelString().Delete(key)
+		case "hash":
+			server.keyManager.hashByKey(string(key)).Drop()
+		case "set":
+			server.keyManager.setByKey(string(key)).Drop()
+		case "list":
+			server.keyManager.listByKey(string(key)).Drop()
+		case "zset":
+			server.keyManager.zsetByKey(string(key)).Drop()
+		default:
+			n--
+		}
+	}
 	reply = IntegerReply(n)
 	return
 }
