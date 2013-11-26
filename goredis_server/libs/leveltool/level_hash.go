@@ -163,5 +163,8 @@ func (l *LevelHash) Drop() (n int) {
 	PrefixEnumerate(iter, l.fieldPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
 		batch.Delete(copyBytes(iter.Key()))
 	}, "next")
+	batch.Delete(l.infoKey())
+	l.db.Write(batch, l.wo)
+	n = 1
 	return
 }

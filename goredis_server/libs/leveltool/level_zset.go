@@ -83,6 +83,11 @@ func (l *LevelSortedSet) memberKey(member []byte) []byte {
 	return []byte(strings.Join([]string{ZSET_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "member", SEP, string(member)}, ""))
 }
 
+// __zset[user_rank]
+func (l *LevelSortedSet) keyPrefix() []byte {
+	return []byte(strings.Join([]string{ZSET_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT}, ""))
+}
+
 // __zset[user_rank]score#
 func (l *LevelSortedSet) scoreKeyPrefix() []byte {
 	return []byte(strings.Join([]string{ZSET_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "score", SEP}, ""))
@@ -405,5 +410,14 @@ func (l *LevelSortedSet) Count() (n int) {
 }
 
 func (l *LevelSortedSet) Drop() (n int) {
+	iter := l.db.NewIterator(l.ro)
+	defer iter.Release()
+	batch := new(leveldb.Batch)
+	PrefixEnumerate(iter, l.keyPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
+		batch.Delete(copyBytes(iter.Key()))
+	}, "next")
+	batch.Delete(l.infoKey())
+	l.db.Write(batch, l.wo)
+	n = 1
 	return
 }

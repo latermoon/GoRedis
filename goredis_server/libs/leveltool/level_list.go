@@ -18,6 +18,7 @@ import (
 	"bytes"
 	// "fmt"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"strconv"
 	"strings"
@@ -80,6 +81,10 @@ func (l *LevelList) infoValue() []byte {
 	s := strconv.FormatInt(l.start, 10)
 	e := strconv.FormatInt(l.end, 10)
 	return []byte(s + "," + e)
+}
+
+func (l *LevelList) keyPrefix() []byte {
+	return []byte(strings.Join([]string{LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT}, ""))
 }
 
 // __list:[key]:idx:1005 = hello
@@ -172,17 +177,14 @@ func (l *LevelList) Len() int64 {
 }
 
 func (l *LevelList) Drop() (n int) {
-	if l.Len() == 0 {
-		return
-	}
+	iter := l.db.NewIterator(l.ro)
+	defer iter.Release()
 	batch := new(leveldb.Batch)
-	for idx := l.start; idx <= l.end; idx++ {
-		batch.Delete(l.idxKey(idx))
-	}
+	PrefixEnumerate(iter, l.keyPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
+		batch.Delete(copyBytes(iter.Key()))
+	}, "next")
 	batch.Delete(l.infoKey())
-	err := l.db.Write(batch, l.wo)
-	if err == nil {
-		n = 1
-	}
+	l.db.Write(batch, l.wo)
+	n = 1
 	return
 }
