@@ -276,6 +276,27 @@ func (l *LevelSortedSet) RangeByIndex(start, stop int) (elems []*ZSetElem) {
 	return
 }
 
+// 根据score范围枚举
+func (l *LevelSortedSet) scoreRangeEnumerate(min, max []byte, high2low bool) (elems []*ZSetElem) {
+	iter := l.db.NewIterator(l.ro)
+	defer iter.Release()
+
+	// prefix
+
+	// direction
+	var direction string
+	if high2low {
+		direction = "next"
+	} else {
+		direction = "prev"
+	}
+	prefix := l.scoreKeyPrefix()
+	PrefixEnumerate(iter, prefix, func(i int, iter iterator.Iterator, quit *bool) {
+
+	}, direction)
+	return
+}
+
 func (l *LevelSortedSet) RangeByScore(min, max []byte, limitOffset, limitCount int) (elems []*ZSetElem) {
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Release()
