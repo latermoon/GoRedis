@@ -39,14 +39,20 @@ func (k *KeyManager) objFromCache(key string, fn func() interface{}) (obj interf
 
 func (k *KeyManager) hashByKey(key string) (item *leveltool.LevelHash) {
 	obj := k.objFromCache(key, func() interface{} {
-		return leveltool.NewLevelHash(k.server.DB(), key)
+		// default: useForSet = false
+		return leveltool.NewLevelHash(k.server.DB(), key, false)
 	})
 	item = obj.(*leveltool.LevelHash)
 	return
 }
 
 func (k *KeyManager) setByKey(key string) (item *leveltool.LevelHash) {
-	return k.hashByKey(key)
+	obj := k.objFromCache(key, func() interface{} {
+		// useForSet = true
+		return leveltool.NewLevelHash(k.server.DB(), key, true)
+	})
+	item = obj.(*leveltool.LevelHash)
+	return
 }
 
 func (k *KeyManager) listByKey(key string) (item *leveltool.LevelList) {

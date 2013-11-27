@@ -22,6 +22,7 @@ type HashElem struct {
 	Value []byte
 }
 
+// 使用userForSet控制实现set还是hash
 type LevelHash struct {
 	db *leveldb.DB
 	ro *opt.ReadOptions
@@ -29,12 +30,15 @@ type LevelHash struct {
 	// key
 	entryKey string
 	mu       sync.Mutex
+	// for SET
+	userForSet bool
 }
 
-func NewLevelHash(db *leveldb.DB, entryKey string) (l *LevelHash) {
+func NewLevelHash(db *leveldb.DB, entryKey string, userForSet bool) (l *LevelHash) {
 	l = &LevelHash{}
 	l.db = db
 	l.entryKey = entryKey
+	l.userForSet = userForSet
 	l.ro = &opt.ReadOptions{}
 	l.wo = &opt.WriteOptions{}
 	return
@@ -45,7 +49,11 @@ func (l *LevelHash) Size() int {
 }
 
 func (l *LevelHash) infoKey() []byte {
-	return []byte(strings.Join([]string{KEY_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, HASH_SUFFIX}, ""))
+	if l.userForSet {
+		return []byte(strings.Join([]string{KEY_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, SET_SUFFIX}, ""))
+	} else {
+		return []byte(strings.Join([]string{KEY_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, HASH_SUFFIX}, ""))
+	}
 }
 
 func (l *LevelHash) infoValue() []byte {
@@ -57,7 +65,11 @@ func (l *LevelHash) fieldKey(field []byte) []byte {
 }
 
 func (l *LevelHash) fieldPrefix() []byte {
-	return []byte(strings.Join([]string{HASH_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT}, ""))
+	if l.userForSet {
+		return []byte(strings.Join([]string{SET_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT}, ""))
+	} else {
+		return []byte(strings.Join([]string{HASH_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT}, ""))
+	}
 }
 
 // 从fieldkey中提取field
