@@ -19,7 +19,7 @@ func NewConsoleAndFileWriter(path string) (m *MultiWriter) {
 	if err != nil {
 		panic("bad log path:" + path)
 	}
-	m.SetWriters(os.Stdout, (wr))
+	m.SetWriters(os.Stdout, wr)
 	return
 }
 
