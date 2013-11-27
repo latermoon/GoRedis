@@ -156,7 +156,7 @@ func (l *LevelHash) Count() (n int) {
 	return
 }
 
-func (l *LevelHash) Drop() (n int) {
+func (l *LevelHash) Drop() (ok bool) {
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Release()
 	batch := new(leveldb.Batch)
@@ -165,6 +165,6 @@ func (l *LevelHash) Drop() (n int) {
 	}, "next")
 	batch.Delete(l.infoKey())
 	l.db.Write(batch, l.wo)
-	n = 1
+	ok = true
 	return
 }

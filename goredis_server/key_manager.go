@@ -1,9 +1,9 @@
 package goredis_server
 
 import (
-	// . "../goredis"
 	leveltool "./libs/leveltool"
 	lru "./libs/lrucache"
+	// "fmt"
 	"sync"
 )
 
@@ -71,4 +71,40 @@ func (k *KeyManager) levelString() (item *leveltool.LevelString) {
 
 func (k *KeyManager) levelKey() (item *leveltool.LevelKey) {
 	return k.lkey
+}
+
+func (k *KeyManager) Delete(keys ...[]byte) (n int) {
+	n = 0
+	for _, keybytes := range keys {
+		key := string(keybytes)
+		t := k.levelKey().TypeOf(keybytes)
+		switch t {
+		case "string":
+			n += k.levelString().Delete(keybytes)
+		case "hash":
+			ok := k.hashByKey(key).Drop()
+			if ok {
+				n++
+			}
+		case "set":
+			ok := k.setByKey(key).Drop()
+			if ok {
+				n++
+			}
+		case "list":
+			ok := k.listByKey(key).Drop()
+			if ok {
+				n++
+			}
+		case "zset":
+			ok := k.zsetByKey(key).Drop()
+			if ok {
+				n++
+			}
+		default:
+		}
+		// ensure remove from lrucache
+		k.lruCache.Delete(key)
+	}
+	return
 }

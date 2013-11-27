@@ -409,7 +409,7 @@ func (l *LevelSortedSet) Count() (n int) {
 	return l.totalCount
 }
 
-func (l *LevelSortedSet) Drop() (n int) {
+func (l *LevelSortedSet) Drop() (ok bool) {
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Release()
 	batch := new(leveldb.Batch)
@@ -418,6 +418,6 @@ func (l *LevelSortedSet) Drop() (n int) {
 	}, "next")
 	batch.Delete(l.infoKey())
 	l.db.Write(batch, l.wo)
-	n = 1
+	ok = true
 	return
 }

@@ -38,12 +38,14 @@ func (l *LevelString) Get(key []byte) (value []byte) {
 	return
 }
 
-func (l *LevelString) Delete(key []byte) (n int) {
-	sk := l.stringKey(key)
-	val := l.Get(sk)
-	if val != nil {
-		l.db.Delete(sk, l.wo)
-		n = 1
+func (l *LevelString) Delete(keys ...[]byte) (n int) {
+	n = 0
+	for _, key := range keys {
+		val := l.Get(key)
+		if val != nil {
+			l.db.Delete(l.stringKey(key), l.wo)
+			n++
+		}
 	}
 	return
 }

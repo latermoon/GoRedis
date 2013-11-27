@@ -176,7 +176,7 @@ func (l *LevelList) Len() int64 {
 	return l.len()
 }
 
-func (l *LevelList) Drop() (n int) {
+func (l *LevelList) Drop() (ok bool) {
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Release()
 	batch := new(leveldb.Batch)
@@ -185,6 +185,6 @@ func (l *LevelList) Drop() (n int) {
 	}, "next")
 	batch.Delete(l.infoKey())
 	l.db.Write(batch, l.wo)
-	n = 1
+	ok = true
 	return
 }
