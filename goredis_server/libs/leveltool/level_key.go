@@ -36,10 +36,22 @@ func (l *LevelKey) TypeOf(key []byte) (t string) {
 	return
 }
 
+// 获取原始key的原始内容
+// goget __key[ss]hash = 2
+func (l *LevelKey) GetInnerValue(gokey []byte) (value []byte) {
+	var err error
+	value, err = l.db.Get(gokey, l.ro)
+	if err != nil {
+		value = nil
+	}
+	return
+}
+
 // 搜索并返回key和类型
 // @param direction "prev" or else for "next"
+// @param searchInnerKey 搜索内部key，__key这些
 // @return bulks bulks[0]=key, bulks[1]=type, bulks[2]=key2, ...
-func (l *LevelKey) Search(prefix []byte, direction string, count int, withtype bool) (bulks []interface{}) {
+func (l *LevelKey) Search(prefix []byte, direction string, count int, withtype bool, searchInnerKey bool) (bulks []interface{}) {
 	ro := &opt.ReadOptions{}
 	iter := l.db.NewIterator(ro)
 	defer iter.Release()
@@ -49,17 +61,36 @@ func (l *LevelKey) Search(prefix []byte, direction string, count int, withtype b
 		bufsize = bufsize * 2
 	}
 	// enumerate
-	innerPrefix := KEY_PREFIX + SEP_LEFT + string(prefix)
+	var innerPrefix []byte
+	if !searchInnerKey {
+		innerPrefix = []byte(KEY_PREFIX + SEP_LEFT + string(prefix))
+	} else {
+		innerPrefix = prefix
+	}
 	bulks = make([]interface{}, 0, bufsize)
-	PrefixEnumerate(iter, []byte(innerPrefix), func(i int, iter iterator.Iterator, quit *bool) {
-		fullkey := copyBytes(iter.Key())
-		sepLeftPos := bytes.Index(fullkey, []byte(SEP_LEFT))
-		sepRightPos := bytes.Index(fullkey, []byte(SEP_RIGHT))
-		key := fullkey[sepLeftPos+1 : sepRightPos]
-		bulks = append(bulks, key)
-		if withtype {
-			t := fullkey[sepRightPos+1:]
-			bulks = append(bulks, copyBytes(t))
+	PrefixEnumerate(iter, innerPrefix, func(i int, iter iterator.Iterator, quit *bool) {
+		if !searchInnerKey {
+			fullkey := copyBytes(iter.Key())
+			sepLeftPos := bytes.Index(fullkey, []byte(SEP_LEFT))
+			sepRightPos := bytes.Index(fullkey, []byte(SEP_RIGHT))
+			key := fullkey[sepLeftPos+1 : sepRightPos]
+			bulks = append(bulks, key)
+			if withtype {
+				t := fullkey[sepRightPos+1:]
+				bulks = append(bulks, copyBytes(t))
+			}
+		} else {
+			fullkey := copyBytes(iter.Key())
+			bulks = append(bulks, fullkey)
+			if withtype {
+				if bytes.HasPrefix(fullkey, []byte(KEY_PREFIX)) {
+					sepRightPos := bytes.Index(fullkey, []byte(SEP_RIGHT))
+					t := fullkey[sepRightPos+1:]
+					bulks = append(bulks, copyBytes(t))
+				} else {
+					bulks = append(bulks, nil)
+				}
+			}
 		}
 	}, direction)
 	return

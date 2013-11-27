@@ -4,15 +4,14 @@ import (
 	. "../goredis"
 )
 
-// 在数据量大的情况下，keys基本没有意义
-// 取消keys，使用key_next或者key_prev来分段扫描全部key
+// 在数据量大的情况下，keys基本不可用，使用key_search来分段扫描全部key
 func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
-	return ErrorReply("keys is not supported by GoRedis, use 'key_next [prefix] [count]' / key_prev [prefix] [count] instead")
+	return ErrorReply("keys is not supported by GoRedis, use 'key_search [prefix] [count] [withtype]' instead")
 }
 
 // 找出下一个key
 // @return ["user:100422:name", "string", "user:100428:name", "string", "user:100422:setting", "hash", ...]
-func (server *GoRedisServer) OnKEY_NEXT(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnKEY_SEARCH(cmd *Command) (reply *Reply) {
 	seekkey, err := cmd.ArgAtIndex(1)
 	if err != nil {
 		return ErrorReply(err)
@@ -32,11 +31,12 @@ func (server *GoRedisServer) OnKEY_NEXT(cmd *Command) (reply *Reply) {
 		withtype = cmd.StringAtIndex(3) == "withtype"
 	}
 	// search
-	bulks := server.keyManager.levelKey().Search(seekkey, "next", count, withtype)
+	bulks := server.keyManager.levelKey().Search(seekkey, "next", count, withtype, false)
 	return MultiBulksReply(bulks)
 }
 
-func (server *GoRedisServer) OnKEY_PREV(cmd *Command) (reply *Reply) {
+// 扫描内部key
+func (server *GoRedisServer) OnGOKEY_SEARCH(cmd *Command) (reply *Reply) {
 	seekkey, err := cmd.ArgAtIndex(1)
 	if err != nil {
 		return ErrorReply(err)
@@ -56,8 +56,19 @@ func (server *GoRedisServer) OnKEY_PREV(cmd *Command) (reply *Reply) {
 		withtype = cmd.StringAtIndex(3) == "withtype"
 	}
 	// search
-	bulks := server.keyManager.levelKey().Search(seekkey, "prev", count, withtype)
+	bulks := server.keyManager.levelKey().Search(seekkey, "next", count, withtype, true)
 	return MultiBulksReply(bulks)
+}
+
+func (server *GoRedisServer) OnGOGET(cmd *Command) (reply *Reply) {
+	key, _ := cmd.ArgAtIndex(1)
+	value := server.keyManager.levelKey().GetInnerValue(key)
+	if value == nil {
+		reply = BulkReply(nil)
+	} else {
+		reply = BulkReply(value)
+	}
+	return
 }
 
 func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {

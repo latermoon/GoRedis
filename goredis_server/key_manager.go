@@ -21,7 +21,7 @@ func NewKeyManager(server *GoRedisServer, capacity uint64) (km *KeyManager) {
 	km.server = server
 	km.lstring = leveltool.NewLevelString(server.DB()) // string
 	km.lkey = leveltool.NewLevelKey(server.DB())       // key
-	km.lruCache = lru.NewLRUCache(10000)
+	km.lruCache = lru.NewLRUCache(capacity)
 	return
 }
 
