@@ -4,15 +4,44 @@ import (
 	. "../goredis"
 )
 
+func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	vals := cmd.Args[2:]
+	lst := server.keyManager.listByKey(key)
+	for _, val := range vals {
+		lst.LPush(val)
+	}
+	length := int(lst.Len())
+	return IntegerReply(length)
+}
+
 func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	vals := cmd.Args[2:]
 	lst := server.keyManager.listByKey(key)
 	for _, val := range vals {
-		lst.Push(val)
+		lst.RPush(val)
 	}
 	length := int(lst.Len())
 	return IntegerReply(length)
+}
+
+func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	lst := server.keyManager.listByKey(key)
+	if lst == nil {
+		return BulkReply(nil)
+	}
+	elem, err := lst.RPop()
+	if err != nil {
+		return ErrorReply(err)
+	}
+	if elem != nil {
+		reply = BulkReply(elem.Value.([]byte))
+	} else {
+		reply = BulkReply(nil)
+	}
+	return
 }
 
 func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
@@ -21,11 +50,15 @@ func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 	if lst == nil {
 		return BulkReply(nil)
 	}
-	elem, err := lst.Pop()
+	elem, err := lst.LPop()
 	if err != nil {
 		return ErrorReply(err)
 	}
-	reply = BulkReply(elem.Value.([]byte))
+	if elem != nil {
+		reply = BulkReply(elem.Value.([]byte))
+	} else {
+		reply = BulkReply(nil)
+	}
 	return
 }
 

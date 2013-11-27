@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"runtime/debug"
 	"strings"
 )
 
@@ -126,7 +127,8 @@ func (server *RedisServer) handleConnection(session *Session) {
 	// 异常处理
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println(fmt.Sprintf("%s %s", session.conn.RemoteAddr(), err))
+			fmt.Println(fmt.Sprintf("Error %s %s", session.conn.RemoteAddr(), err))
+			debug.PrintStack()
 			session.Close()
 		}
 	}()

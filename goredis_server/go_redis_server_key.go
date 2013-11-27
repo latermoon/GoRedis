@@ -2,20 +2,16 @@ package goredis_server
 
 import (
 	. "../goredis"
-	"./libs/leveltool"
-	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
-// 在数据量大的情况下，keys基本没有意义
-// 取消keys，使用key_next或者key_prev来分段扫描全部key
+// 在数据量大的情况下，keys基本不可用，使用key_search来分段扫描全部key
 func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
-	return ErrorReply("keys is not supported, use key_next/key_prev instead")
+	return ErrorReply("keys is not supported by GoRedis, use 'key_search [prefix] [count] [withtype]' instead")
 }
 
 // 找出下一个key
 // @return ["user:100422:name", "string", "user:100428:name", "string", "user:100422:setting", "hash", ...]
-func (server *GoRedisServer) OnKEY_NEXT(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnKEY_SEARCH(cmd *Command) (reply *Reply) {
 	seekkey, err := cmd.ArgAtIndex(1)
 	if err != nil {
 		return ErrorReply(err)
@@ -35,11 +31,31 @@ func (server *GoRedisServer) OnKEY_NEXT(cmd *Command) (reply *Reply) {
 		withtype = cmd.StringAtIndex(3) == "withtype"
 	}
 	// search
-	bulks := server.keySearch(seekkey, "next", count, withtype)
+	bulks := server.keyManager.levelKey().Search(seekkey, "next", count, withtype, false)
 	return MultiBulksReply(bulks)
 }
 
-func (server *GoRedisServer) OnKEY_PREV(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnKEY_SEARCH_DEL(cmd *Command) (reply *Reply) {
+	seekkey, err := cmd.ArgAtIndex(1)
+	if err != nil {
+		return ErrorReply(err)
+	}
+	n := 0
+	for {
+		keys := server.keyManager.levelKey().Search(seekkey, "next", 1000, false, false)
+		if len(keys) == 0 {
+			break
+		}
+		for _, key := range keys {
+			n += server.keyManager.Delete(key.([]byte))
+		}
+	}
+	reply = IntegerReply(n)
+	return
+}
+
+// 扫描内部key
+func (server *GoRedisServer) OnGOKEY_SEARCH(cmd *Command) (reply *Reply) {
 	seekkey, err := cmd.ArgAtIndex(1)
 	if err != nil {
 		return ErrorReply(err)
@@ -59,57 +75,25 @@ func (server *GoRedisServer) OnKEY_PREV(cmd *Command) (reply *Reply) {
 		withtype = cmd.StringAtIndex(3) == "withtype"
 	}
 	// search
-	bulks := server.keySearch(seekkey, "prev", count, withtype)
+	bulks := server.keyManager.levelKey().Search(seekkey, "next", count, withtype, true)
 	return MultiBulksReply(bulks)
 }
 
-// 搜索并返回key和类型
-// @param direction "prev" or else for "next"
-// @return bulks bulks[0]=key, bulks[1]=type, bulks[2]=key2, ...
-func (server *GoRedisServer) keySearch(prefix []byte, direction string, count int, withtype bool) (bulks []interface{}) {
-	db := server.DB()
-	ro := &opt.ReadOptions{}
-	iter := db.NewIterator(ro)
-	defer iter.Release()
-	// buffer
-	bufsize := count
-	if withtype {
-		bufsize = bufsize * 2
+// 获取原始内容
+func (server *GoRedisServer) OnGOGET(cmd *Command) (reply *Reply) {
+	key, _ := cmd.ArgAtIndex(1)
+	value := server.keyManager.levelKey().GetInnerValue(key)
+	if value == nil {
+		reply = BulkReply(nil)
+	} else {
+		reply = BulkReply(value)
 	}
-	// enumerate
-	bulks = make([]interface{}, 0, bufsize)
-	leveltool.PrefixEnumerate(iter, prefix, func(i int, iter iterator.Iterator, quit *bool) {
-		bulks = append(bulks, copyBytes(iter.Key()))
-		if withtype {
-			bs := iter.Value()[0] // 第一个字节
-			bulks = append(bulks, EntryTypeDescription(EntryType(bs)))
-		}
-	}, direction)
 	return
 }
 
 func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	keys := cmd.Args[1:]
-	n := 0
-	// TODO
-	for _, key := range keys {
-		n++
-		t := server.keyManager.levelKey().TypeOf(key)
-		switch t {
-		case "string":
-			server.keyManager.levelString().Delete(key)
-		case "hash":
-			server.keyManager.hashByKey(string(key)).Drop()
-		case "set":
-			server.keyManager.setByKey(string(key)).Drop()
-		case "list":
-			server.keyManager.listByKey(string(key)).Drop()
-		case "zset":
-			server.keyManager.zsetByKey(string(key)).Drop()
-		default:
-			n--
-		}
-	}
+	n := server.keyManager.Delete(keys...)
 	reply = IntegerReply(n)
 	return
 }
