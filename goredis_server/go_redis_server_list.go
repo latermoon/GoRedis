@@ -82,12 +82,26 @@ func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
 	return
 }
 
+func (server *GoRedisServer) OnLTRIM(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	lst := server.keyManager.listByKey(key)
+	start, e1 := cmd.IntAtIndex(2)
+	end, e2 := cmd.IntAtIndex(3)
+	if e1 != nil || e2 != nil {
+		return ErrorReply("bad start/stop")
+	} else if start != 0 {
+		return ErrorReply("start must equal to 0 (in GoRedis)")
+	} else if end < start {
+		return ErrorReply("end must greater than start")
+	}
+	lst.TrimLeft(uint(end - start + 1))
+	reply = StatusReply("OK")
+	return
+}
+
 func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	lst := server.keyManager.listByKey(key)
-	if lst == nil {
-		return MultiBulksReply([]interface{}{})
-	}
 	start, e1 := cmd.IntAtIndex(2)
 	end, e2 := cmd.IntAtIndex(3)
 	if e1 != nil || e2 != nil {

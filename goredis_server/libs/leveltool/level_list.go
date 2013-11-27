@@ -208,6 +208,36 @@ func (l *LevelList) LPop() (e *Element, err error) {
 	return
 }
 
+// 删除左边
+func (l *LevelList) TrimLeft(count uint) (n int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.len() == 0 {
+		return
+	}
+	oldstart, oldend := l.start, l.end
+	batch := new(leveldb.Batch)
+	for idx := oldstart; idx < (oldstart+int64(count)) && idx <= oldend; idx++ {
+		batch.Delete(l.idxKey(idx))
+		l.start++
+	}
+	shouldReset := l.len() == 0
+	if shouldReset {
+		l.start = 0
+		l.end = -1
+		batch.Delete(l.infoKey())
+	} else {
+		batch.Put(l.infoKey(), l.infoValue())
+	}
+	err := l.db.Write(batch, l.wo)
+	if err != nil {
+		// 回退
+		l.start, l.end = oldstart, oldend
+	}
+	return
+}
+
 func (l *LevelList) Index(i int64) (e *Element, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
