@@ -93,7 +93,26 @@ func (l *LevelList) idxKey(idx int64) []byte {
 	return []byte(strings.Join([]string{LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "idx", ":", idxStr}, ""))
 }
 
-func (l *LevelList) Push(value []byte) (e *Element, err error) {
+func (l *LevelList) LPush(value []byte) (e *Element, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// 左游标
+	l.start--
+	batch := new(leveldb.Batch)
+	batch.Put(l.idxKey(l.start), value)
+	batch.Put(l.infoKey(), l.infoValue())
+	err = l.db.Write(batch, l.wo)
+	if err != nil {
+		// 回退
+		l.start++
+	}
+	e = &Element{}
+	e.Value = value
+	return
+}
+
+func (l *LevelList) RPush(value []byte) (e *Element, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -112,7 +131,46 @@ func (l *LevelList) Push(value []byte) (e *Element, err error) {
 	return
 }
 
-func (l *LevelList) Pop() (e *Element, err error) {
+func (l *LevelList) RPop() (e *Element, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.len() == 0 {
+		return nil, nil
+	}
+	// backup
+	oldstart, oldend := l.start, l.end
+
+	// get
+	idx := l.end
+	e = &Element{}
+	e.Value, err = l.db.Get(l.idxKey(idx), l.ro)
+	if err != nil {
+		return nil, err
+	}
+
+	// 只剩下一个元素时，删除infoKey(0)
+	shouldReset := l.len() == 1
+	// 删除数据, 更新左游标
+	batch := new(leveldb.Batch)
+	batch.Delete(l.idxKey(idx))
+	if shouldReset {
+		l.start = 0
+		l.end = -1
+		batch.Delete(l.infoKey())
+	} else {
+		l.end--
+		batch.Put(l.infoKey(), l.infoValue())
+	}
+	err = l.db.Write(batch, l.wo)
+	if err != nil {
+		// 回退
+		l.start, l.end = oldstart, oldend
+	}
+	return
+}
+
+func (l *LevelList) LPop() (e *Element, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -167,6 +225,9 @@ func (l *LevelList) Index(i int64) (e *Element, err error) {
 }
 
 func (l *LevelList) len() int64 {
+	if l.end < l.start {
+		return 0
+	}
 	return l.end - l.start + 1
 }
 

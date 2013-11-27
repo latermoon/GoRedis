@@ -120,7 +120,7 @@ func (s *SlaveSessionClient) processRunloop() {
 			case EntryTypeList:
 				s.server.syncCounters.Get("list").Incr(1)
 				for _, b := range kv.Value.([][]byte) {
-					s.server.keyManager.listByKey(entryKey).Push(b)
+					s.server.keyManager.listByKey(entryKey).RPush(b)
 				}
 			case EntryTypeSet:
 				s.server.syncCounters.Get("set").Incr(1)

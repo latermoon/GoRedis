@@ -96,7 +96,7 @@ func (s *SlaveSession) aofRunloop() {
 			s.currentCommand = <-s.cmdbuffer
 		}
 		s.server.stdlog.Debug("aof write %s", s.currentCommand)
-		_, err := s.aoflist.Push(s.currentCommand.Bytes())
+		_, err := s.aoflist.RPush(s.currentCommand.Bytes())
 		// 如果写入aof出错，应该废弃全部aof，重来snapshot
 		if err != nil {
 			s.server.stdlog.Error("aof write err %s", err)
@@ -144,7 +144,7 @@ func (s *SlaveSession) aofToRemoteRunloop() {
 			return
 		}
 		// 移除
-		_, e3 := s.aoflist.Pop()
+		_, e3 := s.aoflist.LPop()
 		if e3 != nil {
 			// 如果aof出错，应该废弃全部aof，重来snapshot
 			s.server.stdlog.Error("aof to remote pop error %s", e3)
