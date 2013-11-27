@@ -35,6 +35,25 @@ func (server *GoRedisServer) OnKEY_SEARCH(cmd *Command) (reply *Reply) {
 	return MultiBulksReply(bulks)
 }
 
+func (server *GoRedisServer) OnKEY_SEARCH_DEL(cmd *Command) (reply *Reply) {
+	seekkey, err := cmd.ArgAtIndex(1)
+	if err != nil {
+		return ErrorReply(err)
+	}
+	n := 0
+	for {
+		keys := server.keyManager.levelKey().Search(seekkey, "next", 1000, false, false)
+		if len(keys) == 0 {
+			break
+		}
+		for _, key := range keys {
+			n += server.keyManager.Delete(key.([]byte))
+		}
+	}
+	reply = IntegerReply(n)
+	return
+}
+
 // 扫描内部key
 func (server *GoRedisServer) OnGOKEY_SEARCH(cmd *Command) (reply *Reply) {
 	seekkey, err := cmd.ArgAtIndex(1)
@@ -60,6 +79,7 @@ func (server *GoRedisServer) OnGOKEY_SEARCH(cmd *Command) (reply *Reply) {
 	return MultiBulksReply(bulks)
 }
 
+// 获取原始内容
 func (server *GoRedisServer) OnGOGET(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
 	value := server.keyManager.levelKey().GetInnerValue(key)

@@ -69,6 +69,10 @@ func (l *LevelKey) Search(prefix []byte, direction string, count int, withtype b
 	}
 	bulks = make([]interface{}, 0, bufsize)
 	PrefixEnumerate(iter, innerPrefix, func(i int, iter iterator.Iterator, quit *bool) {
+		if i >= count {
+			*quit = true
+			return
+		}
 		if !searchInnerKey {
 			fullkey := copyBytes(iter.Key())
 			sepLeftPos := bytes.Index(fullkey, []byte(SEP_LEFT))
