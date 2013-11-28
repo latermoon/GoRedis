@@ -14,6 +14,8 @@ import (
 	"sync"
 )
 
+const VERSION = "0.1.1"
+
 var (
 	WrongKindError = errors.New("Wrong kind opration")
 	WrongKindReply = ErrorReply(WrongKindError)

@@ -14,12 +14,16 @@ import (
 // go run goredis-server.go -h localhost -p 1602
 // go run goredis-server.go -procs 8 -p 17600
 func main() {
-	fmt.Println("GoRedis 0.1.1 by latermoon")
-
-	hostPtr := flag.String("h", "", "Server host")
-	portPtr := flag.Int("p", 1602, "Server port")
+	version := flag.Bool("v", false, "print goredis-server version")
+	hostPtr := flag.String("h", "", "server host")
+	portPtr := flag.Int("p", 1602, "server port")
 	procsPtr := flag.Int("procs", 8, "GOMAXPROCS")
 	flag.Parse()
+
+	if *version {
+		fmt.Println("goredis-server", goredis_server.VERSION)
+		return
+	}
 
 	runtime.GOMAXPROCS(*procsPtr)
 
@@ -32,7 +36,6 @@ func main() {
 
 	directory := fmt.Sprintf("%s/goredis_%d/", dbhome, *portPtr)
 	os.MkdirAll(directory, os.ModePerm)
-	fmt.Println("dbhome:", directory)
 
 	host := fmt.Sprintf("%s:%d", *hostPtr, *portPtr)
 
