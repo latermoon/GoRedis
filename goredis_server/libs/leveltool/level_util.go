@@ -54,12 +54,13 @@ func PrefixEnumerate(iter iterator.Iterator, prefix []byte, fn func(i int, iter 
 func RangeEnumerate(iter iterator.Iterator, min, max []byte, fn func(i int, iter iterator.Iterator, quit *bool), high2low bool) {
 	var found bool
 	if high2low {
+		max = append(max, 254)
 		found = iter.Seek(max)
 	} else {
 		found = iter.Seek(min)
 	}
 	i := -1
-	if found {
+	if found && bytes.Compare(iter.Key(), min) > 0 && bytes.Compare(iter.Key(), max) < 0 {
 		i++
 		quit := false
 		fn(i, iter, &quit)
@@ -67,15 +68,19 @@ func RangeEnumerate(iter iterator.Iterator, min, max []byte, fn func(i int, iter
 			return
 		}
 	}
+
 	for {
 		found = false
 		if high2low {
 			found = iter.Prev()
+			if !found || bytes.Compare(iter.Key(), min) < 0 {
+				break
+			}
 		} else {
 			found = iter.Next()
-		}
-		if !found {
-			break
+			if !found || bytes.Compare(iter.Key(), max) > 0 {
+				break
+			}
 		}
 		i++
 		quit := false
