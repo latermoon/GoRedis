@@ -14,7 +14,8 @@ import (
 	"sync"
 )
 
-const VERSION = "0.1.1"
+// 版本号，每次更新都需要升级一下
+const VERSION = "0.1.2"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
