@@ -169,6 +169,8 @@ func (l *LevelHash) Count() (n int) {
 }
 
 func (l *LevelHash) Drop() (ok bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Release()
 	batch := new(leveldb.Batch)
