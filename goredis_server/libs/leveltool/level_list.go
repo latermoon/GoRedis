@@ -268,6 +268,8 @@ func (l *LevelList) Len() int64 {
 }
 
 func (l *LevelList) Drop() (ok bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Release()
 	batch := new(leveldb.Batch)
@@ -277,5 +279,7 @@ func (l *LevelList) Drop() (ok bool) {
 	batch.Delete(l.infoKey())
 	l.db.Write(batch, l.wo)
 	ok = true
+	l.start = 0
+	l.end = -1
 	return
 }

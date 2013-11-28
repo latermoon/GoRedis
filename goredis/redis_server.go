@@ -122,13 +122,26 @@ func (server *RedisServer) InvokeCommandHandler(session *Session, cmd *Command) 
 	return
 }
 
+type networkError struct {
+	err error
+}
+
+func (n *networkError) Error() string {
+	return n.err.Error()
+}
+
 // 处理一个客户端连接
 func (server *RedisServer) handleConnection(session *Session) {
 	// 异常处理
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println(fmt.Sprintf("Error %s %s", session.conn.RemoteAddr(), err))
-			debug.PrintStack()
+			switch err.(type) {
+			case *networkError:
+				fmt.Println(fmt.Sprintf("[goredis] end connection %s %s", session.conn.RemoteAddr(), err))
+			default:
+				fmt.Println(fmt.Sprintf("Error %s %s", session.conn.RemoteAddr(), err))
+				debug.PrintStack()
+			}
 			session.Close()
 		}
 	}()
@@ -138,7 +151,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 		// 1) io.EOF
 		// 2) read tcp 127.0.0.1:51863: connection reset by peer
 		if e1 != nil {
-			panic(fmt.Sprintf("end connection %s", e1))
+			panic(&networkError{err: e1})
 		}
 		// 处理
 		reply := server.InvokeCommandHandler(session, cmd)

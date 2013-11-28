@@ -4,14 +4,14 @@ import (
 	. "../goredis"
 )
 
-// 在数据量大的情况下，keys基本不可用，使用key_search来分段扫描全部key
+// 在数据量大的情况下，keys基本不可用，使用keysearch来分段扫描全部key
 func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
-	return ErrorReply("keys is not supported by GoRedis, use 'key_search [prefix] [count] [withtype]' instead")
+	return ErrorReply("keys is not supported by GoRedis, use 'keysearch [prefix] [count] [withtype]' instead")
 }
 
 // 找出下一个key
 // @return ["user:100422:name", "string", "user:100428:name", "string", "user:100422:setting", "hash", ...]
-func (server *GoRedisServer) OnKEY_SEARCH(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnKEYSEARCH(cmd *Command) (reply *Reply) {
 	seekkey, err := cmd.ArgAtIndex(1)
 	if err != nil {
 		return ErrorReply(err)
@@ -35,7 +35,7 @@ func (server *GoRedisServer) OnKEY_SEARCH(cmd *Command) (reply *Reply) {
 	return MultiBulksReply(bulks)
 }
 
-func (server *GoRedisServer) OnKEY_SEARCH_DEL(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnKEYSEARCH_DEL(cmd *Command) (reply *Reply) {
 	seekkey, err := cmd.ArgAtIndex(1)
 	if err != nil {
 		return ErrorReply(err)
@@ -55,7 +55,7 @@ func (server *GoRedisServer) OnKEY_SEARCH_DEL(cmd *Command) (reply *Reply) {
 }
 
 // 扫描内部key
-func (server *GoRedisServer) OnGOKEY_SEARCH(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnGOKEYSEARCH(cmd *Command) (reply *Reply) {
 	seekkey, err := cmd.ArgAtIndex(1)
 	if err != nil {
 		return ErrorReply(err)
