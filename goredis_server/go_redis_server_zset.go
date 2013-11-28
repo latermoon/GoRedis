@@ -1,5 +1,6 @@
 package goredis_server
 
+// 本类编写仓促，重复代码较多，准备重构
 // http://redis.io/commands#sorted_set
 
 import (
@@ -52,7 +53,37 @@ func (server *GoRedisServer) OnZRANGE(cmd *Command) (reply *Reply) {
 	zset := server.keyManager.zsetByKey(key)
 	// bulks
 	bulks := make([]interface{}, 0, 10) // TODO 优化内存分配
-	elems := zset.RangeByIndex(start, stop)
+	high2low := false
+	elems := zset.RangeByIndex(high2low, start, stop)
+	for _, elem := range elems {
+		bulks = append(bulks, elem.Member)
+		if withScore {
+			bulks = append(bulks, elem.Score)
+		}
+	}
+	reply = MultiBulksReply(bulks)
+	return
+}
+
+// ZREVRANGE key start stop [WITHSCORES]
+// Return a range of members in a sorted set, by index, with scores ordered from high to low
+func (server *GoRedisServer) OnZREVRANGE(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	start, e1 := cmd.IntAtIndex(2)
+	stop, e2 := cmd.IntAtIndex(3)
+	if e1 != nil || e2 != nil {
+		return ErrorReply("Bad start/stop")
+	}
+	// 输出score
+	withScore := false
+	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
+		withScore = true
+	}
+	zset := server.keyManager.zsetByKey(key)
+	// bulks
+	bulks := make([]interface{}, 0, 10) // TODO 优化内存分配
+	high2low := true
+	elems := zset.RangeByIndex(high2low, start, stop)
 	for _, elem := range elems {
 		bulks = append(bulks, elem.Member)
 		if withScore {
@@ -80,7 +111,8 @@ func (server *GoRedisServer) OnZRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	zset := server.keyManager.zsetByKey(key)
 	// bulks
 	bulks := make([]interface{}, 0, 10) // TODO 优化内存分配
-	elems := zset.RangeByScore(min, max, 0, -1)
+	high2low := false
+	elems := zset.RangeByScore(high2low, min, max, 0, -1)
 	for _, elem := range elems {
 		bulks = append(bulks, elem.Member)
 		if withScore {
@@ -94,7 +126,29 @@ func (server *GoRedisServer) OnZRANGEBYSCORE(cmd *Command) (reply *Reply) {
 // ZREVRANGEBYSCORE key max min [WITHSCORES] [LIMIT offset count]
 // Return a range of members in a sorted set, by score, with scores ordered from high to low
 func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd *Command) (reply *Reply) {
-	reply = ErrorReply("Not Supported")
+	key := cmd.StringAtIndex(1)
+	min, e1 := cmd.ArgAtIndex(2)
+	max, e2 := cmd.ArgAtIndex(3)
+	if e1 != nil || e2 != nil {
+		return ErrorReply("Bad min/max")
+	}
+	// 输出score
+	withScore := false
+	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
+		withScore = true
+	}
+	zset := server.keyManager.zsetByKey(key)
+	// bulks
+	bulks := make([]interface{}, 0, 10) // TODO 优化内存分配
+	high2low := true
+	elems := zset.RangeByScore(high2low, min, max, 0, -1)
+	for _, elem := range elems {
+		bulks = append(bulks, elem.Member)
+		if withScore {
+			bulks = append(bulks, elem.Score)
+		}
+	}
+	reply = MultiBulksReply(bulks)
 	return
 }
 
@@ -139,10 +193,16 @@ func (server *GoRedisServer) OnZREMRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	return
 }
 
-// ZREVRANGE key start stop [WITHSCORES]
-// Return a range of members in a sorted set, by index, with scores ordered from high to low
-func (server *GoRedisServer) OnZREVRANGE(cmd *Command) (reply *Reply) {
-	reply = ErrorReply("Not Supported")
+func (server *GoRedisServer) OnZINCRBY(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	incrmemt, e1 := cmd.ArgAtIndex(2)
+	member, e2 := cmd.ArgAtIndex(3)
+	if e1 != nil || e2 != nil {
+		return ErrorReply("Bad incrment/member")
+	}
+	zset := server.keyManager.zsetByKey(key)
+	score := zset.IncrBy(incrmemt, member)
+	reply = BulkReply(score)
 	return
 }
 
