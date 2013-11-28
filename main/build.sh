@@ -2,7 +2,7 @@
 
 dt=`date +%Y.%m.%d`
 target=goredis-server-$dt
-go build -o $target /home/workspace/GoRedis/main/goredis-server.go
+go build -o $target goredis-server.go
 
 mkdir /home/server/goredis/ -p
 rm -f /home/server/goredis/goredis-server 
