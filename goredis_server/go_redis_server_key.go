@@ -80,7 +80,7 @@ func (server *GoRedisServer) OnGOKEYSEARCH(cmd *Command) (reply *Reply) {
 }
 
 // 获取原始内容
-func (server *GoRedisServer) OnGOGET(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnCAT(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
 	value := server.keyManager.levelKey().GetInnerValue(key)
 	if value == nil {
@@ -88,6 +88,16 @@ func (server *GoRedisServer) OnGOGET(cmd *Command) (reply *Reply) {
 	} else {
 		reply = BulkReply(value)
 	}
+	return
+}
+
+/**
+ * 过期时间，暂不支持
+ * 1 if the timeout was set.
+ * 0 if key does not exist or the timeout could not be set.
+ */
+func (server *GoRedisServer) OnEXPIRE(cmd *Command) (reply *Reply) {
+	reply = IntegerReply(0)
 	return
 }
 
