@@ -9,13 +9,14 @@ import (
 	"container/list"
 	"errors"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/cache"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"strings"
 	"sync"
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "0.1.4"
+const VERSION = "0.1.6"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -31,7 +32,7 @@ type GoRedisServer struct {
 	// 数据源
 	directory  string
 	db         *leveldb.DB
-	keyManager *KeyManager
+	levelRedis *leveltool.LevelRedis
 	config     *leveltool.LevelConfig
 	// counters
 	cmdCounters     *monitor.Counters
@@ -78,14 +79,17 @@ func (server *GoRedisServer) Init() (err error) {
 	server.stdlog.Info("server init ...")
 	// leveldb
 	options := opt.Options{
+		Compression:  opt.NoCompression,
 		MaxOpenFiles: 100000,
-		WriteBuffer:  256 << 20,
+		BlockCache:   cache.NewLRUCache(32 * opt.MiB),
+		BlockSize:    32 * opt.KiB,
+		WriteBuffer:  120 << 20,
 	}
 	server.db, err = leveldb.OpenFile(server.directory+"/db0", &options)
 	if err != nil {
 		panic(err)
 	}
-	server.keyManager = NewKeyManager(server, 1000)
+	server.levelRedis = leveltool.NewLevelRedis(server.db)
 	server.config = leveltool.NewLevelConfig(server.db, goredisPrefix+"config:")
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")

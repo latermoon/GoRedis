@@ -13,7 +13,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-	"strings"
 	"sync"
 )
 
@@ -50,9 +49,9 @@ func (l *LevelHash) Size() int {
 
 func (l *LevelHash) infoKey() []byte {
 	if l.userForSet {
-		return []byte(strings.Join([]string{KEY_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, SET_SUFFIX}, ""))
+		return joinStringBytes(KEY_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, SET_SUFFIX)
 	} else {
-		return []byte(strings.Join([]string{KEY_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, HASH_SUFFIX}, ""))
+		return joinStringBytes(KEY_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, HASH_SUFFIX)
 	}
 }
 
@@ -66,9 +65,9 @@ func (l *LevelHash) fieldKey(field []byte) []byte {
 
 func (l *LevelHash) fieldPrefix() []byte {
 	if l.userForSet {
-		return []byte(strings.Join([]string{SET_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT}, ""))
+		return joinStringBytes(SET_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT)
 	} else {
-		return []byte(strings.Join([]string{HASH_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT}, ""))
+		return joinStringBytes(HASH_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT)
 	}
 }
 

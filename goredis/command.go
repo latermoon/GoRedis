@@ -58,6 +58,15 @@ func (cmd *Command) IntAtIndex(i int) (n int, err error) {
 	return
 }
 
+func (cmd *Command) Int64AtIndex(i int) (n int64, err error) {
+	if i >= len(cmd.Args) {
+		err = errors.New("Argument out of range")
+		return
+	}
+	n, err = strconv.ParseInt(string(cmd.Args[i]), 10, 64)
+	return
+}
+
 func (cmd *Command) FloatAtIndex(i int) (n float64, err error) {
 	if i >= len(cmd.Args) {
 		err = errors.New("Argument out of range")

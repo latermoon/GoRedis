@@ -5,7 +5,8 @@ package goredis_server
 
 import (
 	. "../goredis"
-	"./libs/leveltool"
+	"./util"
+	"strconv"
 	"strings"
 )
 
@@ -18,20 +19,53 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 	if count%2 != 0 {
 		return ErrorReply("Bad argument count")
 	}
-
-	zset := server.keyManager.zsetByKey(key)
+	// format score
 	for i := 0; i < count; i += 2 {
-		elem := leveltool.NewZSetElem(scoreMembers[i], scoreMembers[i+1])
-		zset.Add(elem)
+		scoreInt, err := strconv.ParseInt(string(scoreMembers[i]), 10, 64)
+		if err != nil {
+			return ErrorReply("bad score")
+		}
+		// replace score
+		scoreMembers[i] = util.Int64ToBytes(scoreInt)
 	}
-	reply = IntegerReply(count / 2)
+	// add
+	zset := server.levelRedis.GetSortedSet(key)
+	n := zset.Add(scoreMembers...)
+	reply = IntegerReply(n)
 	return
 }
 
 func (server *GoRedisServer) OnZCARD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	zset := server.keyManager.zsetByKey(key)
-	reply = IntegerReply(zset.Count())
+	zset := server.levelRedis.GetSortedSet(key)
+	reply = IntegerReply(zset.Len())
+	return
+}
+
+func (server *GoRedisServer) rangeByIndex(cmd *Command, high2low bool) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	start, e1 := cmd.IntAtIndex(2)
+	stop, e2 := cmd.IntAtIndex(3)
+	if e1 != nil || e2 != nil {
+		return ErrorReply("Bad start/stop")
+	}
+	// 输出score
+	withScore := false
+	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
+		withScore = true
+	}
+	zset := server.levelRedis.GetSortedSet(key)
+	scoreMembers := zset.RangeByIndex(high2low, start, stop)
+	count := len(scoreMembers)
+	bulks := make([]interface{}, 0, count)
+	for i := 0; i < count; i += 2 {
+		bulks = append(bulks, scoreMembers[i+1])
+		if withScore {
+			scoreInt := util.BytesToInt64(scoreMembers[i])
+			bulks = append(bulks, []byte(strconv.FormatInt(scoreInt, 10)))
+		}
+	}
+	reply = MultiBulksReply(bulks)
 	return
 }
 
@@ -39,55 +73,36 @@ func (server *GoRedisServer) OnZCARD(cmd *Command) (reply *Reply) {
 // ZRANGE key start stop [WITHSCORES]
 // Return a range of members in a sorted set, by index
 func (server *GoRedisServer) OnZRANGE(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
-	start, e1 := cmd.IntAtIndex(2)
-	stop, e2 := cmd.IntAtIndex(3)
-	if e1 != nil || e2 != nil {
-		return ErrorReply("Bad start/stop")
-	}
-	// 输出score
-	withScore := false
-	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
-		withScore = true
-	}
-	zset := server.keyManager.zsetByKey(key)
-	// bulks
-	bulks := make([]interface{}, 0, 10) // TODO 优化内存分配
-	high2low := false
-	elems := zset.RangeByIndex(high2low, start, stop)
-	for _, elem := range elems {
-		bulks = append(bulks, elem.Member)
-		if withScore {
-			bulks = append(bulks, elem.Score)
-		}
-	}
-	reply = MultiBulksReply(bulks)
-	return
+	return server.rangeByIndex(cmd, false)
 }
 
 // ZREVRANGE key start stop [WITHSCORES]
 // Return a range of members in a sorted set, by index, with scores ordered from high to low
 func (server *GoRedisServer) OnZREVRANGE(cmd *Command) (reply *Reply) {
+	return server.rangeByIndex(cmd, true)
+}
+
+func (server *GoRedisServer) rangeByScore(cmd *Command, high2low bool) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	start, e1 := cmd.IntAtIndex(2)
-	stop, e2 := cmd.IntAtIndex(3)
+	min, e1 := cmd.Int64AtIndex(2)
+	max, e2 := cmd.Int64AtIndex(3)
 	if e1 != nil || e2 != nil {
-		return ErrorReply("Bad start/stop")
+		return ErrorReply("Bad min/max")
 	}
 	// 输出score
 	withScore := false
 	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
 		withScore = true
 	}
-	zset := server.keyManager.zsetByKey(key)
-	// bulks
-	bulks := make([]interface{}, 0, 10) // TODO 优化内存分配
-	high2low := true
-	elems := zset.RangeByIndex(high2low, start, stop)
-	for _, elem := range elems {
-		bulks = append(bulks, elem.Member)
+	zset := server.levelRedis.GetSortedSet(key)
+	scoreMembers := zset.RangeByScore(high2low, util.Int64ToBytes(min), util.Int64ToBytes(max), 0, -1)
+	count := len(scoreMembers)
+	bulks := make([]interface{}, 0, count)
+	for i := 0; i < count; i += 2 {
+		bulks = append(bulks, scoreMembers[i+1])
 		if withScore {
-			bulks = append(bulks, elem.Score)
+			scoreInt := util.BytesToInt64(scoreMembers[i])
+			bulks = append(bulks, []byte(strconv.FormatInt(scoreInt, 10)))
 		}
 	}
 	reply = MultiBulksReply(bulks)
@@ -97,59 +112,13 @@ func (server *GoRedisServer) OnZREVRANGE(cmd *Command) (reply *Reply) {
 // ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
 // Return a range of members in a sorted set, by score
 func (server *GoRedisServer) OnZRANGEBYSCORE(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
-	min, e1 := cmd.ArgAtIndex(2)
-	max, e2 := cmd.ArgAtIndex(3)
-	if e1 != nil || e2 != nil {
-		return ErrorReply("Bad min/max")
-	}
-	// 输出score
-	withScore := false
-	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
-		withScore = true
-	}
-	zset := server.keyManager.zsetByKey(key)
-	// bulks
-	bulks := make([]interface{}, 0, 10) // TODO 优化内存分配
-	high2low := false
-	elems := zset.RangeByScore(high2low, min, max, 0, -1)
-	for _, elem := range elems {
-		bulks = append(bulks, elem.Member)
-		if withScore {
-			bulks = append(bulks, elem.Score)
-		}
-	}
-	reply = MultiBulksReply(bulks)
-	return
+	return server.rangeByScore(cmd, false)
 }
 
 // ZREVRANGEBYSCORE key max min [WITHSCORES] [LIMIT offset count]
 // Return a range of members in a sorted set, by score, with scores ordered from high to low
 func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
-	min, e1 := cmd.ArgAtIndex(2)
-	max, e2 := cmd.ArgAtIndex(3)
-	if e1 != nil || e2 != nil {
-		return ErrorReply("Bad min/max")
-	}
-	// 输出score
-	withScore := false
-	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
-		withScore = true
-	}
-	zset := server.keyManager.zsetByKey(key)
-	// bulks
-	bulks := make([]interface{}, 0, 10) // TODO 优化内存分配
-	high2low := true
-	elems := zset.RangeByScore(high2low, min, max, 0, -1)
-	for _, elem := range elems {
-		bulks = append(bulks, elem.Member)
-		if withScore {
-			bulks = append(bulks, elem.Score)
-		}
-	}
-	reply = MultiBulksReply(bulks)
-	return
+	return server.rangeByScore(cmd, true)
 }
 
 // ZREM key member [member ...]
@@ -157,7 +126,7 @@ func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnZREM(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	members := cmd.Args[2:]
-	zset := server.keyManager.zsetByKey(key)
+	zset := server.levelRedis.GetSortedSet(key)
 	n := zset.Remove(members...)
 	reply = IntegerReply(n)
 	return
@@ -172,7 +141,7 @@ func (server *GoRedisServer) OnZREMRANGEBYRANK(cmd *Command) (reply *Reply) {
 	if e1 != nil || e2 != nil {
 		return ErrorReply("Bad start/stop")
 	}
-	zset := server.keyManager.zsetByKey(key)
+	zset := server.levelRedis.GetSortedSet(key)
 	n := zset.RemoveByIndex(start, stop)
 	reply = IntegerReply(n)
 	return
@@ -182,27 +151,28 @@ func (server *GoRedisServer) OnZREMRANGEBYRANK(cmd *Command) (reply *Reply) {
 // Remove all members in a sorted set within the given scores
 func (server *GoRedisServer) OnZREMRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	min, e1 := cmd.ArgAtIndex(2)
-	max, e2 := cmd.ArgAtIndex(3)
+	min, e1 := cmd.Int64AtIndex(2)
+	max, e2 := cmd.Int64AtIndex(3)
 	if e1 != nil || e2 != nil {
 		return ErrorReply("Bad min/max")
 	}
-	zset := server.keyManager.zsetByKey(key)
-	n := zset.RemoveByScore(min, max)
+	zset := server.levelRedis.GetSortedSet(key)
+	n := zset.RemoveByScore(util.Int64ToBytes(min), util.Int64ToBytes(max))
 	reply = IntegerReply(n)
 	return
 }
 
 func (server *GoRedisServer) OnZINCRBY(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	incrmemt, e1 := cmd.ArgAtIndex(2)
+	incrmemt, e1 := cmd.Int64AtIndex(2)
 	member, e2 := cmd.ArgAtIndex(3)
 	if e1 != nil || e2 != nil {
 		return ErrorReply("Bad incrment/member")
 	}
-	zset := server.keyManager.zsetByKey(key)
-	score := zset.IncrBy(incrmemt, member)
-	reply = BulkReply(score)
+	zset := server.levelRedis.GetSortedSet(key)
+	score := zset.IncrBy(member, incrmemt)
+	scoreInt := util.BytesToInt64(score)
+	reply = BulkReply(strconv.FormatInt(scoreInt, 10))
 	return
 }
 
@@ -211,11 +181,12 @@ func (server *GoRedisServer) OnZINCRBY(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnZSCORE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	member, _ := cmd.ArgAtIndex(2)
-	zset := server.keyManager.zsetByKey(key)
+	zset := server.levelRedis.GetSortedSet(key)
 	score := zset.Score(member)
 	if score == nil {
 		return BulkReply(nil)
 	}
-	reply = BulkReply(score)
+	scoreInt := util.BytesToInt64(score)
+	reply = BulkReply(strconv.FormatInt(scoreInt, 10))
 	return
 }

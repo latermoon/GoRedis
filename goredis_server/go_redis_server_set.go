@@ -9,7 +9,7 @@ import (
 func (server *GoRedisServer) OnSADD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	members := cmd.Args[2:]
-	hash := server.keyManager.setByKey(key)
+	hash := server.levelRedis.GetSet(key)
 	n := 0
 	for _, member := range members {
 		n += hash.Set(member, []byte("true"))
@@ -19,7 +19,7 @@ func (server *GoRedisServer) OnSADD(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnSCARD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	hash := server.keyManager.setByKey(key)
+	hash := server.levelRedis.GetSet(key)
 	n := hash.Count()
 	return IntegerReply(n)
 }
@@ -27,7 +27,7 @@ func (server *GoRedisServer) OnSCARD(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnSISMEMBER(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	member, _ := cmd.ArgAtIndex(2)
-	hash := server.keyManager.setByKey(key)
+	hash := server.levelRedis.GetSet(key)
 	if hash.Exist(member) {
 		reply = IntegerReply(1)
 	} else {
@@ -38,7 +38,7 @@ func (server *GoRedisServer) OnSISMEMBER(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnSMEMBERS(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	hash := server.keyManager.setByKey(key)
+	hash := server.levelRedis.GetSet(key)
 	elems := hash.GetAll(1000)
 	keys := make([]interface{}, 0, len(elems))
 	for _, elem := range elems {
@@ -51,7 +51,7 @@ func (server *GoRedisServer) OnSMEMBERS(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnSREM(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	members := cmd.Args[2:]
-	hash := server.keyManager.setByKey(key)
+	hash := server.levelRedis.GetSet(key)
 	n := hash.Remove(members...)
 	return IntegerReply(n)
 }

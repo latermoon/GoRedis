@@ -7,7 +7,7 @@ import (
 func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	vals := cmd.Args[2:]
-	lst := server.keyManager.listByKey(key)
+	lst := server.levelRedis.GetList(key)
 	err := lst.LPush(vals...)
 	if err != nil {
 		return ErrorReply(err)
@@ -19,7 +19,7 @@ func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	vals := cmd.Args[2:]
-	lst := server.keyManager.listByKey(key)
+	lst := server.levelRedis.GetList(key)
 	err := lst.RPush(vals...)
 	if err != nil {
 		return ErrorReply(err)
@@ -30,7 +30,7 @@ func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	lst := server.keyManager.listByKey(key)
+	lst := server.levelRedis.GetList(key)
 	if lst == nil {
 		return BulkReply(nil)
 	}
@@ -48,7 +48,7 @@ func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	lst := server.keyManager.listByKey(key)
+	lst := server.levelRedis.GetList(key)
 	if lst == nil {
 		return BulkReply(nil)
 	}
@@ -66,7 +66,7 @@ func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	lst := server.keyManager.listByKey(key)
+	lst := server.levelRedis.GetList(key)
 	if lst == nil {
 		return BulkReply(nil)
 	}
@@ -86,7 +86,7 @@ func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLTRIM(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	lst := server.keyManager.listByKey(key)
+	lst := server.levelRedis.GetList(key)
 	start, e1 := cmd.IntAtIndex(2)
 	end, e2 := cmd.IntAtIndex(3)
 	if e1 != nil || e2 != nil {
@@ -103,7 +103,7 @@ func (server *GoRedisServer) OnLTRIM(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	lst := server.keyManager.listByKey(key)
+	lst := server.levelRedis.GetList(key)
 	start, e1 := cmd.IntAtIndex(2)
 	end, e2 := cmd.IntAtIndex(3)
 	if e1 != nil || e2 != nil {
@@ -134,7 +134,7 @@ func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLLEN(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	lst := server.keyManager.listByKey(key)
+	lst := server.levelRedis.GetList(key)
 	if lst == nil {
 		return IntegerReply(0)
 	}

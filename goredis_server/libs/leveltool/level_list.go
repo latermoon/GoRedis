@@ -21,7 +21,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"strconv"
-	"strings"
 	"sync"
 )
 
@@ -74,7 +73,7 @@ func (l *LevelList) initInfo() {
 
 // __key:[entry key]:list =
 func (l *LevelList) infoKey() []byte {
-	return []byte(strings.Join([]string{KEY_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, LIST_SUFFIX}, ""))
+	return joinStringBytes(KEY_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, LIST_SUFFIX)
 }
 
 func (l *LevelList) infoValue() []byte {
@@ -84,13 +83,13 @@ func (l *LevelList) infoValue() []byte {
 }
 
 func (l *LevelList) keyPrefix() []byte {
-	return []byte(strings.Join([]string{LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT}, ""))
+	return joinStringBytes(LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT)
 }
 
 // __list:[key]:idx:1005 = hello
 func (l *LevelList) idxKey(idx int64) []byte {
 	idxStr := strconv.FormatInt(idx, 10)
-	return []byte(strings.Join([]string{LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "idx", ":", idxStr}, ""))
+	return joinStringBytes(LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "idx", ":", idxStr)
 }
 
 func (l *LevelList) LPush(values ...[]byte) (err error) {

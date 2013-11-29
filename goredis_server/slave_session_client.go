@@ -27,7 +27,7 @@ func NewSlaveSessionClient(server *GoRedisServer, session *Session) (s *SlaveSes
 	s = &SlaveSessionClient{}
 	s.server = server
 	s.session = session
-	s.taskqueue = qp.NewQueueProcess(20, s.queueHandler)
+	s.taskqueue = qp.NewQueueProcess(100, s.queueHandler)
 	return
 }
 
@@ -96,20 +96,20 @@ func (s *SlaveSessionClient) queueHandler(t qp.Task) {
 		switch kv.EntryType {
 		case EntryTypeString:
 			s.server.syncCounters.Get("string").Incr(1)
-			s.server.keyManager.levelString().Set(kv.Key.([]byte), kv.Value.([]byte))
+			s.server.levelRedis.Strings().Set(kv.Key.([]byte), kv.Value.([]byte))
 		case EntryTypeHash:
 			s.server.syncCounters.Get("hash").Incr(1)
-			s.server.keyManager.hashByKey(entryKey).Set(kv.Value.([][]byte)...)
+			s.server.levelRedis.GetHash(entryKey).Set(kv.Value.([][]byte)...)
 		case EntryTypeList:
 			s.server.syncCounters.Get("list").Incr(1)
-			s.server.keyManager.listByKey(entryKey).RPush(kv.Value.([][]byte)...)
+			s.server.levelRedis.GetList(entryKey).RPush(kv.Value.([][]byte)...)
 		case EntryTypeSet:
 			s.server.syncCounters.Get("set").Incr(1)
-			s.server.keyManager.setByKey(entryKey).Set(kv.Value.([][]byte)...)
+			s.server.levelRedis.GetSet(entryKey).Set(kv.Value.([][]byte)...)
 		case EntryTypeSortedSet:
 			s.server.syncCounters.Get("zset").Incr(1)
-			zset := s.server.keyManager.zsetByKey(entryKey)
-			zset.Add2(kv.Value.([][]byte)...)
+			zset := s.server.levelRedis.GetSortedSet(entryKey)
+			zset.Add(kv.Value.([][]byte)...)
 		default:
 			s.server.stdlog.Warn("[%s] bad entry type", s.session.RemoteAddr())
 		}
