@@ -27,7 +27,7 @@ func NewSlaveSessionClient(server *GoRedisServer, session *Session) (s *SlaveSes
 	s = &SlaveSessionClient{}
 	s.server = server
 	s.session = session
-	s.taskqueue = qp.NewQueueProcess(20, s.queueHandler)
+	s.taskqueue = qp.NewQueueProcess(100, s.queueHandler)
 	return
 }
 

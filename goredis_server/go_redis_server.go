@@ -9,6 +9,7 @@ import (
 	"container/list"
 	"errors"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/cache"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"strings"
 	"sync"
@@ -78,8 +79,11 @@ func (server *GoRedisServer) Init() (err error) {
 	server.stdlog.Info("server init ...")
 	// leveldb
 	options := opt.Options{
+		Compression:  opt.NoCompression,
 		MaxOpenFiles: 100000,
-		WriteBuffer:  256 << 20,
+		BlockCache:   cache.NewLRUCache(32 * opt.KiB),
+		BlockSize:    32 * opt.KiB,
+		WriteBuffer:  64 << 20,
 	}
 	server.db, err = leveldb.OpenFile(server.directory+"/db0", &options)
 	if err != nil {
