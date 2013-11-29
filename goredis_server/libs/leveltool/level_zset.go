@@ -37,6 +37,10 @@ func NewLevelZSet(redis *LevelRedis, key string) (l *LevelZSet) {
 	return
 }
 
+func (l *LevelZSet) Size() int {
+	return 0
+}
+
 func (l *LevelZSet) initOnce() {
 	if l.totalCount == -1 {
 		data, _ := l.redis.db.Get(l.zsetKey(), l.redis.ro)
@@ -258,4 +262,23 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 func (l *LevelZSet) Len() (n int) {
 	l.initOnce()
 	return l.totalCount
+}
+
+func (l *LevelZSet) Drop() (ok bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.totalCount == 0 {
+		return true
+	}
+	batch := new(leveldb.Batch)
+	min := joinStringBytes(KEY_PREFIX, SEP_LEFT, l.key, SEP_RIGHT)
+	max := append(min, 254)
+	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+		batch.Delete(key)
+	})
+	batch.Delete(l.zsetKey())
+	l.redis.db.Write(batch, l.redis.wo)
+	l.totalCount = 0
+	ok = true
+	return
 }

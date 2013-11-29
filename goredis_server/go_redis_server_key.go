@@ -31,27 +31,17 @@ func (server *GoRedisServer) OnKEYSEARCH(cmd *Command) (reply *Reply) {
 		withtype = cmd.StringAtIndex(3) == "withtype"
 	}
 	// search
-	bulks := server.keyManager.levelKey().Search(seekkey, "next", count, withtype, false)
+	bulks := make([]interface{}, 0, 10)
+	server.levelRedis.Keys(seekkey, func(i int, key, keytype []byte, quit *bool) {
+		bulks = append(bulks, key)
+		if withtype {
+			bulks = append(bulks, keytype)
+		}
+		if i >= count-1 {
+			*quit = true
+		}
+	})
 	return MultiBulksReply(bulks)
-}
-
-func (server *GoRedisServer) OnKEYSEARCH_DEL(cmd *Command) (reply *Reply) {
-	seekkey, err := cmd.ArgAtIndex(1)
-	if err != nil {
-		return ErrorReply(err)
-	}
-	n := 0
-	for {
-		keys := server.keyManager.levelKey().Search(seekkey, "next", 1000, false, false)
-		if len(keys) == 0 {
-			break
-		}
-		for _, key := range keys {
-			n += server.keyManager.Delete(key.([]byte))
-		}
-	}
-	reply = IntegerReply(n)
-	return
 }
 
 // 扫描内部key
@@ -75,19 +65,28 @@ func (server *GoRedisServer) OnGOKEYSEARCH(cmd *Command) (reply *Reply) {
 		withtype = cmd.StringAtIndex(3) == "withtype"
 	}
 	// search
-	bulks := server.keyManager.levelKey().Search(seekkey, "next", count, withtype, true)
+	bulks := make([]interface{}, 0, 10)
+	server.levelRedis.Keys(seekkey, func(i int, key, keytype []byte, quit *bool) {
+		bulks = append(bulks, key)
+		if withtype {
+			bulks = append(bulks, keytype)
+		}
+		if i >= count-1 {
+			*quit = true
+		}
+	})
 	return MultiBulksReply(bulks)
 }
 
 // 获取原始内容
 func (server *GoRedisServer) OnCAT(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	value := server.keyManager.levelKey().GetInnerValue(key)
-	if value == nil {
-		reply = BulkReply(nil)
-	} else {
-		reply = BulkReply(value)
-	}
+	// key, _ := cmd.ArgAtIndex(1)
+	// value := server.keyManager.levelKey().GetInnerValue(key)
+	// if value == nil {
+	// 	reply = BulkReply(nil)
+	// } else {
+	// 	reply = BulkReply(value)
+	// }
 	return
 }
 
@@ -103,14 +102,14 @@ func (server *GoRedisServer) OnEXPIRE(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
 	keys := cmd.Args[1:]
-	n := server.keyManager.Delete(keys...)
+	n := server.levelRedis.Delete(keys...)
 	reply = IntegerReply(n)
 	return
 }
 
 func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
-	t := server.keyManager.levelKey().TypeOf(key)
+	t := server.levelRedis.TypeOf(key)
 	if len(t) > 0 {
 		reply = StatusReply(t)
 	} else {

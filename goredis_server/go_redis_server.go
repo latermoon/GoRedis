@@ -32,7 +32,6 @@ type GoRedisServer struct {
 	directory  string
 	db         *leveldb.DB
 	levelRedis *leveltool.LevelRedis
-	keyManager *KeyManager
 	config     *leveltool.LevelConfig
 	// counters
 	cmdCounters     *monitor.Counters
@@ -87,7 +86,6 @@ func (server *GoRedisServer) Init() (err error) {
 		panic(err)
 	}
 	server.levelRedis = leveltool.NewLevelRedis(server.db)
-	server.keyManager = NewKeyManager(server, 1000)
 	server.config = leveltool.NewLevelConfig(server.db, goredisPrefix+"config:")
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
