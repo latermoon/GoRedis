@@ -8,7 +8,7 @@ import (
 // 线程安全的List，提供满足Redis List的函数
 type SafeList struct {
 	innerList *list.List
-	mutex     sync.Mutex
+	mu        sync.Mutex
 }
 
 func NewSafeList() (sl *SafeList) {
@@ -26,8 +26,8 @@ func (sl *SafeList) Back() (elem *list.Element) {
 }
 
 func (sl *SafeList) LPop() (value interface{}) {
-	sl.mutex.Lock()
-	defer sl.mutex.Unlock()
+	sl.mu.Lock()
+	defer sl.mu.Unlock()
 	elem := sl.innerList.Front()
 	if elem != nil {
 		value = elem.Value
@@ -37,8 +37,8 @@ func (sl *SafeList) LPop() (value interface{}) {
 }
 
 func (sl *SafeList) RPop() (value interface{}) {
-	sl.mutex.Lock()
-	defer sl.mutex.Unlock()
+	sl.mu.Lock()
+	defer sl.mu.Unlock()
 	elem := sl.innerList.Back()
 	if elem != nil {
 		value = elem.Value
@@ -48,8 +48,8 @@ func (sl *SafeList) RPop() (value interface{}) {
 }
 
 func (sl *SafeList) LPush(values ...interface{}) (length int) {
-	sl.mutex.Lock()
-	defer sl.mutex.Unlock()
+	sl.mu.Lock()
+	defer sl.mu.Unlock()
 	for _, value := range values {
 		sl.innerList.PushFront(value)
 	}
@@ -58,8 +58,8 @@ func (sl *SafeList) LPush(values ...interface{}) (length int) {
 }
 
 func (sl *SafeList) RPush(values ...interface{}) (length int) {
-	sl.mutex.Lock()
-	defer sl.mutex.Unlock()
+	sl.mu.Lock()
+	defer sl.mu.Unlock()
 	for _, value := range values {
 		sl.innerList.PushBack(value)
 	}
@@ -68,16 +68,16 @@ func (sl *SafeList) RPush(values ...interface{}) (length int) {
 }
 
 func (sl *SafeList) Len() (length int) {
-	sl.mutex.Lock()
-	defer sl.mutex.Unlock()
+	sl.mu.Lock()
+	defer sl.mu.Unlock()
 	length = sl.innerList.Len()
 	return
 }
 
 // 通过枚举实现，列表数据较大时性能不佳，并且lock住其它操作
 func (sl *SafeList) Index(index int) (value interface{}) {
-	sl.mutex.Lock()
-	defer sl.mutex.Unlock()
+	sl.mu.Lock()
+	defer sl.mu.Unlock()
 	i := 0
 	for e := sl.innerList.Front(); e != nil; e = e.Next() {
 		if i == index {
@@ -91,8 +91,8 @@ func (sl *SafeList) Index(index int) (value interface{}) {
 
 // 通过枚举实现，列表数据较大时性能不佳，并且lock住其它操作
 func (sl *SafeList) Range(start int, end int) (values []interface{}) {
-	sl.mutex.Lock()
-	defer sl.mutex.Unlock()
+	sl.mu.Lock()
+	defer sl.mu.Unlock()
 	length := sl.innerList.Len()
 	if start >= length || end < start {
 		values = make([]interface{}, 0)

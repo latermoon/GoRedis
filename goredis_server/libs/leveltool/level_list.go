@@ -93,41 +93,43 @@ func (l *LevelList) idxKey(idx int64) []byte {
 	return []byte(strings.Join([]string{LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "idx", ":", idxStr}, ""))
 }
 
-func (l *LevelList) LPush(value []byte) (e *Element, err error) {
+func (l *LevelList) LPush(values ...[]byte) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	// 左游标
-	l.start--
+	oldstart := l.start
 	batch := new(leveldb.Batch)
-	batch.Put(l.idxKey(l.start), value)
+	for _, value := range values {
+		l.start--
+		batch.Put(l.idxKey(l.start), value)
+	}
 	batch.Put(l.infoKey(), l.infoValue())
 	err = l.db.Write(batch, l.wo)
 	if err != nil {
 		// 回退
-		l.start++
+		l.start = oldstart
 	}
-	e = &Element{}
-	e.Value = value
 	return
 }
 
-func (l *LevelList) RPush(value []byte) (e *Element, err error) {
+func (l *LevelList) RPush(values ...[]byte) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// 添加数据并更新右游标
-	l.end++
+	// 右游标
+	oldend := l.end
 	batch := new(leveldb.Batch)
-	batch.Put(l.idxKey(l.end), value)
+	for _, value := range values {
+		l.end++
+		batch.Put(l.idxKey(l.end), value)
+	}
 	batch.Put(l.infoKey(), l.infoValue())
 	err = l.db.Write(batch, l.wo)
 	if err != nil {
 		// 回退
-		l.end--
+		l.end = oldend
 	}
-	e = &Element{}
-	e.Value = value
 	return
 }
 
