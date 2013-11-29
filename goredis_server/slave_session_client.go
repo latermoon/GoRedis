@@ -2,12 +2,10 @@ package goredis_server
 
 import (
 	. "../goredis"
+	qp "./libs/queueprocess"
 	"./libs/rdb"
-	"./libs/safelist"
 	"runtime"
-	// "strconv"
 	"strings"
-	"time"
 )
 
 type keyValuePair struct {
@@ -20,15 +18,15 @@ type keyValuePair struct {
 type SlaveSessionClient struct {
 	session           *Session
 	server            *GoRedisServer
-	taskqueue         *safelist.SafeList // 队列存储
-	shouldStopRunloop bool               // 跳出runloop指令
+	taskqueue         *qp.QueueProcess // 队列处理
+	shouldStopRunloop bool             // 跳出runloop指令
 }
 
 func NewSlaveSessionClient(server *GoRedisServer, session *Session) (s *SlaveSessionClient) {
 	s = &SlaveSessionClient{}
 	s.server = server
 	s.session = session
-	s.taskqueue = safelist.NewSafeList()
+	s.taskqueue = qp.NewQueueProcess(10, s.queueHandler)
 	return
 }
 
@@ -57,7 +55,6 @@ func (s *SlaveSessionClient) Start() {
 		return
 	}
 	// 异步入库
-	go s.processRunloop()
 	// 阻塞处理，直到出错
 	err := s.startSync()
 	if err != nil {
@@ -67,72 +64,56 @@ func (s *SlaveSessionClient) Start() {
 	s.shouldStopRunloop = true
 }
 
-func (s *SlaveSessionClient) processRunloop() {
-	var sleepCount uint
-	sleepCount = 0
-	for {
-		if s.shouldStopRunloop {
-			s.server.stdlog.Info("[%s] slaveof stop runloop", s.session.RemoteAddr())
-			break
+func (s *SlaveSessionClient) queueHandler(t qp.Task) {
+	if s.shouldStopRunloop {
+		s.taskqueue.Stop()
+		s.server.stdlog.Info("[%s] slaveof stop runloop", s.session.RemoteAddr())
+		return
+	}
+	obj := t
+	// Process
+	s.server.syncCounters.Get("buffer").SetCount(s.taskqueue.Len())
+	// s.server.stdlog.Debug("[%s] slaveof process %s", s.session.RemoteAddr(), obj)
+	switch obj.(type) {
+	case *Command:
+		// 这些sync回来的command，全部是更新操作，不需要返回reply
+		cmd := obj.(*Command)
+		_ = s.server.InvokeCommandHandler(s.session, cmd)
+		s.server.syncCounters.Get("total").Incr(1)
+		cmdName := strings.ToUpper(cmd.Name())
+		cate := GetCommandCategory(cmdName)
+		// incr counter
+		s.server.syncCounters.Get(string(cate)).Incr(1)
+		switch cmdName {
+		case "PING":
+			s.server.syncCounters.Get("ping").Incr(1)
 		}
-		// POP
-		obj := s.taskqueue.LPop()
-		if obj == nil {
-			sleepCount++
-			if sleepCount >= 100 || sleepCount <= 0 {
-				s.server.stdlog.Info("[%s] slaveof still waiting for data ", s.session.RemoteAddr())
-				sleepCount = 1
-			}
-			sleepTime := time.Millisecond * time.Duration(10*sleepCount)
-			time.Sleep(sleepTime)
-			continue
-		} else {
-			sleepCount = 0
-		}
-		// Process
-		s.server.syncCounters.Get("buffer").SetCount(s.taskqueue.Len())
-		// s.server.stdlog.Debug("[%s] slaveof process %s", s.session.RemoteAddr(), obj)
-		switch obj.(type) {
-		case *Command:
-			// 这些sync回来的command，全部是更新操作，不需要返回reply
-			cmd := obj.(*Command)
-			_ = s.server.InvokeCommandHandler(s.session, cmd)
-			s.server.syncCounters.Get("total").Incr(1)
-			cmdName := strings.ToUpper(cmd.Name())
-			cate := GetCommandCategory(cmdName)
-			// incr counter
-			s.server.syncCounters.Get(string(cate)).Incr(1)
-			switch cmdName {
-			case "PING":
-				s.server.syncCounters.Get("ping").Incr(1)
-			}
-		case *keyValuePair:
-			kv := obj.(*keyValuePair)
-			entryKey := string(kv.Key.([]byte))
-			s.server.syncCounters.Get("total").Incr(1)
-			switch kv.EntryType {
-			case EntryTypeString:
-				s.server.syncCounters.Get("string").Incr(1)
-				s.server.keyManager.levelString().Set(kv.Key.([]byte), kv.Value.([]byte))
-			case EntryTypeHash:
-				s.server.syncCounters.Get("hash").Incr(1)
-				s.server.keyManager.hashByKey(entryKey).Set(kv.Value.([][]byte)...)
-			case EntryTypeList:
-				s.server.syncCounters.Get("list").Incr(1)
-				s.server.keyManager.listByKey(entryKey).RPush(kv.Value.([][]byte)...)
-			case EntryTypeSet:
-				s.server.syncCounters.Get("set").Incr(1)
-				s.server.keyManager.setByKey(entryKey).Set(kv.Value.([][]byte)...)
-			case EntryTypeSortedSet:
-				s.server.syncCounters.Get("zset").Incr(1)
-				zset := s.server.keyManager.zsetByKey(entryKey)
-				zset.Add2(kv.Value.([][]byte)...)
-			default:
-				s.server.stdlog.Warn("[%s] bad entry type", s.session.RemoteAddr())
-			}
+	case *keyValuePair:
+		kv := obj.(*keyValuePair)
+		entryKey := string(kv.Key.([]byte))
+		s.server.syncCounters.Get("total").Incr(1)
+		switch kv.EntryType {
+		case EntryTypeString:
+			s.server.syncCounters.Get("string").Incr(1)
+			s.server.keyManager.levelString().Set(kv.Key.([]byte), kv.Value.([]byte))
+		case EntryTypeHash:
+			s.server.syncCounters.Get("hash").Incr(1)
+			s.server.keyManager.hashByKey(entryKey).Set(kv.Value.([][]byte)...)
+		case EntryTypeList:
+			s.server.syncCounters.Get("list").Incr(1)
+			s.server.keyManager.listByKey(entryKey).RPush(kv.Value.([][]byte)...)
+		case EntryTypeSet:
+			s.server.syncCounters.Get("set").Incr(1)
+			s.server.keyManager.setByKey(entryKey).Set(kv.Value.([][]byte)...)
+		case EntryTypeSortedSet:
+			s.server.syncCounters.Get("zset").Incr(1)
+			zset := s.server.keyManager.zsetByKey(entryKey)
+			zset.Add2(kv.Value.([][]byte)...)
 		default:
-			s.server.stdlog.Warn("[%s] bad queue obj", s.session.RemoteAddr())
+			s.server.stdlog.Warn("[%s] bad entry type", s.session.RemoteAddr())
 		}
+	default:
+		s.server.stdlog.Warn("[%s] bad queue obj", s.session.RemoteAddr())
 	}
 }
 
@@ -169,7 +150,11 @@ func (s *SlaveSessionClient) startSync() (err error) {
 		if c == '*' {
 			if cmd, e2 := s.session.ReadCommand(); e2 == nil {
 				// PUSH
-				s.taskqueue.RPush(cmd)
+				hash := 0
+				if len(cmd.Args) > 1 {
+					hash = qp.StringCharSum(cmd.StringAtIndex(1))
+				}
+				s.taskqueue.Process(hash, cmd)
 			} else {
 				s.server.stdlog.Error("sync error %s", e2)
 				err = e2
