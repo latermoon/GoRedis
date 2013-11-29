@@ -8,3 +8,11 @@ func StringCharSum(s string) (n int) {
 	}
 	return
 }
+
+func BytesCharSum(bs []byte) (n int) {
+	count := len(bs)
+	for i := 0; i < count; i++ {
+		n += int(bs[i])
+	}
+	return
+}
