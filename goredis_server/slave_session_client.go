@@ -119,9 +119,7 @@ func (s *SlaveSessionClient) processRunloop() {
 				s.server.keyManager.hashByKey(entryKey).Set(kv.Value.([][]byte)...)
 			case EntryTypeList:
 				s.server.syncCounters.Get("list").Incr(1)
-				for _, b := range kv.Value.([][]byte) {
-					s.server.keyManager.listByKey(entryKey).RPush(b)
-				}
+				s.server.keyManager.listByKey(entryKey).RPush(kv.Value.([][]byte)...)
 			case EntryTypeSet:
 				s.server.syncCounters.Get("set").Incr(1)
 				s.server.keyManager.setByKey(entryKey).Set(kv.Value.([][]byte)...)
@@ -310,6 +308,6 @@ func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
 
 // ZSet
 func (p *rdbDecoder) EndZSet(key []byte) {
-	kv := &keyValuePair{Key: key, Value: p.zsetEntry, EntryType: EntryTypeSortedSet}
-	p.slaveClient.taskqueue.RPush(kv)
+	// kv := &keyValuePair{Key: key, Value: p.zsetEntry, EntryType: EntryTypeSortedSet}
+	// p.slaveClient.taskqueue.RPush(kv)
 }

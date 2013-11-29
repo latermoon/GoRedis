@@ -457,6 +457,9 @@ func (l *LevelSortedSet) Count() (n int) {
 func (l *LevelSortedSet) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.totalCount == 0 {
+		return true
+	}
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Release()
 	batch := new(leveldb.Batch)

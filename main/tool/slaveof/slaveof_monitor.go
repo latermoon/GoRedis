@@ -104,12 +104,12 @@ func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
 func (p *rdbDecoder) Hset(key, field, value []byte) {
 	p.hashEntry = append(p.hashEntry, field)
 	p.hashEntry = append(p.hashEntry, value)
-	fmt.Printf("[hash] hset %q %q %q\n", key, field, value)
+	// fmt.Printf("[hash] hset %q %q %q\n", key, field, value)
 }
 
 // Hash
 func (p *rdbDecoder) EndHash(key []byte) {
-
+	fmt.Printf("[hash] %q count:%d\n", key, len(p.hashEntry)/2)
 }
 
 func (p *rdbDecoder) StartSet(key []byte, cardinality, expiry int64) {
@@ -119,11 +119,12 @@ func (p *rdbDecoder) StartSet(key []byte, cardinality, expiry int64) {
 
 func (p *rdbDecoder) Sadd(key, member []byte) {
 	p.setEntry = append(p.setEntry)
-	fmt.Printf("[set] sadd %q %q", key, member)
+	// fmt.Printf("[set] sadd %q %q\n", key, member)
 }
 
 // Set
 func (p *rdbDecoder) EndSet(key []byte) {
+	fmt.Printf("[set] %q count:%d\n", key, len(p.setEntry))
 }
 
 func (p *rdbDecoder) StartList(key []byte, length, expiry int64) {
@@ -135,11 +136,12 @@ func (p *rdbDecoder) StartList(key []byte, length, expiry int64) {
 func (p *rdbDecoder) Rpush(key, value []byte) {
 	p.listEntry = append(p.listEntry, value)
 	p.i++
-	fmt.Printf("[list] rpush %q %q", key, value)
+	// fmt.Printf("[list] rpush %q %q\n", key, value)
 }
 
 // List
 func (p *rdbDecoder) EndList(key []byte) {
+	fmt.Printf("[list] %q count:%d\n", key, len(p.listEntry))
 }
 
 func (p *rdbDecoder) StartZSet(key []byte, cardinality, expiry int64) {
@@ -152,9 +154,10 @@ func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
 	p.zsetEntry = append(p.zsetEntry, []byte(strconv.FormatInt(int64(score), 10)))
 	p.zsetEntry = append(p.zsetEntry, member)
 	p.i++
-	fmt.Printf("[zset] zadd %q %f %q", key, score, member)
+	// fmt.Printf("[zset] zadd %q %f %q\n", key, score, member)
 }
 
 // ZSet
 func (p *rdbDecoder) EndZSet(key []byte) {
+	fmt.Printf("[zset] %q count:%d\n", key, len(p.zsetEntry)/2)
 }

@@ -8,8 +8,9 @@ func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	vals := cmd.Args[2:]
 	lst := server.keyManager.listByKey(key)
-	for _, val := range vals {
-		lst.LPush(val)
+	err := lst.LPush(vals...)
+	if err != nil {
+		return ErrorReply(err)
 	}
 	length := int(lst.Len())
 	return IntegerReply(length)
@@ -19,8 +20,9 @@ func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	vals := cmd.Args[2:]
 	lst := server.keyManager.listByKey(key)
-	for _, val := range vals {
-		lst.RPush(val)
+	err := lst.RPush(vals...)
+	if err != nil {
+		return ErrorReply(err)
 	}
 	length := int(lst.Len())
 	return IntegerReply(length)
