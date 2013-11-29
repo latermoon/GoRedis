@@ -3,7 +3,16 @@ package leveltool
 import (
 	"bytes"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
+	"strings"
 )
+
+func joinStringBytes(s ...string) []byte {
+	return []byte(strings.Join(s, ""))
+}
+
+func joinBytes(b ...[]byte) []byte {
+	return bytes.Join(b, nil)
+}
 
 // 前缀扫描，设置*quit=true时退出枚举
 // @param direction 枚举方向，"prev"从大到小，默认值"next"表示从小到大

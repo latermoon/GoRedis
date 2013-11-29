@@ -8,7 +8,6 @@ __key:age:string = 27
 import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-	"strings"
 )
 
 type LevelString struct {
@@ -26,7 +25,7 @@ func NewLevelString(db *leveldb.DB) (l *LevelString) {
 }
 
 func (l *LevelString) stringKey(key []byte) []byte {
-	return []byte(strings.Join([]string{KEY_PREFIX, SEP_LEFT, string(key), SEP_RIGHT, STRING_SUFFIX}, ""))
+	return joinStringBytes(KEY_PREFIX, SEP_LEFT, string(key), SEP_RIGHT, STRING_SUFFIX)
 }
 
 func (l *LevelString) Get(key []byte) (value []byte) {
