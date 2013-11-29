@@ -16,7 +16,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "0.1.5"
+const VERSION = "0.1.6"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -81,9 +81,9 @@ func (server *GoRedisServer) Init() (err error) {
 	options := opt.Options{
 		Compression:  opt.NoCompression,
 		MaxOpenFiles: 100000,
-		BlockCache:   cache.NewLRUCache(32 * opt.KiB),
+		BlockCache:   cache.NewLRUCache(32 * opt.MiB),
 		BlockSize:    32 * opt.KiB,
-		WriteBuffer:  64 << 20,
+		WriteBuffer:  120 << 20,
 	}
 	server.db, err = leveldb.OpenFile(server.directory+"/db0", &options)
 	if err != nil {
