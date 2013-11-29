@@ -2,6 +2,7 @@ package leveltool
 
 import (
 	"bytes"
+	"encoding/binary"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"strings"
 )
@@ -12,6 +13,16 @@ func joinStringBytes(s ...string) []byte {
 
 func joinBytes(b ...[]byte) []byte {
 	return bytes.Join(b, nil)
+}
+
+func Int64ToBytes(i int64) []byte {
+	var buf = make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, uint64(i))
+	return buf
+}
+
+func BytesToInt64(buf []byte) int64 {
+	return int64(binary.BigEndian.Uint64(buf))
 }
 
 // 前缀扫描，设置*quit=true时退出枚举
