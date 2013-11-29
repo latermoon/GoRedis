@@ -5,7 +5,7 @@ import (
 	"./libs/rdb"
 	"./libs/safelist"
 	"runtime"
-	"strconv"
+	// "strconv"
 	"strings"
 	"time"
 )
@@ -234,7 +234,7 @@ func (p *rdbDecoder) EndDatabase(n int) {
 }
 
 func (p *rdbDecoder) EndRDB() {
-	p.server.stdlog.Info("[%s] call CG()")
+	p.server.stdlog.Info("[%s] call CG()", p.slaveClient.session.RemoteAddr())
 	runtime.GC()
 	p.server.stdlog.Info("[%s] rdb end, sync %d items", p.slaveClient.session.RemoteAddr(), p.keyCount)
 }
@@ -242,8 +242,8 @@ func (p *rdbDecoder) EndRDB() {
 // Set
 func (p *rdbDecoder) Set(key, value []byte, expiry int64) {
 	p.keyCount++
-	kv := &keyValuePair{Key: key, Value: value, EntryType: EntryTypeString}
-	p.slaveClient.taskqueue.RPush(kv)
+	// kv := &keyValuePair{Key: key, Value: value, EntryType: EntryTypeString}
+	// p.slaveClient.taskqueue.RPush(kv)
 }
 
 func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
@@ -252,14 +252,14 @@ func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
 }
 
 func (p *rdbDecoder) Hset(key, field, value []byte) {
-	p.hashEntry = append(p.hashEntry, field)
-	p.hashEntry = append(p.hashEntry, value)
+	// p.hashEntry = append(p.hashEntry, field)
+	// p.hashEntry = append(p.hashEntry, value)
 }
 
 // Hash
 func (p *rdbDecoder) EndHash(key []byte) {
-	kv := &keyValuePair{Key: key, Value: p.hashEntry, EntryType: EntryTypeHash}
-	p.slaveClient.taskqueue.RPush(kv)
+	// kv := &keyValuePair{Key: key, Value: p.hashEntry, EntryType: EntryTypeHash}
+	// p.slaveClient.taskqueue.RPush(kv)
 }
 
 func (p *rdbDecoder) StartSet(key []byte, cardinality, expiry int64) {
@@ -268,13 +268,13 @@ func (p *rdbDecoder) StartSet(key []byte, cardinality, expiry int64) {
 }
 
 func (p *rdbDecoder) Sadd(key, member []byte) {
-	p.setEntry = append(p.setEntry)
+	// p.setEntry = append(p.setEntry)
 }
 
 // Set
 func (p *rdbDecoder) EndSet(key []byte) {
-	kv := &keyValuePair{Key: key, Value: p.setEntry, EntryType: EntryTypeSet}
-	p.slaveClient.taskqueue.RPush(kv)
+	// kv := &keyValuePair{Key: key, Value: p.setEntry, EntryType: EntryTypeSet}
+	// p.slaveClient.taskqueue.RPush(kv)
 }
 
 func (p *rdbDecoder) StartList(key []byte, length, expiry int64) {
@@ -284,14 +284,14 @@ func (p *rdbDecoder) StartList(key []byte, length, expiry int64) {
 }
 
 func (p *rdbDecoder) Rpush(key, value []byte) {
-	p.listEntry = append(p.listEntry, value)
+	// p.listEntry = append(p.listEntry, value)
 	p.i++
 }
 
 // List
 func (p *rdbDecoder) EndList(key []byte) {
-	kv := &keyValuePair{Key: key, Value: p.listEntry, EntryType: EntryTypeList}
-	p.slaveClient.taskqueue.RPush(kv)
+	// kv := &keyValuePair{Key: key, Value: p.listEntry, EntryType: EntryTypeList}
+	// p.slaveClient.taskqueue.RPush(kv)
 }
 
 func (p *rdbDecoder) StartZSet(key []byte, cardinality, expiry int64) {
@@ -301,8 +301,8 @@ func (p *rdbDecoder) StartZSet(key []byte, cardinality, expiry int64) {
 }
 
 func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
-	p.zsetEntry = append(p.zsetEntry, []byte(strconv.FormatInt(int64(score), 10)))
-	p.zsetEntry = append(p.zsetEntry, member)
+	// p.zsetEntry = append(p.zsetEntry, []byte(strconv.FormatInt(int64(score), 10)))
+	// p.zsetEntry = append(p.zsetEntry, member)
 	p.i++
 }
 
