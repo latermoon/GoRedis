@@ -31,6 +31,7 @@ type GoRedisServer struct {
 	// 数据源
 	directory  string
 	db         *leveldb.DB
+	levelRedis *leveltool.LevelRedis
 	keyManager *KeyManager
 	config     *leveltool.LevelConfig
 	// counters
@@ -85,6 +86,7 @@ func (server *GoRedisServer) Init() (err error) {
 	if err != nil {
 		panic(err)
 	}
+	server.levelRedis = leveltool.NewLevelRedis(server.db)
 	server.keyManager = NewKeyManager(server, 1000)
 	server.config = leveltool.NewLevelConfig(server.db, goredisPrefix+"config:")
 	// monitor
