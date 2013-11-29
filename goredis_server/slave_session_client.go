@@ -303,7 +303,7 @@ func (p *rdbDecoder) StartZSet(key []byte, cardinality, expiry int64) {
 }
 
 func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
-	p.zsetEntry = append(p.zsetEntry, []byte(strconv.FormatInt(int64(score), 64)))
+	p.zsetEntry = append(p.zsetEntry, []byte(strconv.FormatInt(int64(score), 10)))
 	p.zsetEntry = append(p.zsetEntry, member)
 	p.i++
 }
