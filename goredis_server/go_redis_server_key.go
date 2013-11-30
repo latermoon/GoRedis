@@ -2,6 +2,7 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"./libs/leveltool"
 )
 
 // 在数据量大的情况下，keys基本不可用，使用keysearch来分段扫描全部key
@@ -45,7 +46,7 @@ func (server *GoRedisServer) OnKEYSEARCH(cmd *Command) (reply *Reply) {
 }
 
 // 扫描内部key
-func (server *GoRedisServer) OnGOKEYSEARCH(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnRAW_KEYSEARCH(cmd *Command) (reply *Reply) {
 	seekkey, err := cmd.ArgAtIndex(1)
 	if err != nil {
 		return ErrorReply(err)
@@ -60,17 +61,12 @@ func (server *GoRedisServer) OnGOKEYSEARCH(cmd *Command) (reply *Reply) {
 			return ErrorReply("count range: 1 < count < 10000")
 		}
 	}
-	withtype := false
-	if len(cmd.Args) > 3 {
-		withtype = cmd.StringAtIndex(3) == "withtype"
-	}
 	// search
 	bulks := make([]interface{}, 0, 10)
-	server.levelRedis.Keys(seekkey, func(i int, key, keytype []byte, quit *bool) {
+	min := seekkey
+	max := append(seekkey, 254)
+	server.levelRedis.Enumerate(min, max, leveltool.IteratorForward, func(i int, key, value []byte, quit *bool) {
 		bulks = append(bulks, key)
-		if withtype {
-			bulks = append(bulks, keytype)
-		}
 		if i >= count-1 {
 			*quit = true
 		}
@@ -79,14 +75,14 @@ func (server *GoRedisServer) OnGOKEYSEARCH(cmd *Command) (reply *Reply) {
 }
 
 // 获取原始内容
-func (server *GoRedisServer) OnCAT(cmd *Command) (reply *Reply) {
-	// key, _ := cmd.ArgAtIndex(1)
-	// value := server.keyManager.levelKey().GetInnerValue(key)
-	// if value == nil {
-	// 	reply = BulkReply(nil)
-	// } else {
-	// 	reply = BulkReply(value)
-	// }
+func (server *GoRedisServer) OnRAW_GET(cmd *Command) (reply *Reply) {
+	key, _ := cmd.ArgAtIndex(1)
+	value := server.levelRedis.RawGet(key)
+	if value == nil {
+		reply = BulkReply(nil)
+	} else {
+		reply = BulkReply(value)
+	}
 	return
 }
 
