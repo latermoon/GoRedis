@@ -61,6 +61,7 @@ const (
 	ZSET_PREFIX = "_z"
 )
 
+// 枚举方向
 type IteratorDirection int
 
 const (
@@ -75,7 +76,6 @@ type LevelRedis struct {
 	lruCache *lru.LRUCache // LRU缓存层
 	mu       sync.Mutex
 	lstring  *LevelString
-	lkey     *LevelKey
 }
 
 func NewLevelRedis(db *leveldb.DB) (l *LevelRedis) {
@@ -92,6 +92,13 @@ func (l *LevelRedis) Strings() (s *LevelString) {
 	return l.lstring
 }
 
+// 获取原始key的内容
+func (l *LevelRedis) RawGet(key []byte) (value []byte) {
+	value, _ = l.db.Get(key, l.ro)
+	return
+}
+
+// 使用LRUCache管理string以外的数据结构实例
 func (l *LevelRedis) objFromCache(key string, fn func() interface{}) (obj interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -176,12 +183,14 @@ func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
 			}
 		default:
 		}
-		// ensure remove from lrucache
-		l.lruCache.Delete(key)
+		if t != "string" {
+			l.lruCache.Delete(key)
+		}
 	}
 	return
 }
 
+// keys前缀扫描
 func (l *LevelRedis) Keys(prefix []byte, fn func(i int, key, keytype []byte, quit *bool)) {
 	min := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(prefix))
 	max := append(min, 254)
@@ -193,6 +202,7 @@ func (l *LevelRedis) Keys(prefix []byte, fn func(i int, key, keytype []byte, qui
 	})
 }
 
+// key范围枚举
 func (l *LevelRedis) Enumerate(min, max []byte, direction IteratorDirection, fn func(i int, key, value []byte, quit *bool)) {
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Release()
