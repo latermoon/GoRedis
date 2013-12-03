@@ -50,3 +50,7 @@ func (m *MapDocument) RichSet(input map[string]interface{}) (err error) {
 func (m *MapDocument) RichGet(fields ...string) (result map[string]interface{}) {
 	return
 }
+
+func (m *MapDocument) getField(field string) (ptr *interface{}) {
+	return
+}
