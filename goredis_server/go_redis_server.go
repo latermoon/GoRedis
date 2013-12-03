@@ -79,7 +79,6 @@ func (server *GoRedisServer) Init() (err error) {
 	server.stdlog.Info("server init ...")
 	// leveldb
 	options := opt.Options{
-		Compression:  opt.NoCompression,
 		MaxOpenFiles: 100000,
 		BlockCache:   cache.NewLRUCache(32 * opt.MiB),
 		BlockSize:    32 * opt.KiB,
