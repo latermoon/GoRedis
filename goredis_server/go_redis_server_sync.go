@@ -19,10 +19,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	slave := server.findSlaveById(uid)
 	if slave == nil {
 		server.stdlog.Info("[%s] new slave %s", uid, session.RemoteAddr())
-		snapshot, err := server.DB().GetSnapshot()
-		if err != nil {
-			return ErrorReply(err)
-		}
+		snapshot := server.levelRedis.DB().NewSnapshot()
 		slave = NewSlaveSession(server, session, uid)
 		server.slavelist.PushBack(slave)
 		go slave.SendSnapshot(snapshot)

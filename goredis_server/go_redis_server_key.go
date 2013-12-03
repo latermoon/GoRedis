@@ -2,7 +2,7 @@ package goredis_server
 
 import (
 	. "../goredis"
-	"./libs/leveltool"
+	"./libs/levelredis"
 )
 
 // 在数据量大的情况下，keys基本不可用，使用keysearch来分段扫描全部key
@@ -65,7 +65,7 @@ func (server *GoRedisServer) OnRAW_KEYSEARCH(cmd *Command) (reply *Reply) {
 	bulks := make([]interface{}, 0, 10)
 	min := seekkey
 	max := append(seekkey, 254)
-	server.levelRedis.Enumerate(min, max, leveltool.IteratorForward, func(i int, key, value []byte, quit *bool) {
+	server.levelRedis.Enumerate(min, max, levelredis.IteratorForward, func(i int, key, value []byte, quit *bool) {
 		bulks = append(bulks, key)
 		if i >= count-1 {
 			*quit = true

@@ -3,14 +3,12 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/golog"
-	"./libs/leveltool"
+	"./libs/levelredis"
 	"./libs/uuid"
 	"./monitor"
 	"container/list"
 	"errors"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/cache"
-	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/latermoon/levigo"
 	"strings"
 	"sync"
 )
@@ -31,9 +29,8 @@ type GoRedisServer struct {
 	RedisServer
 	// 数据源
 	directory  string
-	db         *leveldb.DB
-	levelRedis *leveltool.LevelRedis
-	config     *leveltool.LevelConfig
+	levelRedis *levelredis.LevelRedis
+	config     *levelredis.LevelConfig
 	// counters
 	cmdCounters     *monitor.Counters
 	cmdCateCounters *monitor.Counters // 指令集统计
@@ -78,18 +75,22 @@ func (server *GoRedisServer) Init() (err error) {
 	server.stdlog.Info("========================================")
 	server.stdlog.Info("server init ...")
 	// leveldb
-	options := opt.Options{
-		MaxOpenFiles: 100000,
-		BlockCache:   cache.NewLRUCache(32 * opt.MiB),
-		BlockSize:    32 * opt.KiB,
-		WriteBuffer:  120 << 20,
-	}
-	server.db, err = leveldb.OpenFile(server.directory+"/db0", &options)
+	// options := opt.Options{
+	// 	MaxOpenFiles: 100000,
+	// 	BlockCache:   cache.NewLRUCache(32 * opt.MiB),
+	// 	BlockSize:    32 * opt.KiB,
+	// 	WriteBuffer:  120 << 20,
+	// }
+	// server.db, err = leveldb.OpenFile(server.directory+"/db0", &options)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// server.levelRedis = leveltool.NewLevelRedis(server.db)
+	err = server.initLevelDB()
 	if err != nil {
-		panic(err)
+		return
 	}
-	server.levelRedis = leveltool.NewLevelRedis(server.db)
-	server.config = leveltool.NewLevelConfig(server.db, goredisPrefix+"config:")
+	server.config = levelredis.NewLevelConfig(server.levelRedis, goredisPrefix+"config:")
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initSyncMonitor(server.directory + "/sync.log")
@@ -99,8 +100,16 @@ func (server *GoRedisServer) Init() (err error) {
 	return
 }
 
-func (server *GoRedisServer) DB() (db *leveldb.DB) {
-	return server.db
+func (server *GoRedisServer) initLevelDB() (err error) {
+	opts := levigo.NewOptions()
+	opts.SetCache(levigo.NewLRUCache(3 << 30))
+	opts.SetCreateIfMissing(true)
+	db, e1 := levigo.Open(server.directory+"/db0", opts)
+	if e1 != nil {
+		return e1
+	}
+	server.levelRedis = levelredis.NewLevelRedis(db)
+	return
 }
 
 func (server *GoRedisServer) Listen(host string) {
