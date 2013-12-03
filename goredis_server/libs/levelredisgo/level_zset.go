@@ -1,4 +1,4 @@
-package leveltool
+package levelredisgo
 
 /**
 基于leveldb实现的zset，用于海量存储，节约内存

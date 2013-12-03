@@ -1,4 +1,4 @@
-package leveltool
+package levelredisgo
 
 /*
 __key[profile]hash = ""

@@ -1,4 +1,4 @@
-package leveltool
+package levelredisgo
 
 /*
 基于leveldb实现的redis持久化层

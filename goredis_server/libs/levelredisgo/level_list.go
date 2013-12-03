@@ -1,4 +1,4 @@
-package leveltool
+package levelredisgo
 
 /*
 基于leveldb实现的list，主要用于海量存储，比如aof、日志

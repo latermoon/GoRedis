@@ -1,4 +1,4 @@
-package leveltool
+package levelredisgo
 
 import (
 	"github.com/syndtr/goleveldb/leveldb"
