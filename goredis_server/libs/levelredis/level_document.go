@@ -77,3 +77,12 @@ func (l *LevelDocument) Get(fields ...string) (result map[string]interface{}) {
 	result = l.doc.RichGet(fields...)
 	return
 }
+
+func (l *LevelDocument) Drop() (ok bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.redis.db.Delete(l.redis.wo, l.docKey())
+	l.doc = nil
+	ok = true
+	return
+}

@@ -196,6 +196,11 @@ func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
 			if ok {
 				n++
 			}
+		case "doc":
+			ok := l.GetDoc(key).Drop()
+			if ok {
+				n++
+			}
 		default:
 		}
 		if t != "string" {
