@@ -1,4 +1,4 @@
-package leveltool
+package levelredis
 
 /*
 基于leveldb实现的redis持久化层
@@ -31,8 +31,8 @@ import (
 	lru "../lrucache"
 	"bytes"
 	// "fmt"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/latermoon/levigo"
+	"math"
 	"sync"
 )
 
@@ -44,6 +44,9 @@ const (
 	KEY_PREFIX = "+"
 )
 
+// 字节最大范围
+const MAXBYTE byte = math.MaxUint8
+
 // 数据结构的key后缀
 const (
 	STRING_SUFFIX = "string"
@@ -51,6 +54,7 @@ const (
 	LIST_SUFFIX   = "list"
 	SET_SUFFIX    = "set"
 	ZSET_SUFFIX   = "zset"
+	DOC_SUFFIX    = "doc"
 )
 
 // 数据结构的key前缀
@@ -70,22 +74,26 @@ const (
 )
 
 type LevelRedis struct {
-	db       *leveldb.DB
-	ro       *opt.ReadOptions
-	wo       *opt.WriteOptions
+	db       *levigo.DB
+	ro       *levigo.ReadOptions
+	wo       *levigo.WriteOptions
 	lruCache *lru.LRUCache // LRU缓存层
 	mu       sync.Mutex
 	lstring  *LevelString
 }
 
-func NewLevelRedis(db *leveldb.DB) (l *LevelRedis) {
+func NewLevelRedis(db *levigo.DB) (l *LevelRedis) {
 	l = &LevelRedis{}
 	l.db = db
-	l.ro = &opt.ReadOptions{}
-	l.wo = &opt.WriteOptions{}
-	l.lstring = NewLevelString(db)
+	l.ro = levigo.NewReadOptions()
+	l.wo = levigo.NewWriteOptions()
+	l.lstring = NewLevelString(l)
 	l.lruCache = lru.NewLRUCache(10000)
 	return
+}
+
+func (l *LevelRedis) DB() (db *levigo.DB) {
+	return l.db
 }
 
 func (l *LevelRedis) Strings() (s *LevelString) {
@@ -94,7 +102,7 @@ func (l *LevelRedis) Strings() (s *LevelString) {
 
 // 获取原始key的内容
 func (l *LevelRedis) RawGet(key []byte) (value []byte) {
-	value, _ = l.db.Get(key, l.ro)
+	value, _ = l.db.Get(l.ro, key)
 	return
 }
 
@@ -113,21 +121,21 @@ func (l *LevelRedis) objFromCache(key string, fn func() interface{}) (obj interf
 
 func (l *LevelRedis) GetList(key string) (lst *LevelList) {
 	obj := l.objFromCache(key, func() interface{} {
-		return NewLevelList(l.db, key)
+		return NewLevelList(l, key)
 	})
 	return obj.(*LevelList)
 }
 
 func (l *LevelRedis) GetHash(key string) (h *LevelHash) {
 	obj := l.objFromCache(key, func() interface{} {
-		return NewLevelHash(l.db, key, false)
+		return NewLevelHash(l, key, false)
 	})
 	return obj.(*LevelHash)
 }
 
 func (l *LevelRedis) GetSet(key string) (s *LevelHash) {
 	obj := l.objFromCache(key, func() interface{} {
-		return NewLevelHash(l.db, key, true)
+		return NewLevelHash(l, key, true)
 	})
 	return obj.(*LevelHash)
 }
@@ -137,6 +145,13 @@ func (l *LevelRedis) GetSortedSet(key string) (z *LevelZSet) {
 		return NewLevelZSet(l, key)
 	})
 	return obj.(*LevelZSet)
+}
+
+func (l *LevelRedis) GetDoc(key string) (d *LevelDocument) {
+	obj := l.objFromCache(key, func() interface{} {
+		return NewLevelDocument(l, key)
+	})
+	return obj.(*LevelDocument)
 }
 
 func (l *LevelRedis) TypeOf(key []byte) (t string) {
@@ -181,6 +196,11 @@ func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
 			if ok {
 				n++
 			}
+		case "doc":
+			ok := l.GetDoc(key).Drop()
+			if ok {
+				n++
+			}
 		default:
 		}
 		if t != "string" {
@@ -205,13 +225,15 @@ func (l *LevelRedis) Keys(prefix []byte, fn func(i int, key, keytype []byte, qui
 // key范围枚举
 func (l *LevelRedis) Enumerate(min, max []byte, direction IteratorDirection, fn func(i int, key, value []byte, quit *bool)) {
 	iter := l.db.NewIterator(l.ro)
-	defer iter.Release()
+	defer iter.Close()
 	found := false
 	if direction == IteratorBackward {
-		found = iter.Seek(max)
+		iter.Seek(max)
 	} else {
-		found = iter.Seek(min)
+		iter.Seek(min)
 	}
+	found = iter.Valid()
+
 	i := -1
 	if found {
 		i++
@@ -224,12 +246,14 @@ func (l *LevelRedis) Enumerate(min, max []byte, direction IteratorDirection, fn 
 	for {
 		found = false
 		if direction == IteratorBackward {
-			found = iter.Prev()
+			iter.Prev()
+			found = iter.Valid()
 			if !found || bytes.Compare(iter.Key(), min) < 0 {
 				break
 			}
 		} else {
-			found = iter.Next()
+			iter.Next()
+			found = iter.Valid()
 			if !found || bytes.Compare(iter.Key(), max) > 0 {
 				break
 			}

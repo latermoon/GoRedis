@@ -1,22 +1,17 @@
-package leveltool
+package levelredis
 
 import (
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/opt"
+// "github.com/latermoon/levigo"
 )
 
 type LevelConfig struct {
-	db     *leveldb.DB
-	ro     *opt.ReadOptions
-	wo     *opt.WriteOptions
+	redis  *LevelRedis
 	prefix string
 }
 
-func NewLevelConfig(db *leveldb.DB, prefix string) (l *LevelConfig) {
+func NewLevelConfig(redis *LevelRedis, prefix string) (l *LevelConfig) {
 	l = &LevelConfig{}
-	l.db = db
-	l.ro = &opt.ReadOptions{}
-	l.wo = &opt.WriteOptions{}
+	l.redis = redis
 	l.prefix = prefix
 	return
 }

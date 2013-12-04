@@ -1,4 +1,4 @@
-package main
+package slaveof
 
 import (
 	. "../../../goredis"
@@ -7,6 +7,28 @@ import (
 	"net"
 	"strconv"
 )
+
+type SlaveOfServer struct {
+	srchost string
+	dsthost string
+}
+
+func NewSlaveOfServer(srchost, dsthost string) (s *SlaveOfServer) {
+	s = &SlaveOfServer{}
+	s.srchost = srchost
+	s.dsthost = dsthost
+	return
+}
+
+func (s *SlaveOfServer) Start() (err error) {
+	var conn net.Conn
+	conn, err = net.Dial("tcp", s.dsthost)
+	if err != nil {
+		return
+	}
+	session := NewSession(conn)
+	session.WriteCommand(NewCommand([]byte("SYNC")))
+}
 
 func main() {
 	host := "latermoon.tj.momo.com:6379"

@@ -2,10 +2,9 @@ package goredis_server
 
 import (
 	. "../goredis"
-	"./libs/leveltool"
+	"./libs/levelredis"
 	// "fmt"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/latermoon/levigo"
 	// "strings"
 	"sync"
 )
@@ -19,11 +18,11 @@ type SlaveSession struct {
 	cmdbuffer            chan *Command
 	currentCommand       *Command // 当前处理中的command
 	sendmutex            sync.Mutex
-	uid                  string               // 从库id
-	aofEnabled           bool                 // 支持从库快照
-	remoteExists         bool                 //是否存在远程连接
-	shouldChangeToRemote bool                 // 应该转向写入远程
-	aoflist              *leveltool.LevelList // 存放同步中断后指令
+	uid                  string                // 从库id
+	aofEnabled           bool                  // 支持从库快照
+	remoteExists         bool                  //是否存在远程连接
+	shouldChangeToRemote bool                  // 应该转向写入远程
+	aoflist              *levelredis.LevelList // 存放同步中断后指令
 }
 
 func NewSlaveSession(server *GoRedisServer, session *Session, uid string) (s *SlaveSession) {
@@ -35,7 +34,7 @@ func NewSlaveSession(server *GoRedisServer, session *Session, uid string) (s *Sl
 	s.uid = uid
 	s.aofEnabled = len(uid) > 0 //存在uid就可以访问本地快照
 	if s.aofEnabled {
-		s.aoflist = leveltool.NewLevelList(s.server.DB(), "__slaveaof:"+s.uid)
+		s.aoflist = levelredis.NewLevelList(s.server.levelRedis, "__slaveaof:"+s.uid)
 	}
 	return
 }
@@ -160,18 +159,18 @@ func (s *SlaveSession) AsyncSendCommand(cmd *Command) {
 // 向从库发送数据库快照
 // 时间关系，暂时使用了 []byte -> Entry -> Command -> slave 的方法，
 // 应该改为官方发送rdb数据的方式
-func (s *SlaveSession) SendSnapshot(snapshot *leveldb.Snapshot) {
+func (s *SlaveSession) SendSnapshot(snapshot *levigo.Snapshot) {
 	s.server.stdlog.Info("snapshot send runloop start")
 	defer s.server.stdlog.Info("snapshot send runloop end")
 	s.sendmutex.Lock()
 	defer s.sendmutex.Unlock()
 
-	iter := snapshot.NewIterator(&opt.ReadOptions{})
-	defer func() {
-		// 必须释放Iterator和Snapshot
-		iter.Release()
-		snapshot.Release()
-	}()
+	// iter := snapshot.NewIterator(&opt.ReadOptions{})
+	// defer func() {
+	// 	// 必须释放Iterator和Snapshot
+	// 	iter.Release()
+	// 	snapshot.Release()
+	// }()
 
 	// leveltool.PrefixEnumerate(iter, prefix, func(i int, iter iterator.Iterator, quit *bool) {
 	// })

@@ -1,26 +1,16 @@
-package leveltool
-
-/*
-__key:name:string = latermoon
-__key:age:string = 27
-*/
+package levelredis
 
 import (
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/opt"
+// "github.com/latermoon/levigo"
 )
 
 type LevelString struct {
-	db *leveldb.DB
-	ro *opt.ReadOptions
-	wo *opt.WriteOptions
+	redis *LevelRedis
 }
 
-func NewLevelString(db *leveldb.DB) (l *LevelString) {
+func NewLevelString(redis *LevelRedis) (l *LevelString) {
 	l = &LevelString{}
-	l.db = db
-	l.ro = &opt.ReadOptions{}
-	l.wo = &opt.WriteOptions{}
+	l.redis = redis
 	return
 }
 
@@ -30,7 +20,7 @@ func (l *LevelString) stringKey(key []byte) []byte {
 
 func (l *LevelString) Get(key []byte) (value []byte) {
 	var err error
-	value, err = l.db.Get(l.stringKey(key), l.ro)
+	value, err = l.redis.db.Get(l.redis.ro, l.stringKey(key))
 	if err != nil {
 		value = nil
 	}
@@ -42,7 +32,7 @@ func (l *LevelString) Delete(keys ...[]byte) (n int) {
 	for _, key := range keys {
 		val := l.Get(key)
 		if val != nil {
-			l.db.Delete(l.stringKey(key), l.wo)
+			l.redis.db.Delete(l.redis.wo, l.stringKey(key))
 			n++
 		}
 	}
@@ -50,6 +40,6 @@ func (l *LevelString) Delete(keys ...[]byte) (n int) {
 }
 
 func (l *LevelString) Set(key []byte, value []byte) (err error) {
-	err = l.db.Put(l.stringKey(key), value, l.wo)
+	err = l.redis.db.Put(l.redis.wo, l.stringKey(key), value)
 	return
 }

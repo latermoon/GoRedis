@@ -1,18 +1,9 @@
-package leveltool
-
-/*
-__key[profile]hash = ""
-__hash[profile]name = latermoon
-__hash[profile]age = 27
-__hash[profile]sex = M
-*/
+package levelredis
 
 import (
 	// "fmt"
 	"bytes"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/latermoon/levigo"
 	"sync"
 )
 
@@ -23,9 +14,7 @@ type HashElem struct {
 
 // 使用userForSet控制实现set还是hash
 type LevelHash struct {
-	db *leveldb.DB
-	ro *opt.ReadOptions
-	wo *opt.WriteOptions
+	redis *LevelRedis
 	// key
 	entryKey string
 	mu       sync.Mutex
@@ -33,13 +22,11 @@ type LevelHash struct {
 	userForSet bool
 }
 
-func NewLevelHash(db *leveldb.DB, entryKey string, userForSet bool) (l *LevelHash) {
+func NewLevelHash(redis *LevelRedis, entryKey string, userForSet bool) (l *LevelHash) {
 	l = &LevelHash{}
-	l.db = db
+	l.redis = redis
 	l.entryKey = entryKey
 	l.userForSet = userForSet
-	l.ro = &opt.ReadOptions{}
-	l.wo = &opt.WriteOptions{}
 	return
 }
 
@@ -80,7 +67,7 @@ func (l *LevelHash) fieldInKey(fieldkey []byte) (field []byte) {
 func (l *LevelHash) Get(field []byte) (val []byte) {
 	fieldkey := l.fieldKey(field)
 	var err error
-	val, err = l.db.Get(fieldkey, l.ro)
+	val, err = l.redis.db.Get(l.redis.ro, fieldkey)
 	if err != nil {
 		val = nil
 	}
@@ -90,7 +77,9 @@ func (l *LevelHash) Get(field []byte) (val []byte) {
 func (l *LevelHash) Set(fieldVals ...[]byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	batch := new(leveldb.Batch)
+
+	batch := levigo.NewWriteBatch()
+	defer batch.Close()
 	n = 0
 	for i := 0; i < len(fieldVals); i += 2 {
 		fieldkey := l.fieldKey(fieldVals[i])
@@ -99,24 +88,24 @@ func (l *LevelHash) Set(fieldVals ...[]byte) (n int) {
 		n++
 	}
 	batch.Put(l.infoKey(), l.infoValue())
-	l.db.Write(batch, l.wo)
+	l.redis.db.Write(l.redis.wo, batch)
 	return
 }
 
 func (l *LevelHash) GetAll(limit int) (elems []*HashElem) {
-	iter := l.db.NewIterator(l.ro)
-	defer iter.Release()
+	min := l.fieldPrefix()
+	max := append(min, MAXBYTE)
 	elems = make([]*HashElem, 0, 10)
-	PrefixEnumerate(iter, l.fieldPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
+	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
 		if limit != -1 && i >= limit {
 			*quit = true
 			return
 		}
 		elem := &HashElem{}
-		elem.Key = l.fieldInKey(iter.Key())
-		elem.Value = copyBytes(iter.Value())
+		elem.Key = l.fieldInKey(key)
+		elem.Value = value
 		elems = append(elems, elem)
-	}, "next")
+	})
 	return
 }
 
@@ -129,23 +118,24 @@ func (l *LevelHash) Exist(field []byte) (exist bool) {
 func (l *LevelHash) Remove(fields ...[]byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
 	n = 0
 	for _, field := range fields {
 		if l.Get(field) != nil {
-			l.db.Delete(l.fieldKey(field), l.wo)
+			l.redis.db.Delete(l.redis.wo, l.fieldKey(field))
 			n++
 		}
 	}
 	// 检查是否已经删除完
 	hasElem := false
-	iter := l.db.NewIterator(l.ro)
-	defer iter.Release()
-	PrefixEnumerate(iter, l.fieldPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
+	min := l.fieldPrefix()
+	max := append(min, MAXBYTE)
+	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
 		hasElem = true
 		*quit = true
-	}, "next")
+	})
 	if !hasElem {
-		l.db.Delete(l.infoKey(), l.wo)
+		l.redis.db.Delete(l.redis.wo, l.infoKey())
 	}
 	return
 }
@@ -153,31 +143,31 @@ func (l *LevelHash) Remove(fields ...[]byte) (n int) {
 // 为了数据管理方便，这里不持久化count，每次都是枚举实现
 // 为了性能保障，对于大于1000返回-1，不再扫描
 func (l *LevelHash) Count() (n int) {
-	iter := l.db.NewIterator(l.ro)
-	defer iter.Release()
-	n = 0
-	PrefixEnumerate(iter, l.fieldPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
+	min := l.fieldPrefix()
+	max := append(min, MAXBYTE)
+	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
 		n++
 		if n > 1000 {
 			n = -1
 			*quit = true
 			return
 		}
-	}, "next")
+	})
 	return
 }
 
 func (l *LevelHash) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	iter := l.db.NewIterator(l.ro)
-	defer iter.Release()
-	batch := new(leveldb.Batch)
-	PrefixEnumerate(iter, l.fieldPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
-		batch.Delete(copyBytes(iter.Key()))
-	}, "next")
+
+	batch := levigo.NewWriteBatch()
+	min := l.fieldPrefix()
+	max := append(min, MAXBYTE)
+	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+		batch.Delete(key)
+	})
 	batch.Delete(l.infoKey())
-	l.db.Write(batch, l.wo)
+	l.redis.db.Write(l.redis.wo, batch)
 	ok = true
 	return
 }

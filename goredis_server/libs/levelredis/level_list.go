@@ -1,25 +1,12 @@
-package leveltool
+package levelredis
 
-/*
-基于leveldb实现的list，主要用于海量存储，比如aof、日志
-
-1、数据结构
-要提供序号访问，就不能删除中间的元素
-__key[key]list = 1004,1008
-__list[key]idx:1004 = hello
-__list[key]idx:1005 = hello
-__list[key]idx:1006 = hello
-__list[key]idx:1007 = hello
-__list[key]idx:1008 = hello
-*/
+// 基于leveldb实现的list，主要用于海量存储，比如aof、日志
 // 本页面命名注意，idx都表示大于l.start的那个索引序号，而不是0开始的数组序号
 
 import (
 	"bytes"
 	// "fmt"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/latermoon/levigo"
 	"strconv"
 	"sync"
 )
@@ -32,9 +19,7 @@ type Element struct {
 // 类似双向链表，右进左出，可以通过索引查找
 // 海量存储，占用内存小
 type LevelList struct {
-	db       *leveldb.DB
-	ro       *opt.ReadOptions
-	wo       *opt.WriteOptions
+	redis    *LevelRedis
 	entryKey string
 	// 游标控制
 	start int64
@@ -42,11 +27,9 @@ type LevelList struct {
 	mu    sync.Mutex
 }
 
-func NewLevelList(db *leveldb.DB, entryKey string) (l *LevelList) {
+func NewLevelList(redis *LevelRedis, entryKey string) (l *LevelList) {
 	l = &LevelList{}
-	l.db = db
-	l.ro = &opt.ReadOptions{}
-	l.wo = &opt.WriteOptions{}
+	l.redis = redis
 	l.entryKey = entryKey
 	l.start = 0
 	l.end = -1
@@ -59,7 +42,7 @@ func (l *LevelList) Size() int {
 }
 
 func (l *LevelList) initInfo() {
-	data, err := l.db.Get(l.infoKey(), l.ro)
+	data, err := l.redis.db.Get(l.redis.ro, l.infoKey())
 	if err != nil {
 		return
 	}
@@ -98,13 +81,13 @@ func (l *LevelList) LPush(values ...[]byte) (err error) {
 
 	// 左游标
 	oldstart := l.start
-	batch := new(leveldb.Batch)
+	batch := levigo.NewWriteBatch()
 	for _, value := range values {
 		l.start--
 		batch.Put(l.idxKey(l.start), value)
 	}
 	batch.Put(l.infoKey(), l.infoValue())
-	err = l.db.Write(batch, l.wo)
+	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		// 回退
 		l.start = oldstart
@@ -118,13 +101,13 @@ func (l *LevelList) RPush(values ...[]byte) (err error) {
 
 	// 右游标
 	oldend := l.end
-	batch := new(leveldb.Batch)
+	batch := levigo.NewWriteBatch()
 	for _, value := range values {
 		l.end++
 		batch.Put(l.idxKey(l.end), value)
 	}
 	batch.Put(l.infoKey(), l.infoValue())
-	err = l.db.Write(batch, l.wo)
+	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		// 回退
 		l.end = oldend
@@ -145,7 +128,7 @@ func (l *LevelList) RPop() (e *Element, err error) {
 	// get
 	idx := l.end
 	e = &Element{}
-	e.Value, err = l.db.Get(l.idxKey(idx), l.ro)
+	e.Value, err = l.redis.db.Get(l.redis.ro, l.idxKey(idx))
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +136,7 @@ func (l *LevelList) RPop() (e *Element, err error) {
 	// 只剩下一个元素时，删除infoKey(0)
 	shouldReset := l.len() == 1
 	// 删除数据, 更新左游标
-	batch := new(leveldb.Batch)
+	batch := levigo.NewWriteBatch()
 	batch.Delete(l.idxKey(idx))
 	if shouldReset {
 		l.start = 0
@@ -163,7 +146,7 @@ func (l *LevelList) RPop() (e *Element, err error) {
 		l.end--
 		batch.Put(l.infoKey(), l.infoValue())
 	}
-	err = l.db.Write(batch, l.wo)
+	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		// 回退
 		l.start, l.end = oldstart, oldend
@@ -184,14 +167,14 @@ func (l *LevelList) LPop() (e *Element, err error) {
 	// get
 	idx := l.start
 	e = &Element{}
-	e.Value, err = l.db.Get(l.idxKey(idx), l.ro)
+	e.Value, err = l.redis.db.Get(l.redis.ro, l.idxKey(idx))
 	if err != nil {
 		return nil, err
 	}
 	// 只剩下一个元素时，删除infoKey(0)
 	shouldReset := l.len() == 1
 	// 删除数据, 更新左游标
-	batch := new(leveldb.Batch)
+	batch := levigo.NewWriteBatch()
 	batch.Delete(l.idxKey(idx))
 	if shouldReset {
 		l.start = 0
@@ -201,7 +184,7 @@ func (l *LevelList) LPop() (e *Element, err error) {
 		l.start++
 		batch.Put(l.infoKey(), l.infoValue())
 	}
-	err = l.db.Write(batch, l.wo)
+	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		// 回退
 		l.start, l.end = oldstart, oldend
@@ -218,7 +201,7 @@ func (l *LevelList) TrimLeft(count uint) (n int) {
 		return
 	}
 	oldstart, oldend := l.start, l.end
-	batch := new(leveldb.Batch)
+	batch := levigo.NewWriteBatch()
 	for idx := oldstart; idx < (oldstart+int64(count)) && idx <= oldend; idx++ {
 		batch.Delete(l.idxKey(idx))
 		l.start++
@@ -231,7 +214,7 @@ func (l *LevelList) TrimLeft(count uint) (n int) {
 	} else {
 		batch.Put(l.infoKey(), l.infoValue())
 	}
-	err := l.db.Write(batch, l.wo)
+	err := l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		// 回退
 		l.start, l.end = oldstart, oldend
@@ -248,7 +231,7 @@ func (l *LevelList) Index(i int64) (e *Element, err error) {
 	}
 	idx := l.start + i
 	e = &Element{}
-	e.Value, err = l.db.Get(l.idxKey(idx), l.ro)
+	e.Value, err = l.redis.db.Get(l.redis.ro, l.idxKey(idx))
 	if err != nil {
 		return nil, err
 	}
@@ -271,14 +254,15 @@ func (l *LevelList) Len() int64 {
 func (l *LevelList) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	iter := l.db.NewIterator(l.ro)
-	defer iter.Release()
-	batch := new(leveldb.Batch)
-	PrefixEnumerate(iter, l.keyPrefix(), func(i int, iter iterator.Iterator, quit *bool) {
-		batch.Delete(copyBytes(iter.Key()))
-	}, "next")
+
+	min := l.keyPrefix()
+	max := append(min, MAXBYTE)
+	batch := levigo.NewWriteBatch()
+	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+		batch.Delete(key)
+	})
 	batch.Delete(l.infoKey())
-	l.db.Write(batch, l.wo)
+	l.redis.db.Write(l.redis.wo, batch)
 	ok = true
 	l.start = 0
 	l.end = -1
