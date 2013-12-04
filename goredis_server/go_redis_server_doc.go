@@ -19,7 +19,6 @@ user:100422:doc = {
 }
 
 // Update/Insert
-doc_set(key, {Action:{Field1:Value1, ...}, ...})
 doc_set(key, {"name":"latermoon"})
 doc_set(key, {"$rpush":["photos", "d.jpg", "e.jpg"]}})
 doc_set(key, {"$incr":["version", 1]})
@@ -27,11 +26,13 @@ doc_set(key, {"setting.mute":{"start":23, "end":8}})
 doc_set(key, {"setting.mute.start":23, "setting.mute.end":8})
 doc_set(key, {"$del":["name", "photos.$1", "setting.mute.start"])
 
-doc_set(key, {"$set":{"name":"latermoon"}, "$inc":{"profile.version":1}})
+doc_set(key, {"$set":{"name":"latermoon", "sex":"M"}, "$inc":{"profile.version":1}})
 
 // Get All
 doc_get(key)
 doc_get(key, "name,sex,photos,setting.mute,version")
+
+doc_del(key, "name,setting.mute,version")
 
 */
 

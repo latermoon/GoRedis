@@ -81,7 +81,10 @@ func (l *LevelDocument) Get(fields ...string) (result map[string]interface{}) {
 func (l *LevelDocument) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.redis.db.Delete(l.redis.wo, l.docKey())
+	in, _ := l.redis.db.Get(l.redis.ro, l.docKey())
+	if in != nil {
+		l.redis.db.Delete(l.redis.wo, l.docKey())
+	}
 	l.doc = nil
 	ok = true
 	return

@@ -60,6 +60,7 @@ func (m *MapDocument) RichSet(input map[string]interface{}) (err error) {
 				err = m.doIncr(parent, key, value)
 			}
 		case "del":
+
 		default:
 		}
 	}
@@ -78,6 +79,7 @@ func (m *MapDocument) RichGet(fields ...string) (result map[string]interface{}) 
 	for _, field := range fields {
 		dstparent := result
 		srcparent := m.data
+		// 逐个字段扫描copy
 		pairs := strings.Split(field, dot)
 		for i := 0; i < len(pairs); i++ {
 			curkey := pairs[i]
