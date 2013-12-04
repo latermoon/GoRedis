@@ -54,6 +54,7 @@ const (
 	LIST_SUFFIX   = "list"
 	SET_SUFFIX    = "set"
 	ZSET_SUFFIX   = "zset"
+	DOC_SUFFIX    = "doc"
 )
 
 // 数据结构的key前缀
@@ -144,6 +145,13 @@ func (l *LevelRedis) GetSortedSet(key string) (z *LevelZSet) {
 		return NewLevelZSet(l, key)
 	})
 	return obj.(*LevelZSet)
+}
+
+func (l *LevelRedis) GetDoc(key string) (d *LevelDocument) {
+	obj := l.objFromCache(key, func() interface{} {
+		return NewLevelDocument(l, key)
+	})
+	return obj.(*LevelDocument)
 }
 
 func (l *LevelRedis) TypeOf(key []byte) (t string) {

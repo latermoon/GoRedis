@@ -1,7 +1,5 @@
 package goredis_server
 
-// TODO 本类未完成
-
 /*
 实现类似于mongo的document base指令，
 对一个key提供docuemnt存储，以及原子操作
@@ -20,8 +18,6 @@ user:100422:doc = {
 	version: 172 // int
 }
 
-// Replace/Insert
-doc_replace(key, {"name":"latermoon", "sex":1, "photos":[...], ...})
 // Update/Insert
 doc_set(key, {Action:{Field1:Value1, ...}, ...})
 doc_set(key, {"name":"latermoon"})
@@ -30,6 +26,9 @@ doc_set(key, {"$incr":["version", 1]})
 doc_set(key, {"setting.mute":{"start":23, "end":8}})
 doc_set(key, {"setting.mute.start":23, "setting.mute.end":8})
 doc_set(key, {"$del":["name", "photos.$1", "setting.mute.start"])
+
+doc_set(key, {"$set":{"name":"latermoon"}, "$inc":{"profile.version":1}})
+
 // Get All
 doc_get(key)
 doc_get(key, "name,sex,photos,setting.mute,version")
@@ -38,12 +37,48 @@ doc_get(key, "name,sex,photos,setting.mute,version")
 
 import (
 	. "../goredis"
+	"encoding/json"
 )
 
+/*
+doc_set hi '{"name":"latermoon", "version":10}'
+doc_set hi '{"$inc":{"version":1}}'
+*/
 func (server *GoRedisServer) OnDOC_SET(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	// 传入的json字节
+	jsonbytes, err := cmd.ArgAtIndex(2)
+	if err != nil {
+		return ErrorReply(err)
+	}
+	// 反序列化为map
+	jsonObj := make(map[string]interface{})
+	err = json.Unmarshal(jsonbytes, &jsonObj)
+	if err != nil {
+		return ErrorReply(err)
+	}
+	// 调用LevelDocument更新数据
+	doc := server.levelRedis.GetDoc(key)
+	err = doc.Set(jsonObj)
+	if err != nil {
+		return ErrorReply(err)
+	}
+	reply = StatusReply("OK")
 	return
 }
 
 func (server *GoRedisServer) OnDOC_GET(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	fields := cmd.StringArgs()[2:]
+	doc := server.levelRedis.GetDoc(key)
+	result := doc.Get(fields...)
+	if result == nil {
+		return BulkReply(nil)
+	}
+	data, err := json.Marshal(result)
+	if err != nil {
+		return ErrorReply(err)
+	}
+	reply = BulkReply(data)
 	return
 }

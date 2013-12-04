@@ -1,11 +1,8 @@
 package levelredis
 
-// TODO 本类未完成
-
 import (
 	"encoding/json"
 	"errors"
-	// "fmt"
 	"reflect"
 	"strings"
 )
@@ -13,6 +10,7 @@ import (
 var (
 	WrongKindError   = errors.New("wrong kind error")
 	BadArgumentCount = errors.New("bad argument count")
+	BadArgumentType  = errors.New("bad argument type")
 	MapInterfaceType = reflect.TypeOf(make(map[string]interface{}))
 )
 
@@ -27,8 +25,7 @@ type MapDocument struct {
 
 func NewMapDocument(data map[string]interface{}) (m *MapDocument) {
 	m = &MapDocument{}
-	m.data = data
-	if m.data == nil {
+	if m.data = data; m.data == nil {
 		m.data = make(map[string]interface{})
 	}
 	return
@@ -38,25 +35,30 @@ func NewMapDocument(data map[string]interface{}) (m *MapDocument) {
 func (m *MapDocument) RichSet(input map[string]interface{}) (err error) {
 	for k, v := range input {
 		if !strings.HasPrefix(k, "$") {
-			if strings.Index(k, dot) < 0 {
-				m.data[k] = v
-			} else {
-				// 对于多层级的元素，需要分拆查找
-				parent, key, _ := m.findElement(k)
-				parent[key] = v
-			}
+			parent, key, _ := m.findElement(k)
+			parent[key] = v
 			continue
 		}
 		action := k[1:]
 		switch action {
+		case "set":
+			argmap := v.(map[string]interface{})
+			for field, value := range argmap {
+				parent, key, _ := m.findElement(field)
+				parent[key] = value
+			}
 		case "rpush":
-			arglist := v.([]interface{}) // [0] 表示 field，[1:] 是要添加的元素
-			parent, key, _ := m.findElement(arglist[0].(string))
-			m.doRpush(parent, key, arglist[1:])
-		case "incr":
-			arglist := v.([]interface{}) // [0] 表示 field，[1] 是要incr的数字
-			parent, key, _ := m.findElement(arglist[0].(string))
-			m.doIncr(parent, key, arglist[1])
+			argmap := v.(map[string]interface{})
+			for field, value := range argmap {
+				parent, key, _ := m.findElement(field)
+				m.doRpush(parent, key, value.([]interface{}))
+			}
+		case "inc":
+			argmap := v.(map[string]interface{})
+			for field, value := range argmap {
+				parent, key, _ := m.findElement(field)
+				err = m.doIncr(parent, key, value)
+			}
 		case "del":
 		default:
 		}
@@ -66,6 +68,37 @@ func (m *MapDocument) RichSet(input map[string]interface{}) (err error) {
 
 // doc_get(key, ["name", "setting.mute", "photos.$1"])
 func (m *MapDocument) RichGet(fields ...string) (result map[string]interface{}) {
+	result = make(map[string]interface{})
+	if len(fields) == 0 {
+		for k, v := range m.data {
+			result[k] = v
+		}
+		return
+	}
+	for _, field := range fields {
+		dstparent := result
+		srcparent := m.data
+		pairs := strings.Split(field, dot)
+		for i := 0; i < len(pairs); i++ {
+			curkey := pairs[i]
+			// var ok bool
+			obj, ok := srcparent[curkey]
+			if !ok {
+				continue
+			} else if reflect.TypeOf(srcparent[curkey]) != MapInterfaceType {
+				// 基础类型
+				dstparent[curkey] = obj
+				continue
+			}
+			dstparent[curkey] = make(map[string]interface{})
+			srcparent = srcparent[curkey].(map[string]interface{})
+			dstparent = dstparent[curkey].(map[string]interface{})
+		}
+		key := pairs[len(pairs)-1]
+		if obj, ok := srcparent[key]; ok {
+			dstparent[key] = obj
+		}
+	}
 	return
 }
 
@@ -109,17 +142,33 @@ func (m *MapDocument) doIncr(parent map[string]interface{}, key string, value in
 	if obj == nil {
 		parent[key] = value
 	} else {
-		parent[key] = obj.(int) + value.(int)
+		oldint, e1 := toInt(obj)
+		incrint, e2 := toInt(value)
+		if e1 != nil || e2 != nil {
+			return BadArgumentType
+		}
+		parent[key] = oldint + incrint
 	}
-	// fmt.Println(obj, reflect.TypeOf(obj), value, reflect.TypeOf(value))
 	return
 }
 
-func parseFloat64(obj interface{}) {
-
+func toInt(obj interface{}) (n int, err error) {
+	switch obj.(type) {
+	case int:
+		n = obj.(int)
+	case float64:
+		n = int(obj.(float64))
+	default:
+		err = BadArgumentType
+	}
+	return
 }
 
 func (m *MapDocument) String() string {
 	b, _ := json.Marshal(m.data)
 	return string(b)
+}
+
+func (m *MapDocument) Map() map[string]interface{} {
+	return m.data
 }
