@@ -42,8 +42,9 @@ import (
 )
 
 /*
-doc_set hi '{"name":"latermoon", "version":10}'
+doc_set hi '{"name":"latermoon", "sex":"M", "version":10, "setting":{"start":23, "end":8}}'
 doc_set hi '{"$inc":{"version":1}}'
+doc_set hi '{"$del":["version", "setting.start"]}'
 */
 func (server *GoRedisServer) OnDOC_SET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)

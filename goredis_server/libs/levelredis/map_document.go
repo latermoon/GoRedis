@@ -12,6 +12,7 @@ var (
 	BadArgumentCount = errors.New("bad argument count")
 	BadArgumentType  = errors.New("bad argument type")
 	MapInterfaceType = reflect.TypeOf(make(map[string]interface{}))
+	miitype          = reflect.TypeOf(make(map[interface{}]interface{}))
 )
 
 const (
@@ -35,7 +36,7 @@ func NewMapDocument(data map[string]interface{}) (m *MapDocument) {
 func (m *MapDocument) RichSet(input map[string]interface{}) (err error) {
 	for k, v := range input {
 		if !strings.HasPrefix(k, "$") {
-			parent, key, _ := m.findElement(k)
+			parent, key, _, _ := m.findElement(k, true)
 			parent[key] = v
 			continue
 		}
@@ -44,23 +45,29 @@ func (m *MapDocument) RichSet(input map[string]interface{}) (err error) {
 		case "set":
 			argmap := v.(map[string]interface{})
 			for field, value := range argmap {
-				parent, key, _ := m.findElement(field)
+				parent, key, _, _ := m.findElement(field, true)
 				parent[key] = value
 			}
 		case "rpush":
 			argmap := v.(map[string]interface{})
 			for field, value := range argmap {
-				parent, key, _ := m.findElement(field)
+				parent, key, _, _ := m.findElement(field, true)
 				m.doRpush(parent, key, value.([]interface{}))
 			}
 		case "inc":
 			argmap := v.(map[string]interface{})
 			for field, value := range argmap {
-				parent, key, _ := m.findElement(field)
+				parent, key, _, _ := m.findElement(field, true)
 				err = m.doIncr(parent, key, value)
 			}
 		case "del":
-
+			arglist := v.([]interface{})
+			for _, field := range arglist {
+				parent, key, _, exist := m.findElement(field.(string), false)
+				if exist {
+					delete(parent, key)
+				}
+			}
 		default:
 		}
 	}
@@ -76,6 +83,7 @@ func (m *MapDocument) RichGet(fields ...string) (result map[string]interface{}) 
 		}
 		return
 	}
+
 	for _, field := range fields {
 		dstparent := result
 		srcparent := m.data
@@ -109,7 +117,7 @@ func (m *MapDocument) RichGet(fields ...string) (result map[string]interface{}) 
  * @param field 多级的field使用"."分隔
  * @return parent[key] == obj，其中 parent 目标元素父对象，必定是map[string]interface{}，key 目标元素key，obj，目标元素
  */
-func (m *MapDocument) findElement(field string) (parent map[string]interface{}, key string, obj interface{}) {
+func (m *MapDocument) findElement(field string, createIfMissing bool) (parent map[string]interface{}, key string, obj interface{}, exist bool) {
 	pairs := strings.Split(field, dot)
 	parent = m.data
 	for i := 0; i < len(pairs)-1; i++ {
@@ -118,10 +126,16 @@ func (m *MapDocument) findElement(field string) (parent map[string]interface{}, 
 		_, ok = parent[curkey]
 		// 初始化或覆盖
 		if !ok || reflect.TypeOf(parent[curkey]) != MapInterfaceType {
-			parent[curkey] = make(map[string]interface{})
+			if createIfMissing {
+				parent[curkey] = make(map[string]interface{})
+			} else {
+				exist = false
+				return
+			}
 		}
 		parent = parent[curkey].(map[string]interface{})
 	}
+	exist = true
 	key = pairs[len(pairs)-1]
 	obj = parent[key]
 	return

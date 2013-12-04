@@ -2,6 +2,7 @@ package levelredis
 
 import (
 	"github.com/latermoon/msgpackgo/codec"
+	"reflect"
 	"sync"
 )
 
@@ -19,6 +20,8 @@ func NewLevelDocument(redis *LevelRedis, key string) (l *LevelDocument) {
 	l = &LevelDocument{}
 	l.redis = redis
 	l.key = key
+	l.mh.RawToString = true
+	l.mh.MapType = reflect.TypeOf(make(map[string]interface{}))
 	return
 }
 
