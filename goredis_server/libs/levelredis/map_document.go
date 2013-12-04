@@ -11,7 +11,7 @@ var (
 	WrongKindError   = errors.New("wrong kind error")
 	BadArgumentCount = errors.New("bad argument count")
 	BadArgumentType  = errors.New("bad argument type")
-	MapInterfaceType = reflect.TypeOf(make(map[string]interface{}))
+	msitype          = reflect.TypeOf(make(map[string]interface{}))
 	miitype          = reflect.TypeOf(make(map[interface{}]interface{}))
 )
 
@@ -95,7 +95,7 @@ func (m *MapDocument) RichGet(fields ...string) (result map[string]interface{}) 
 			obj, ok := srcparent[curkey]
 			if !ok {
 				continue
-			} else if reflect.TypeOf(srcparent[curkey]) != MapInterfaceType {
+			} else if reflect.TypeOf(srcparent[curkey]) != msitype {
 				// 基础类型
 				dstparent[curkey] = obj
 				continue
@@ -125,7 +125,7 @@ func (m *MapDocument) findElement(field string, createIfMissing bool) (parent ma
 		var ok bool
 		_, ok = parent[curkey]
 		// 初始化或覆盖
-		if !ok || reflect.TypeOf(parent[curkey]) != MapInterfaceType {
+		if !ok || reflect.TypeOf(parent[curkey]) != msitype {
 			if createIfMissing {
 				parent[curkey] = make(map[string]interface{})
 			} else {
