@@ -9,7 +9,6 @@ package goredis_server
 user:100422:doc = {
 	name: "latermoon", // string
 	sex: 1 // int
-	regtime: ISOTime("2013-12-3 22:12:48"), // time
 	photos: ["a.jpg", "b.jpg", "c.jpg"], // array<string>
 	setting: { // hash
 		mute: {
