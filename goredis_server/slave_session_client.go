@@ -8,10 +8,12 @@ import (
 	. "../goredis"
 	"./libs/levelredis"
 	qp "./libs/queueprocess"
+	"./monitor"
 	"errors"
 	"fmt"
 	"github.com/latermoon/levigo"
 	"github.com/latermoon/msgpackgo/codec"
+	"os"
 	"time"
 )
 
@@ -24,6 +26,11 @@ type SlaveSessionClient struct {
 	aofRedis          *levelredis.LevelRedis
 	queueCount        int // 队列数
 	msgpack_handle    codec.MsgpackHandle
+	// 监控
+	syncCounters *monitor.Counters
+	syncMonitor  *monitor.StatusLogger
+	// path
+	homedir string
 }
 
 func NewSlaveSessionClient(server *GoRedisServer, session *SlaveSession) (s *SlaveSessionClient) {
@@ -32,6 +39,9 @@ func NewSlaveSessionClient(server *GoRedisServer, session *SlaveSession) (s *Sla
 	s.session = session
 	// s.taskqueue = qp.NewQueueProcess(100, s.queueHandler)
 	s.queueCount = 100
+	s.homedir = s.server.directory + "slaveof_" + s.session.MasterHost()
+	os.MkdirAll(s.homedir, os.ModePerm)
+	s.initMonitor()
 	s.initSlaveDb()
 	return
 }
@@ -43,7 +53,7 @@ func (s *SlaveSessionClient) initSlaveDb() (err error) {
 	opts.SetBlockSize(32 * 1024)
 	opts.SetWriteBufferSize(128 * 1024 * 1024)
 	opts.SetCreateIfMissing(true)
-	db, e1 := levigo.Open(s.server.directory+"/slaveof_"+s.session.MasterHost(), opts)
+	db, e1 := levigo.Open(s.homedir+"/db0", opts)
 	if e1 != nil {
 		return e1
 	}
@@ -51,17 +61,27 @@ func (s *SlaveSessionClient) initSlaveDb() (err error) {
 	return
 }
 
+func (s *SlaveSessionClient) initMonitor() {
+	s.syncCounters = monitor.NewCounters()
+	s.syncMonitor = monitor.NewStatusLogger(s.homedir + "/sync.log")
+	s.syncMonitor.Add(monitor.NewTimeFormater("Time", 8))
+	cmds := []string{"rdbsync", "cmdsync", "proc"}
+	for _, cmd := range cmds {
+		s.syncMonitor.Add(monitor.NewCountFormater(s.syncCounters.Get(cmd), cmd, 8, "ChangedCount"))
+	}
+	// buffer用于显示同步过程中的taskqueue buffer长度
+	s.syncMonitor.Add(monitor.NewCountFormater(s.syncCounters.Get("buffer"), "buffer", 9, "Count"))
+	go s.syncMonitor.Start()
+}
+
 func (s *SlaveSessionClient) Start() {
 	if s.shouldStopRunloop {
 		s.server.stdlog.Error("[%s] slaveof should run once", s.session.RemoteAddr())
 		return
 	}
-	for i := 0; i < s.queueCount; i++ {
-		aofkey := fmt.Sprintf("queue_%d", i)
-		go s.queueProcess(aofkey)
-	}
 	// 阻塞处理，直到出错
 	s.session.DidRecvCommand = s.didRecvCommand
+	s.session.RdbFinished = s.rdbFinished
 	err := s.session.Sync(s.server.UID())
 	if err != nil {
 		s.server.stdlog.Error("[%s] slaveof sync error %s", s.session.RemoteAddr(), err)
@@ -70,9 +90,15 @@ func (s *SlaveSessionClient) Start() {
 	s.shouldStopRunloop = true
 }
 
-func (s *SlaveSessionClient) didRecvCommand(cmd *Command, count int64) {
+func (s *SlaveSessionClient) didRecvCommand(cmd *Command, count int64, isrdb bool) {
 	if len(cmd.Args) == 1 {
 		return
+	}
+	s.syncCounters.Get("buffer").Incr(1)
+	if isrdb {
+		s.syncCounters.Get("rdbsync").Incr(1)
+	} else {
+		s.syncCounters.Get("cmdsync").Incr(1)
 	}
 	key, _ := cmd.ArgAtIndex(1)
 	aofkey := fmt.Sprintf("queue_%d", SumOfBytesChars(key)%s.queueCount)
@@ -84,6 +110,14 @@ func (s *SlaveSessionClient) didRecvCommand(cmd *Command, count int64) {
 		fmt.Println("err,", err)
 	}
 	// _ = s.server.InvokeCommandHandler(s.session, cmd)
+}
+
+// 当rdb同步结束后，开始启动消费队列
+func (s *SlaveSessionClient) rdbFinished(count int64) {
+	for i := 0; i < s.queueCount; i++ {
+		aofkey := fmt.Sprintf("queue_%d", i)
+		go s.queueProcess(aofkey)
+	}
 }
 
 func (s *SlaveSessionClient) queueProcess(aofkey string) {
@@ -104,13 +138,15 @@ func (s *SlaveSessionClient) queueProcess(aofkey string) {
 		if elem == nil {
 			continue
 		}
-		cmd, e2 := s.decodeCommand(elem.Value.([]byte))
+		s.syncCounters.Get("buffer").Incr(-1)
+		s.syncCounters.Get("proc").Incr(1)
+		_, e2 := s.decodeCommand(elem.Value.([]byte))
 		if e2 != nil {
 			fmt.Println("decode err", aofkey, e1)
 			time.Sleep(time.Millisecond * time.Duration(100))
 			continue
 		}
-		fmt.Println(aofkey, lst.Len(), "->pop", cmd)
+		// fmt.Println(aofkey, lst.Len(), "->pop", cmd)
 		// cmd := NewCommand(obj.([]byte)...)
 	}
 }
