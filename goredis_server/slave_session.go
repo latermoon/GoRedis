@@ -4,6 +4,7 @@ import (
 	. "../goredis"
 	"./libs/rdb"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 )
@@ -18,21 +19,31 @@ const (
 type SlaveSession struct {
 	session        *Session
 	status         string
+	masterHost     string
 	DidRecvCommand func(cmd *Command, count int64)
 	didRecvCommand func(cmd *Command)
 	totalCount     int64
 }
 
-func NewSlaveSession(sess *Session) (s *SlaveSession) {
+func NewSlaveSession(sess *Session, masterHost string) (s *SlaveSession) {
 	s = &SlaveSession{}
 	s.session = sess
 	s.status = SSDisconnected
+	s.masterHost = masterHost
 	s.totalCount = 0
 	s.didRecvCommand = func(cmd *Command) {
 		s.totalCount++
 		s.DidRecvCommand(cmd, s.totalCount)
 	}
 	return
+}
+
+func (s *SlaveSession) MasterHost() string {
+	return s.masterHost
+}
+
+func (s *SlaveSession) RemoteAddr() net.Addr {
+	return s.session.RemoteAddr()
 }
 
 func (s *SlaveSession) Sync(uid string) (err error) {
@@ -42,7 +53,11 @@ func (s *SlaveSession) Sync(uid string) (err error) {
 	if err != nil {
 		return
 	}
-	s.session.WriteCommand(NewCommand([]byte("SYNC")))
+	if isgoredis {
+		s.session.WriteCommand(NewCommand([]byte("SYNC"), []byte("UID"), []byte(uid)))
+	} else {
+		s.session.WriteCommand(NewCommand([]byte("SYNC")))
+	}
 	readRdbFinish := false
 	var c byte
 	for {

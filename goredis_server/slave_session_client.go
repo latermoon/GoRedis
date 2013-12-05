@@ -6,9 +6,13 @@ slaveClient.Stop()
 */
 import (
 	. "../goredis"
-	// "./libs/levelredis"
+	"./libs/levelredis"
 	qp "./libs/queueprocess"
-	"strings"
+	"errors"
+	"fmt"
+	"github.com/latermoon/levigo"
+	"github.com/latermoon/msgpackgo/codec"
+	"time"
 )
 
 // 主从同步中的从库连接
@@ -17,13 +21,33 @@ type SlaveSessionClient struct {
 	server            *GoRedisServer
 	taskqueue         *qp.QueueProcess // 队列处理
 	shouldStopRunloop bool             // 跳出runloop指令
+	aofRedis          *levelredis.LevelRedis
+	queueCount        int // 队列数
+	msgpack_handle    codec.MsgpackHandle
 }
 
 func NewSlaveSessionClient(server *GoRedisServer, session *SlaveSession) (s *SlaveSessionClient) {
 	s = &SlaveSessionClient{}
 	s.server = server
 	s.session = session
-	s.taskqueue = qp.NewQueueProcess(100, s.queueHandler)
+	// s.taskqueue = qp.NewQueueProcess(100, s.queueHandler)
+	s.queueCount = 100
+	s.initSlaveDb()
+	return
+}
+
+func (s *SlaveSessionClient) initSlaveDb() (err error) {
+	opts := levigo.NewOptions()
+	opts.SetCache(levigo.NewLRUCache(32 * 1024 * 1024))
+	opts.SetCompression(levigo.SnappyCompression)
+	opts.SetBlockSize(32 * 1024)
+	opts.SetWriteBufferSize(128 * 1024 * 1024)
+	opts.SetCreateIfMissing(true)
+	db, e1 := levigo.Open(s.server.directory+"/slaveof_"+s.session.MasterHost(), opts)
+	if e1 != nil {
+		return e1
+	}
+	s.aofRedis = levelredis.NewLevelRedis(db)
 	return
 }
 
@@ -32,9 +56,13 @@ func (s *SlaveSessionClient) Start() {
 		s.server.stdlog.Error("[%s] slaveof should run once", s.session.RemoteAddr())
 		return
 	}
-	// 异步入库
+	for i := 0; i < s.queueCount; i++ {
+		aofkey := fmt.Sprintf("queue_%d", i)
+		go s.queueProcess(aofkey)
+	}
 	// 阻塞处理，直到出错
-	err := s.startSync()
+	s.session.DidRecvCommand = s.didRecvCommand
+	err := s.session.Sync(s.server.UID())
 	if err != nil {
 		s.server.stdlog.Error("[%s] slaveof sync error %s", s.session.RemoteAddr(), err)
 	}
@@ -42,125 +70,75 @@ func (s *SlaveSessionClient) Start() {
 	s.shouldStopRunloop = true
 }
 
-func (s *SlaveSessionClient) queueHandler(t qp.Task) {
-	if s.shouldStopRunloop {
-		s.taskqueue.Stop()
-		s.server.stdlog.Info("[%s] slaveof stop runloop", s.session.RemoteAddr())
+func (s *SlaveSessionClient) didRecvCommand(cmd *Command, count int64) {
+	if len(cmd.Args) == 1 {
 		return
 	}
-	obj := t
-	// Process
-	s.server.syncCounters.Get("buffer").SetCount(s.taskqueue.Len())
-	// s.server.stdlog.Debug("[%s] slaveof process %s", s.session.RemoteAddr(), obj)
-	switch obj.(type) {
-	case *Command:
-		// 这些sync回来的command，全部是更新操作，不需要返回reply
-		cmd := obj.(*Command)
-		_ = s.server.InvokeCommandHandler(s.session, cmd)
-		s.server.syncCounters.Get("total").Incr(1)
-		cmdName := strings.ToUpper(cmd.Name())
-		cate := GetCommandCategory(cmdName)
-		// incr counter
-		s.server.syncCounters.Get(string(cate)).Incr(1)
-		switch cmdName {
-		case "PING":
-			s.server.syncCounters.Get("ping").Incr(1)
+	key, _ := cmd.ArgAtIndex(1)
+	aofkey := fmt.Sprintf("queue_%d", SumOfBytesChars(key)%s.queueCount)
+	lst := s.aofRedis.GetList(aofkey)
+	out, err := s.encodeCommand(cmd)
+	if err == nil {
+		lst.RPush(out)
+	} else {
+		fmt.Println("err,", err)
+	}
+	// _ = s.server.InvokeCommandHandler(s.session, cmd)
+}
+
+func (s *SlaveSessionClient) queueProcess(aofkey string) {
+	lst := s.aofRedis.GetList(aofkey)
+	for {
+		if s.shouldStopRunloop {
+			return
 		}
-	case *keyValuePair:
-		kv := obj.(*keyValuePair)
-		entryKey := string(kv.Key.([]byte))
-		s.server.syncCounters.Get("total").Incr(1)
-		switch kv.EntryType {
-		case EntryTypeString:
-			s.server.syncCounters.Get("string").Incr(1)
-			s.server.levelRedis.Strings().Set(kv.Key.([]byte), kv.Value.([]byte))
-		case EntryTypeHash:
-			s.server.syncCounters.Get("hash").Incr(1)
-			s.server.levelRedis.GetHash(entryKey).Set(kv.Value.([][]byte)...)
-		case EntryTypeList:
-			s.server.syncCounters.Get("list").Incr(1)
-			s.server.levelRedis.GetList(entryKey).RPush(kv.Value.([][]byte)...)
-		case EntryTypeSet:
-			s.server.syncCounters.Get("set").Incr(1)
-			s.server.levelRedis.GetSet(entryKey).Set(kv.Value.([][]byte)...)
-		case EntryTypeSortedSet:
-			s.server.syncCounters.Get("zset").Incr(1)
-			zset := s.server.levelRedis.GetSortedSet(entryKey)
-			zset.Add(kv.Value.([][]byte)...)
-		default:
-			s.server.stdlog.Warn("[%s] bad entry type", s.session.RemoteAddr())
+		if lst.Len() == 0 {
+			time.Sleep(time.Millisecond * time.Duration(100))
 		}
-	default:
-		s.server.stdlog.Warn("[%s] bad queue obj", s.session.RemoteAddr())
+		elem, e1 := lst.LPop()
+		if e1 != nil {
+			fmt.Println("lpop err", aofkey, e1)
+			time.Sleep(time.Millisecond * time.Duration(100))
+			continue
+		}
+		if elem == nil {
+			continue
+		}
+		cmd, e2 := s.decodeCommand(elem.Value.([]byte))
+		if e2 != nil {
+			fmt.Println("decode err", aofkey, e1)
+			time.Sleep(time.Millisecond * time.Duration(100))
+			continue
+		}
+		fmt.Println(aofkey, lst.Len(), "->pop", cmd)
+		// cmd := NewCommand(obj.([]byte)...)
 	}
 }
 
-func (s *SlaveSessionClient) startSync() (err error) {
-	// 检查是goredis还是官方redis
-	var info string
-	info, err = s.detectRedisInfo("server")
-	if err != nil {
-		s.server.stdlog.Error("[%s] slave of error %s", s.session.RemoteAddr(), err)
-		return
-	}
-	isGoRedis := strings.Index(info, "goredis_version") > 0
+func (s *SlaveSessionClient) encodeCommand(cmd *Command) (out []byte, err error) {
+	enc := codec.NewEncoderBytes(&out, &s.msgpack_handle)
+	err = enc.Encode(cmd.Args)
+	return
+}
 
-	var cmdsync *Command
-	if isGoRedis {
-		// 如果是GoRedis，需要发送自身uid，实现增量同步
-		cmdsync = NewCommand([]byte("SYNC"), []byte("uid"), []byte(s.server.UID()))
-	} else {
-		// 官方Redis的SYNC不接受多参数，-ERR wrong number of arguments for 'sync' command
-		cmdsync = NewCommand([]byte("SYNC"))
-	}
-
-	s.session.WriteCommand(cmdsync)
-
-	// 这里代码有有点乱，可优化
-	readRdbFinish := false
-	var c byte
-	for {
-		c, err = s.session.PeekByte()
-		if err != nil {
-			s.server.stdlog.Warn("master gone away %s", s.session.RemoteAddr())
-			break
+func (s *SlaveSessionClient) decodeCommand(in []byte) (cmd *Command, err error) {
+	dec := codec.NewDecoderBytes(in, &s.msgpack_handle)
+	var v interface{}
+	err = dec.Decode(&v)
+	if err == nil {
+		objs, ok := v.([]interface{})
+		if !ok {
+			err = errors.New("bad command bytes")
+			return
 		}
-		if c == '*' {
-			if cmd, e2 := s.session.ReadCommand(); e2 == nil {
-				// PUSH
-				hash := 0
-				if len(cmd.Args) > 1 {
-					hash = qp.StringCharSum(cmd.StringAtIndex(1))
-				}
-				s.taskqueue.Process(hash, cmd)
-			} else {
-				s.server.stdlog.Error("sync error %s", e2)
-				err = e2
-				break
-			}
-		} else if !readRdbFinish && c == '$' {
-			s.server.stdlog.Info("[%s] sync rdb ", s.session.RemoteAddr())
-			s.session.ReadByte()
-			var rdbsize int
-			rdbsize, err = s.session.ReadLineInteger()
-			if err != nil {
-				break
-			}
-			s.server.stdlog.Info("[%s] rdb size %d bytes", s.session.RemoteAddr(), rdbsize)
-			// read
-			// dec := newDecoder(s.server, s)
-			// err = rdb.Decode(s.session, dec)
-			// if err != nil {
-			// 	break
-			// }
-			readRdbFinish = true
-		} else {
-			s.server.stdlog.Debug("[%s] skip byte %q %s", s.session.RemoteAddr(), c, string(c))
-			_, err = s.session.ReadByte()
-			if err != nil {
-				break
-			}
+		args := make([][]byte, 0, len(objs))
+		for i := 0; i < len(objs); i++ {
+			args = append(args, objs[i].([]byte))
 		}
+		cmd = NewCommand(args...)
 	}
 	return
+}
+
+func (s *SlaveSessionClient) queueHandler(t qp.Task) {
 }
