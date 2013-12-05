@@ -118,6 +118,23 @@ func copyBytes(src []byte) (dst []byte) {
 	return
 }
 
+// 获取字符串的char总值
+func SumOfStringChars(s string) (n int) {
+	count := len(s)
+	for i := 0; i < count; i++ {
+		n += count
+	}
+	return
+}
+
+func SumOfBytesChars(bs []byte) (n int) {
+	count := len(bs)
+	for i := 0; i < count; i++ {
+		n += int(bs[i])
+	}
+	return
+}
+
 func BytesToInterfaceSlice(vals [][]byte) (result []interface{}) {
 	result = make([]interface{}, len(vals))
 	for i, val := range vals {

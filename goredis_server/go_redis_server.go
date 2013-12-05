@@ -14,7 +14,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.1"
+const VERSION = "1.0.4"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -145,13 +145,13 @@ func (server *GoRedisServer) initLogger() {
 
 // 初始化从库
 func (server *GoRedisServer) initSlaveSessions() {
-	m := server.slaveIdMap()
-	server.stdlog.Info("init slaves: %s", m)
-	for uid, _ := range m {
-		slaveSession := NewSlaveSession(server, nil, uid)
-		server.slavelist.PushBack(slaveSession)
-		slaveSession.ContinueAof()
-	}
+	// m := server.slaveIdMap()
+	// server.stdlog.Info("init slaves: %s", m)
+	// for uid, _ := range m {
+	// 	slaveSession := NewSlaveSession(server, nil, uid)
+	// 	server.slavelist.PushBack(slaveSession)
+	// 	slaveSession.ContinueAof()
+	// }
 }
 
 // 命令执行监控
@@ -197,7 +197,8 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) {
 		// 同步到从库
 		if _, ok := server.needSyncCmdTable[cmdName]; ok {
 			for e := server.slavelist.Front(); e != nil; e = e.Next() {
-				e.Value.(*SlaveSession).AsyncSendCommand(cmd)
+				// TODO
+				// e.Value.(*SlaveSession).AsyncSendCommand(cmd)
 			}
 		}
 	}()

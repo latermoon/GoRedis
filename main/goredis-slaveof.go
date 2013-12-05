@@ -4,7 +4,7 @@
 package main
 
 import (
-	"../goredis_server"
+	. "./tool/slaveof"
 	"flag"
 	"fmt"
 	"os"
@@ -15,12 +15,12 @@ import (
 func main() {
 	version := flag.Bool("v", false, "print goredis-slaveof version")
 	srcPtr := flag.String("src", "", "source host")
-	dstPtr := flag.Int("dst", 1602, "dest host")
+	dstPtr := flag.String("dst", "", "dest host")
 	procsPtr := flag.Int("procs", 8, "GOMAXPROCS")
 	flag.Parse()
 
 	if *version {
-		fmt.Println("goredis-slaveof", "0.1.1")
+		fmt.Println("goredis-slaveof", "0.1.2")
 		return
 	}
 
@@ -33,7 +33,16 @@ func main() {
 		dbhome = "/tmp"
 	}
 
-	directory := fmt.Sprintf("%s/goredis_%s_slaveof_%s/", dbhome, *dstPtr, *srcPtr)
-	os.MkdirAll(directory, os.ModePerm)
+	if len(*dstPtr) == 0 || len(*srcPtr) == 0 {
+		panic("bad dsthost or srchost")
+	}
 
+	directory := fmt.Sprintf("%s/goredis_%s_slaveof_%s/", dbhome, *dstPtr, *srcPtr)
+	fmt.Println("dbhome:", directory)
+
+	slaveClient, err := NewSlaveOf(directory, *srcPtr, *dstPtr)
+	if err != nil {
+		panic(err)
+	}
+	slaveClient.Start()
 }

@@ -21,11 +21,12 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 	}
 	// format score
 	for i := 0; i < count; i += 2 {
-		scoreInt, err := strconv.ParseInt(string(scoreMembers[i]), 10, 64)
+		scorefloat, err := strconv.ParseFloat(string(scoreMembers[i]), 64)
 		if err != nil {
 			return ErrorReply("bad score")
 		}
 		// replace score
+		scoreInt := int64(scorefloat)
 		scoreMembers[i] = util.Int64ToBytes(scoreInt)
 	}
 	// add

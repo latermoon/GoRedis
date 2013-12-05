@@ -22,9 +22,10 @@ type LevelList struct {
 	redis    *LevelRedis
 	entryKey string
 	// 游标控制
-	start int64
-	end   int64
-	mu    sync.Mutex
+	start         int64
+	end           int64
+	mu            sync.Mutex
+	inTransaction bool // 处于事务过程
 }
 
 func NewLevelList(redis *LevelRedis, entryKey string) (l *LevelList) {
@@ -75,6 +76,30 @@ func (l *LevelList) idxKey(idx int64) []byte {
 	return joinStringBytes(LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "idx", ":", idxStr)
 }
 
+// 打开事务后，每次push不会更新infoKey()的内容，以达到提速和事务效果
+func (l *LevelList) BeginTransaction() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.inTransaction {
+		return
+	}
+	l.inTransaction = true
+}
+
+func (l *LevelList) Commit() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if !l.inTransaction {
+		return
+	}
+	if l.len() == 0 {
+		l.redis.db.Delete(l.redis.wo, l.infoKey())
+	} else {
+		l.redis.db.Put(l.redis.wo, l.infoKey(), l.infoValue())
+	}
+	l.inTransaction = false
+}
+
 func (l *LevelList) LPush(values ...[]byte) (err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -86,7 +111,9 @@ func (l *LevelList) LPush(values ...[]byte) (err error) {
 		l.start--
 		batch.Put(l.idxKey(l.start), value)
 	}
-	batch.Put(l.infoKey(), l.infoValue())
+	if !l.inTransaction {
+		batch.Put(l.infoKey(), l.infoValue())
+	}
 	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		// 回退
@@ -106,7 +133,9 @@ func (l *LevelList) RPush(values ...[]byte) (err error) {
 		l.end++
 		batch.Put(l.idxKey(l.end), value)
 	}
-	batch.Put(l.infoKey(), l.infoValue())
+	if !l.inTransaction {
+		batch.Put(l.infoKey(), l.infoValue())
+	}
 	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		// 回退
