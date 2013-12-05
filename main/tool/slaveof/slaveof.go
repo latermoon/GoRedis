@@ -64,7 +64,7 @@ func (s *SlaveOf) initConnection() (err error) {
 	}
 	s.session = NewSlaveSession(NewSession(srcconn), s.srchost)
 	s.pool = &redis.Pool{
-		MaxIdle:     100,
+		MaxIdle:     500,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", s.dsthost)
@@ -180,13 +180,13 @@ func (s *SlaveOf) queueProcess(i int) {
 			continue
 		}
 		conn := s.pool.Get()
-		defer conn.Close()
 		argCount := len(cmd.Args) - 1
 		objs := make([]interface{}, 0, argCount)
 		for i := 0; i < argCount; i++ {
 			objs = append(objs, cmd.Args[i+1])
 		}
 		conn.Do(cmd.Name(), objs...)
+		conn.Close()
 		// fmt.Println(aofkey, lst.Len(), "->pop", cmd)
 		// cmd := NewCommand(obj.([]byte)...)
 	}
