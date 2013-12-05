@@ -25,6 +25,7 @@ type SlaveSessionClient struct {
 	shouldStopRunloop bool             // 跳出runloop指令
 	aofRedis          *levelredis.LevelRedis
 	queueCount        int // 队列数
+	queueLists        []*levelredis.LevelList
 	msgpack_handle    codec.MsgpackHandle
 	// 监控
 	syncCounters *monitor.Counters
@@ -39,7 +40,7 @@ func NewSlaveSessionClient(server *GoRedisServer, session *SlaveSession) (s *Sla
 	s.session = session
 	// s.taskqueue = qp.NewQueueProcess(100, s.queueHandler)
 	s.queueCount = 100
-	s.homedir = s.server.directory + "slaveof_" + s.session.MasterHost()
+	s.homedir = fmt.Sprintf("%sslaveof_%s", s.server.directory, s.session.RemoteAddr())
 	os.MkdirAll(s.homedir, os.ModePerm)
 	s.initMonitor()
 	s.initSlaveDb()
@@ -58,6 +59,13 @@ func (s *SlaveSessionClient) initSlaveDb() (err error) {
 		return e1
 	}
 	s.aofRedis = levelredis.NewLevelRedis(db)
+	// init lists
+	s.queueLists = make([]*levelredis.LevelList, s.queueCount)
+	for i := 0; i < s.queueCount; i++ {
+		aofkey := fmt.Sprintf("queue_%d", i)
+		s.queueLists[i] = s.aofRedis.GetList(aofkey)
+		s.queueLists[i].BeginTransaction()
+	}
 	return
 }
 
@@ -101,8 +109,7 @@ func (s *SlaveSessionClient) didRecvCommand(cmd *Command, count int64, isrdb boo
 		s.syncCounters.Get("cmdsync").Incr(1)
 	}
 	key, _ := cmd.ArgAtIndex(1)
-	aofkey := fmt.Sprintf("queue_%d", SumOfBytesChars(key)%s.queueCount)
-	lst := s.aofRedis.GetList(aofkey)
+	lst := s.queueLists[SumOfBytesChars(key)%s.queueCount]
 	out, err := s.encodeCommand(cmd)
 	if err == nil {
 		lst.RPush(out)
@@ -115,13 +122,13 @@ func (s *SlaveSessionClient) didRecvCommand(cmd *Command, count int64, isrdb boo
 // 当rdb同步结束后，开始启动消费队列
 func (s *SlaveSessionClient) rdbFinished(count int64) {
 	for i := 0; i < s.queueCount; i++ {
-		aofkey := fmt.Sprintf("queue_%d", i)
-		go s.queueProcess(aofkey)
+		s.queueLists[i].Commit()
+		go s.queueProcess(i)
 	}
 }
 
-func (s *SlaveSessionClient) queueProcess(aofkey string) {
-	lst := s.aofRedis.GetList(aofkey)
+func (s *SlaveSessionClient) queueProcess(i int) {
+	lst := s.queueLists[i]
 	for {
 		if s.shouldStopRunloop {
 			return
@@ -131,7 +138,7 @@ func (s *SlaveSessionClient) queueProcess(aofkey string) {
 		}
 		elem, e1 := lst.LPop()
 		if e1 != nil {
-			fmt.Println("lpop err", aofkey, e1)
+			fmt.Println("lpop err", i, e1)
 			time.Sleep(time.Millisecond * time.Duration(100))
 			continue
 		}
@@ -142,7 +149,7 @@ func (s *SlaveSessionClient) queueProcess(aofkey string) {
 		s.syncCounters.Get("proc").Incr(1)
 		_, e2 := s.decodeCommand(elem.Value.([]byte))
 		if e2 != nil {
-			fmt.Println("decode err", aofkey, e1)
+			fmt.Println("decode err", i, e1)
 			time.Sleep(time.Millisecond * time.Duration(100))
 			continue
 		}
