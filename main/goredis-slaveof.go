@@ -20,7 +20,7 @@ func main() {
 	flag.Parse()
 
 	if *version {
-		fmt.Println("goredis-slaveof", "0.1.1")
+		fmt.Println("goredis-slaveof", "0.1.2")
 		return
 	}
 
