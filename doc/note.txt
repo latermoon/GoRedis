@@ -1,71 +1,36 @@
-## Data
-"__goredis:slaves"
-"__goredis:uid"
-
-"__key|name|string" = "latermoon"
-"__key|age|string" = "27"
-"__key|user:100422:setting|hash" = [count]
-"__key|paul|list" = [start, 3, end, 4]
-"__key|_kikc_momoid_|set" = [count]
-
-
-"__hash|user:100422:setting|field|ok"
-"__list:paul:idx:3" = 100423
-"__list:paul:idx:4" = 100428
-"__set:_kikc_momoid_:field:100422" = true
-"__set:_kikc_momoid_:field:100423" = true
-"__set:_kikc_momoid_:field:100428" = true
-
-
- 4) "__list[paul]idx#1"
- 5) "__list[paul]idx#10"
- 6) "__list[paul]idx#11"
- 7) "__list[paul]idx#2"
- 8) "__list[paul]idx#3"
- 9) "__list[paul]idx#4"
-10) "__list[paul]idx#5"
-11) "__list[paul]idx#6"
-12) "__list[paul]idx#7"
-13) "__list[paul]idx#8"
-14) "__list[paul]idx#9"
-
 ## Commands
 http://redis.io/commands
 
 ### string 
-get/set/mget/mset
-incr/decr/incrby/decrby
-NOTSUPPORTED(append/bitcount/bitop/getbit/getrange/getset/incrbyfloat/msetnx/psetex/setbit/setex/setnx/setrange/strlen)
+	get/set/mget/mset
+	incr/decr/incrby/decrby
+	NOTSUPPORTED(append/bitcount/bitop/getbit/getrange/getset/incrbyfloat/msetnx/psetex/setbit/setex/setnx/setrange/strlen)
 
 ### key
-del key [key ...]
-key_next prefix [count]
-key_prev prefix [count]
-type key
-NOTSUPPORTED()
+	del key [key ...]
+	key_next prefix [count]
+	key_prev prefix [count]
+	type key
+	NOTSUPPORTED()
 
 ### hash
-hget/hset/hmget/hmset
-hgetall
-hlen
-hdel
-NOTSUPPORTED(hexists/hincrby/hincrbyfloat/hkeys/hsetnx/hvals/hscan)
+	hget/hset/hmget/hmset
+	hgetall
+	hlen
+	hdel
+	NOTSUPPORTED(hexists/hincrby/hincrbyfloat/hkeys/hsetnx/hvals/hscan)
 
 ### list
-lpush/lpop/rpush/rpop
-lindex
-lrange
-llen
-NOTSUPPORTED(blpop/brpop/brpoplpush/linsert/lpushx/lrem/lset/ltrim/rpoplpush/rpushx)
+	lpush/lpop/rpush/rpop
+	lindex
+	lrange
+	llen
+	NOTSUPPORTED(blpop/brpop/brpoplpush/linsert/lpushx/lrem/lset/ltrim/rpoplpush/rpushx)
 
 ### zset 
-zadd
-zrange/zrangebyscore
-zrem/zremrangebyrank/zremrangebyscore
-zcard/zscore
-NOTSUPPORTED(zcount/zincrby/zinterstore/zrank/...)
+	zadd
+	zrange/zrangebyscore
+	zrem/zremrangebyrank/zremrangebyscore
+	zcard/zscore
+	NOTSUPPORTED(zcount/zincrby/zinterstore/zrank/...)
 
-zadd aaa 1002 a 100 b 1005 c 20 d 10043 e
-zremrangebyscore aaa 10 1002
-zremrangebyrank aaa 0 2
-key_next "__zset" 100

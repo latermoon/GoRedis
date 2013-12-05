@@ -4,9 +4,11 @@
 package main
 
 import (
-	"../goredis_server"
+	. "../goredis"
+	. "../goredis_server"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"runtime"
 )
@@ -34,6 +36,17 @@ func main() {
 	}
 
 	directory := fmt.Sprintf("%s/goredis_%s_slaveof_%s/", dbhome, *dstPtr, *srcPtr)
-	os.MkdirAll(directory, os.ModePerm)
+	fmt.Println("dbhome:", directory)
+	// os.MkdirAll(directory, os.ModePerm)
 
+	conn, err := net.Dial("tcp", "latermoon.momo.com:6379")
+	if err != nil {
+		panic(err)
+	}
+
+	slave := NewSlaveSession(NewSession(conn))
+	slave.DidRecvCommand = func(cmd *Command, count int64) {
+		fmt.Println(count, cmd)
+	}
+	slave.Sync()
 }

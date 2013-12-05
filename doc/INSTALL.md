@@ -1,25 +1,26 @@
-### install go
-wget latermoon:8000/go1.1.2.linux-amd64.tar.gz
-tar zxvf go1.1.2.linux-amd64.tar.gz
-mkdir /home/server/gopath
 
-vi /etc/profile
-export PATH=$PATH:/home/server/go/bin
-export GOROOT=/home/server/go/
-export GOPATH=/home/server/gopath/
+### install go
+
+	wget latermoon:8000/go1.1.2.linux-amd64.tar.gz
+	tar zxvf go1.1.2.linux-amd64.tar.gz
+	mkdir /home/server/gopath
+
+	vi /etc/profile
+	export PATH=$PATH:/home/server/go/bin
+	export GOROOT=/home/server/go/
+	export GOPATH=/home/server/gopath/
 
 ### git
-yum install git
-git clone -b GoRedisDev https://github.com/latermoon/GoRedis.git GoRedisDev
-git fetch
 
-vi /etc/hosts
-207.97.227.239 github.com
-204.232.175.94 gist.github.com
-207.97.227.243 raw.github.com
-203.208.46.176  code.google.com
+	yum install git
+	git clone -b GoRedisDev https://github.com/latermoon/GoRedis.git GoRedisDev
+	git fetch
 
-yum install hg
+	yum install hg
 
-go get github.com/syndtr/goleveldb/leveldb
+### leveldb for golang
+
+	yum install leveldb
+	
+	go get github.com/latermoon/levigo
 
