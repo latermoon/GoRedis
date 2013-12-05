@@ -116,7 +116,6 @@ func (s *SlaveSessionClient) didRecvCommand(cmd *Command, count int64, isrdb boo
 	} else {
 		fmt.Println("err,", err)
 	}
-	// _ = s.server.InvokeCommandHandler(s.session, cmd)
 }
 
 // 当rdb同步结束后，开始启动消费队列
@@ -147,12 +146,13 @@ func (s *SlaveSessionClient) queueProcess(i int) {
 		}
 		s.syncCounters.Get("buffer").Incr(-1)
 		s.syncCounters.Get("proc").Incr(1)
-		_, e2 := s.decodeCommand(elem.Value.([]byte))
+		cmd, e2 := s.decodeCommand(elem.Value.([]byte))
 		if e2 != nil {
 			fmt.Println("decode err", i, e1)
 			time.Sleep(time.Millisecond * time.Duration(100))
 			continue
 		}
+		_ = s.server.InvokeCommandHandler(s.session.Session(), cmd)
 		// fmt.Println(aofkey, lst.Len(), "->pop", cmd)
 		// cmd := NewCommand(obj.([]byte)...)
 	}

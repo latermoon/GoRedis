@@ -40,6 +40,10 @@ func NewSlaveSession(sess *Session, masterHost string) (s *SlaveSession) {
 	return
 }
 
+func (s *SlaveSession) Session() (sess *Session) {
+	return s.session
+}
+
 func (s *SlaveSession) MasterHost() string {
 	return s.masterHost
 }
