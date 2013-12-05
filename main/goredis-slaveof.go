@@ -39,7 +39,7 @@ func main() {
 	fmt.Println("dbhome:", directory)
 	// os.MkdirAll(directory, os.ModePerm)
 
-	conn, err := net.Dial("tcp", "latermoon.momo.com:6379")
+	conn, err := net.Dial("tcp", "redis-relation-a003:7200")
 	if err != nil {
 		panic(err)
 	}
