@@ -5,6 +5,7 @@ import (
 	"./libs/rdb"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -34,8 +35,13 @@ func NewSlaveSession(sess *Session) (s *SlaveSession) {
 	return
 }
 
-func (s *SlaveSession) Sync() (err error) {
+func (s *SlaveSession) Sync(uid string) (err error) {
 	s.status = SSConnecting
+	var isgoredis bool
+	isgoredis, err = s.isSlaveOfGoRedis()
+	if err != nil {
+		return
+	}
 	s.session.WriteCommand(NewCommand([]byte("SYNC")))
 	readRdbFinish := false
 	var c byte
@@ -76,6 +82,36 @@ func (s *SlaveSession) Sync() (err error) {
 			if err != nil {
 				break
 			}
+		}
+	}
+	return
+}
+
+func (s *SlaveSession) isSlaveOfGoRedis() (isGoRedis bool, err error) {
+	// 检查是goredis还是官方redis
+	var info string
+	info, err = s.getRedisInfo("server")
+	if err != nil {
+		return
+	}
+	isGoRedis = strings.Index(info, "goredis_version") > 0
+	return
+}
+
+// 获取redis info
+func (s *SlaveSession) getRedisInfo(section string) (info string, err error) {
+	cmdinfo := NewCommand([]byte("INFO"), []byte(section))
+	s.session.WriteCommand(cmdinfo)
+	var reply *Reply
+	reply, err = s.session.ReadReply()
+	if err == nil {
+		switch reply.Value.(type) {
+		case string:
+			info = reply.Value.(string)
+		case []byte:
+			info = string(reply.Value.([]byte))
+		default:
+			info = reply.String()
 		}
 	}
 	return

@@ -4,7 +4,7 @@ package goredis_server
 实现类似于mongo的document base指令，
 对一个key提供docuemnt存储，以及原子操作
 
-user:100422:doc = {
+user:100422:profile = {
 	name: "latermoon", // string
 	sex: 1 // int
 	photos: ["a.jpg", "b.jpg", "c.jpg"], // array<string>

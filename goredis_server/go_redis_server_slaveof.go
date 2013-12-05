@@ -21,6 +21,7 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 	reply = StatusReply("OK")
 	// 异步处理
 	session := NewSession(conn)
+	slaveSession := NewSlaveSession(session)
 	slaveClient := NewSlaveSessionClient(server, session)
 	go slaveClient.Start()
 	return

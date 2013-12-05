@@ -1,5 +1,9 @@
 package goredis_server
 
+/*
+slaveClient.Start()
+slaveClient.Stop()
+*/
 import (
 	. "../goredis"
 	// "./libs/levelredis"
@@ -7,44 +11,19 @@ import (
 	"strings"
 )
 
-type keyValuePair struct {
-	Key       interface{}
-	Value     interface{}
-	EntryType EntryType
-}
-
 // 主从同步中的从库连接
 type SlaveSessionClient struct {
-	session           *Session
+	session           *SlaveSession
 	server            *GoRedisServer
 	taskqueue         *qp.QueueProcess // 队列处理
 	shouldStopRunloop bool             // 跳出runloop指令
 }
 
-func NewSlaveSessionClient(server *GoRedisServer, session *Session) (s *SlaveSessionClient) {
+func NewSlaveSessionClient(server *GoRedisServer, session *SlaveSession) (s *SlaveSessionClient) {
 	s = &SlaveSessionClient{}
 	s.server = server
 	s.session = session
 	s.taskqueue = qp.NewQueueProcess(100, s.queueHandler)
-	return
-}
-
-// 获取redis info
-func (s *SlaveSessionClient) detectRedisInfo(section string) (info string, err error) {
-	cmdinfo := NewCommand([]byte("INFO"), []byte(section))
-	s.session.WriteCommand(cmdinfo)
-	var reply *Reply
-	reply, err = s.session.ReadReply()
-	if err == nil {
-		switch reply.Value.(type) {
-		case string:
-			info = reply.Value.(string)
-		case []byte:
-			info = string(reply.Value.([]byte))
-		default:
-			info = reply.String()
-		}
-	}
 	return
 }
 
