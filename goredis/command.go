@@ -63,7 +63,11 @@ func (cmd *Command) Int64AtIndex(i int) (n int64, err error) {
 		err = errors.New("Argument out of range")
 		return
 	}
-	n, err = strconv.ParseInt(string(cmd.Args[i]), 10, 64)
+	var f float64
+	f, err = strconv.ParseFloat(string(cmd.Args[i]), 64)
+	if err == nil {
+		n = int64(f)
+	}
 	return
 }
 
