@@ -125,16 +125,43 @@ func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 	return
 }
 
+// 返回-1表示member不存在
+func (l *LevelZSet) Rank(high2low bool, member []byte) (idx int) {
+	// 对于不存在的key，先检查一次，减少扫描成本
+	if l.Score(member) == nil {
+		return -1
+	}
+	direction := IteratorForward
+	if high2low {
+		direction = IteratorBackward
+	}
+	idx = -1
+	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), direction, func(i int, key, value []byte, quit *bool) {
+		_, curmember := l.splitScoreKey(key)
+		// fmt.Println(i, string(key), string(curmember), string(member))
+		rtn := bytes.Compare(member, curmember)
+		if rtn == 0 {
+			idx = i
+			*quit = true
+		} else if high2low && rtn > 0 {
+			*quit = true
+			return
+		} else if !high2low && rtn < 0 {
+			*quit = true
+			return
+		}
+	})
+	return
+}
+
 func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [][]byte) {
 	direction := IteratorForward
 	if high2low {
 		direction = IteratorBackward
 	}
-	min := l.scoreKeyPrefix()
-	max := append(min, MAXBYTE)
 	scoreMembers = make([][]byte, 0, 2)
-	l.redis.Enumerate(min, max, direction, func(i int, key, value []byte, quit *bool) {
-		// fmt.Println(string(min), string(max), start, stop, i, string(key), string(value))
+	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), direction, func(i int, key, value []byte, quit *bool) {
+		// fmt.Println(i, string(key))
 		if i < start {
 			return
 		} else if i >= start && (stop == -1 || i <= stop) {

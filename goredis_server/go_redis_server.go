@@ -14,7 +14,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.4"
+const VERSION = "1.0.6"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -34,11 +34,9 @@ type GoRedisServer struct {
 	// counters
 	cmdCounters     *monitor.Counters
 	cmdCateCounters *monitor.Counters // 指令集统计
-	syncCounters    *monitor.Counters
 	// logger
-	cmdMonitor  *monitor.StatusLogger
-	syncMonitor *monitor.StatusLogger
-	stdlog      *golog.Logger
+	cmdMonitor *monitor.StatusLogger
+	stdlog     *golog.Logger
 	// 从库
 	uid              string // 实例id
 	slavelist        *list.List
@@ -66,7 +64,6 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	// counter
 	server.cmdCounters = monitor.NewCounters()
 	server.cmdCateCounters = monitor.NewCounters()
-	server.syncCounters = monitor.NewCounters()
 	return
 }
 
@@ -93,7 +90,6 @@ func (server *GoRedisServer) Init() (err error) {
 	server.config = levelredis.NewLevelConfig(server.levelRedis, goredisPrefix+"config:")
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
-	server.initSyncMonitor(server.directory + "/sync.log")
 	// slave
 	server.stdlog.Info("init uid %s", server.UID())
 	server.initSlaveSessions()
@@ -170,19 +166,6 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 		server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCateCounters.Get(cateName), cateName, padding, "ChangedCount"))
 	}
 	go server.cmdMonitor.Start()
-}
-
-// 从库同步监控
-func (server *GoRedisServer) initSyncMonitor(path string) {
-	server.syncMonitor = monitor.NewStatusLogger(path)
-	server.syncMonitor.Add(monitor.NewTimeFormater("Time", 8))
-	cmds := []string{"total", "string", "hash", "set", "list", "zset", "ping"}
-	for _, cmd := range cmds {
-		server.syncMonitor.Add(monitor.NewCountFormater(server.syncCounters.Get(cmd), cmd, 8, "ChangedCount"))
-	}
-	// buffer用于显示同步过程中的taskqueue buffer长度
-	server.syncMonitor.Add(monitor.NewCountFormater(server.syncCounters.Get("buffer"), "buffer", 9, "Count"))
-	go server.syncMonitor.Start()
 }
 
 // for CommandHandler

@@ -106,7 +106,7 @@ func ErrorReply(err interface{}) (r *Reply) {
 	case error:
 		r.Value = err.(error).Error()
 	default:
-		panic("Bad err val")
+		r.Value = fmt.Sprint(err)
 	}
 	return
 }

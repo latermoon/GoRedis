@@ -9,6 +9,7 @@ package goredis
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strconv"
 )
 
@@ -37,12 +38,15 @@ func (cmd *Command) Name() string {
 
 // 参数按字符串返回
 func (cmd *Command) StringAtIndex(i int) string {
+	if i >= len(cmd.Args) {
+		return ""
+	}
 	return string(cmd.Args[i])
 }
 
 func (cmd *Command) ArgAtIndex(i int) (arg []byte, err error) {
 	if i >= len(cmd.Args) {
-		err = errors.New("Argument out of range")
+		err = errors.New(fmt.Sprintf("out of range %d/%d", i, len(cmd.Args)))
 		return
 	}
 	arg = cmd.Args[i]
@@ -50,26 +54,24 @@ func (cmd *Command) ArgAtIndex(i int) (arg []byte, err error) {
 }
 
 func (cmd *Command) IntAtIndex(i int) (n int, err error) {
-	if i >= len(cmd.Args) {
-		err = errors.New("Argument out of range")
-		return
+	var f float64
+	if f, err = cmd.FloatAtIndex(i); err == nil {
+		n = int(f)
 	}
-	n, err = strconv.Atoi(string(cmd.Args[i]))
 	return
 }
 
 func (cmd *Command) Int64AtIndex(i int) (n int64, err error) {
-	if i >= len(cmd.Args) {
-		err = errors.New("Argument out of range")
-		return
+	var f float64
+	if f, err = cmd.FloatAtIndex(i); err == nil {
+		n = int64(f)
 	}
-	n, err = strconv.ParseInt(string(cmd.Args[i]), 10, 64)
 	return
 }
 
 func (cmd *Command) FloatAtIndex(i int) (n float64, err error) {
 	if i >= len(cmd.Args) {
-		err = errors.New("Argument out of range")
+		err = errors.New(fmt.Sprintf("out of range %d/%d", i, len(cmd.Args)))
 		return
 	}
 	n, err = strconv.ParseFloat(string(cmd.Args[i]), 64)

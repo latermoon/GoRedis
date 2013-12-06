@@ -5,6 +5,7 @@ package levelredis
 
 string
 	+[name]string = "latermoon"
+	+[name]string#e1083 = "latermoon"
 hash
 	+[info]hash = ""
 	_h[info]name = "latermoon"
@@ -24,7 +25,6 @@ zset
 	_z[user_rank]m#100422 = "1002"
 	_z[user_rank]m#100423 = "1006"
 	_z[user_rank]m#300000 = "10102"
-
 */
 
 import (
@@ -220,6 +220,67 @@ func (l *LevelRedis) Keys(prefix []byte, fn func(i int, key, keytype []byte, qui
 		fn(i, key[left+1:right], key[right+1:], quit)
 		// fmt.Println(string(min), string(max), i, string(key), string(value), string(keytype), *quit)
 	})
+}
+
+func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IteratorDirection, fn func(i int, key, value []byte, quit *bool)) {
+	iter := l.db.NewIterator(l.ro)
+	defer iter.Close()
+	found := false
+	if direction == IteratorForward {
+		iter.Seek(prefix)
+	} else {
+		var seek []byte
+		// 从后面搜索时，设定适合的最大值
+		if len(prefix) > 0 {
+			seek = copyBytes(prefix)
+			if prefix[len(prefix)-1] < MAXBYTE {
+				// seek[len(seek)-1] = MAXBYTE
+				seek = append(seek, MAXBYTE)
+			}
+		} else {
+			seek = []byte{MAXBYTE}
+		}
+		// fmt.Println("seek ", string(prefix), " ", string(seek))
+		iter.Seek(seek)
+	}
+	found = iter.Valid()
+	if !found {
+		return
+	}
+
+	i := -1
+	if found && bytes.HasPrefix(iter.Key(), prefix) {
+		i++
+		quit := false
+		fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
+		if quit {
+			return
+		}
+	}
+	for {
+		found = false
+		if direction == IteratorBackward {
+			iter.Prev()
+			found = iter.Valid()
+			if !found || !bytes.HasPrefix(iter.Key(), prefix) {
+				break
+			}
+		} else {
+			iter.Next()
+			found = iter.Valid()
+			if !found || !bytes.HasPrefix(iter.Key(), prefix) {
+				break
+			}
+		}
+		i++
+		quit := false
+		fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
+		if quit {
+			return
+		}
+	}
+
+	return
 }
 
 // key范围枚举

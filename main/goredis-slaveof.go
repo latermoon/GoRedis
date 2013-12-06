@@ -1,4 +1,6 @@
-// goredis-slaveof从库中转站
+// goredis-slaveof 主从同步代理
+// 典型应用场景是异地机房redis主从同步，master和goredis-slaveof在同一个机房，保障稳定连接
+// 然后goredis-slaveof把master的数据队列到本地，然后传输到异地机房slave实例，专线断开不会导致全量主从同步
 // @author latermoon
 
 package main
