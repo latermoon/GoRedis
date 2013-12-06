@@ -234,12 +234,13 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IteratorDirection,
 		if len(prefix) > 0 {
 			seek = copyBytes(prefix)
 			if prefix[len(prefix)-1] < MAXBYTE {
-				seek[len(seek)-1] = MAXBYTE
+				// seek[len(seek)-1] = MAXBYTE
+				seek = append(seek, MAXBYTE)
 			}
 		} else {
 			seek = []byte{MAXBYTE}
 		}
-		// fmt.Println(string(prefix), " ", string(seek))
+		// fmt.Println("seek ", string(prefix), " ", string(seek))
 		iter.Seek(seek)
 	}
 	found = iter.Valid()

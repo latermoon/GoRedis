@@ -44,6 +44,29 @@ func (server *GoRedisServer) OnZCARD(cmd *Command) (reply *Reply) {
 	return
 }
 
+func (server *GoRedisServer) zrank(cmd *Command, high2low bool) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	member, err := cmd.ArgAtIndex(2)
+	if err != nil {
+		return ErrorReply(err)
+	}
+	zset := server.levelRedis.GetSortedSet(key)
+	idx := zset.Rank(high2low, member)
+	if idx == -1 {
+		return BulkReply(nil)
+	} else {
+		return IntegerReply(idx)
+	}
+}
+
+func (server *GoRedisServer) OnZRANK(cmd *Command) (reply *Reply) {
+	return server.zrank(cmd, false)
+}
+
+func (server *GoRedisServer) OnZREVRANK(cmd *Command) (reply *Reply) {
+	return server.zrank(cmd, true)
+}
+
 func (server *GoRedisServer) rangeByIndex(cmd *Command, high2low bool) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	start, e1 := cmd.IntAtIndex(2)

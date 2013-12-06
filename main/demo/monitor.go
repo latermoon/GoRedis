@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/latermoon/redigo/redis"
 	"net"
-	"strings"
 	"time"
 )
 
@@ -39,35 +38,50 @@ func main() {
 		splitMonitorLine(line, cmd)
 
 		rd := pool.Get()
-		defer rd.Close()
 		objs := make([]interface{}, 0, len(cmd.Args)-1)
 		for _, arg := range cmd.Args[1:] {
 			objs = append(objs, arg)
 		}
 		reply, err := rd.Do(cmd.Name(), objs...)
+		rd.Close()
 
 		fmt.Println(len(cmd.Args), cmd)
-		// fmt.Println("err:", err)
 		if err == nil {
-			fmt.Println("+reply:", reply)
+			// fmt.Println("+reply:", reply)
+			printReply(reply)
 		} else {
 			fmt.Println("-err:", err)
-			if strings.Index(err.Error(), "Not Supported") >= 0 {
-
-			} else {
-				break
-			}
+			panic(err)
 		}
+	}
+}
+
+func printReply(reply interface{}) {
+	fmt.Print("+reply: ")
+	switch reply.(type) {
+	case []interface{}:
+		arr := reply.([]interface{})
+		fmt.Print("[")
+		for _, e := range arr {
+			fmt.Print(string(e.([]byte)), " ")
+		}
+		fmt.Println("]")
+	case int:
+		fmt.Println(reply)
+	case []byte:
+		fmt.Println(string(reply.([]byte)))
+	default:
+		fmt.Println(reply)
 	}
 }
 
 func init() {
 	pool = &redis.Pool{
-		MaxIdle:     2,
+		MaxIdle:     100,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
-			// c, err := redis.Dial("tcp", "goredis-nearby-a001:18400")
-			c, err := redis.Dial("tcp", "localhost:1602")
+			c, err := redis.Dial("tcp", "goredis-nearby-a001:18400")
+			// c, err := redis.Dial("tcp", "localhost:1602")
 			return c, err
 		},
 	}
