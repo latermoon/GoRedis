@@ -5,6 +5,7 @@ package levelredis
 
 string
 	+[name]string = "latermoon"
+	+[name]string#e1083 = "latermoon"
 hash
 	+[info]hash = ""
 	_h[info]name = "latermoon"
@@ -24,7 +25,6 @@ zset
 	_z[user_rank]m#100422 = "1002"
 	_z[user_rank]m#100423 = "1006"
 	_z[user_rank]m#300000 = "10102"
-
 */
 
 import (
