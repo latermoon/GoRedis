@@ -130,11 +130,9 @@ func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [
 	if high2low {
 		direction = IteratorBackward
 	}
-	min := l.scoreKeyPrefix()
-	max := append(min, MAXBYTE)
 	scoreMembers = make([][]byte, 0, 2)
-	l.redis.Enumerate(min, max, direction, func(i int, key, value []byte, quit *bool) {
-		// fmt.Println(string(min), string(max), start, stop, i, string(key), string(value))
+	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), direction, func(i int, key, value []byte, quit *bool) {
+		// fmt.Println(i, string(key))
 		if i < start {
 			return
 		} else if i >= start && (stop == -1 || i <= stop) {

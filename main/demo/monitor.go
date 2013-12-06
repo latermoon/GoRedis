@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/latermoon/redigo/redis"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -36,24 +37,33 @@ func main() {
 		}
 		cmd.Args = cmd.Args[0:0]
 		splitMonitorLine(line, cmd)
+
 		rd := pool.Get()
 		defer rd.Close()
 		objs := make([]interface{}, 0, len(cmd.Args)-1)
 		for _, arg := range cmd.Args[1:] {
 			objs = append(objs, arg)
 		}
-		reply, err := rd.Do(cmd.Name(), objs)
-		// go func() {
+		reply, err := rd.Do(cmd.Name(), objs...)
 
-		// }()
-		fmt.Println(cmd)
-		fmt.Println(reply)
+		fmt.Println(len(cmd.Args), cmd)
+		// fmt.Println("err:", err)
+		if err == nil {
+			fmt.Println("+reply:", reply)
+		} else {
+			fmt.Println("-err:", err)
+			if strings.Index(err.Error(), "Not Supported") >= 0 {
+
+			} else {
+				break
+			}
+		}
 	}
 }
 
 func init() {
 	pool = &redis.Pool{
-		MaxIdle:     200,
+		MaxIdle:     2,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			// c, err := redis.Dial("tcp", "goredis-nearby-a001:18400")
@@ -69,11 +79,11 @@ func splitMonitorLine(line []byte, cmd *Command) {
 	firstQuote := bytes.Index(line, []byte("\""))    // 第一个引号
 	lastQuote := bytes.LastIndex(line, []byte("\"")) // 最后一个引号，主要是为了去掉最后的换行符
 
-	cmdline := line[firstQuote:lastQuote]
+	cmdline := line[firstQuote : lastQuote+1]
 	reader := bytes.NewReader(cmdline)
 
-	var argidx int        // 当前操作的Args元素
-	quoteMatched := false // 引号成双匹配
+	var argidx int    // 当前操作的Args元素
+	quoteMatched := 0 // 引号出现次数
 	for {
 		c, err := reader.ReadByte()
 		if err != nil {
@@ -81,17 +91,18 @@ func splitMonitorLine(line []byte, cmd *Command) {
 		}
 		switch c {
 		case '"':
+			quoteMatched++
 			// 遇到第一个引号，创建内存空间
-			if !quoteMatched {
+			if quoteMatched == 1 {
 				cmd.Args = append(cmd.Args, []byte{})
 				argidx = len(cmd.Args) - 1
-			} else {
+			} else if quoteMatched == 2 {
 				// 遇到另一个引号，标记关闭
-				quoteMatched = true
+				quoteMatched = 0
 			}
 		case ' ':
 			//  引号内的空格属于内容
-			if !quoteMatched {
+			if quoteMatched == 1 {
 				cmd.Args[argidx] = append(cmd.Args[argidx], c)
 			}
 		case '\\':

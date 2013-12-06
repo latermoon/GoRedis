@@ -6,6 +6,7 @@ package goredis_server
 import (
 	. "../goredis"
 	"./util"
+	// "fmt"
 	"strconv"
 	"strings"
 )
@@ -62,6 +63,7 @@ func (server *GoRedisServer) rangeByIndex(cmd *Command, high2low bool) (reply *R
 	for i := 0; i < count; i += 2 {
 		bulks = append(bulks, scoreMembers[i+1])
 		if withScore {
+			// fmt.Println(i, string(scoreMembers[i]))
 			scoreInt := util.BytesToInt64(scoreMembers[i])
 			bulks = append(bulks, []byte(strconv.FormatInt(scoreInt, 10)))
 		}
