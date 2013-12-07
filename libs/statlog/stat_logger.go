@@ -7,11 +7,18 @@ insert  query update delete    res faults  conn repl       time
     *6     97    *39     *6  25.5g     18 10095  SLV   00:25:24
     *5    118    *22     *7  25.5g      6 10094  SLV   00:25:25
 
-l := statlog.NewStatLogger(wr)
-l.Add("total", func() interface{} {
+slog := statlog.NewStatLogger(os.Stdout)
+opt := &statlog.Opt{Padding: 8}
 
-})
+slog.Add(statlog.TimeItem("time"))
+slog.Add(statlog.Item("total", func() interface{} {
+	return "10"
+}, opt))
+slog.Add(statlog.Item("buffer", func() interface{} {
+	return 10342
+}, opt))
 
+slog.Start()
 */
 import (
 	"bytes"
@@ -69,9 +76,11 @@ func (s *StatLogger) Start() {
 			s.printTitle()
 			printInterval = 0
 		}
+
 		if s.beforeFunc != nil {
 			s.beforeFunc()
 		}
+		// 输出数据
 		s.printLine()
 		if s.afterFunc != nil {
 			s.afterFunc()

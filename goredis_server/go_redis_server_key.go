@@ -3,7 +3,13 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/levelredis"
+	"runtime"
 )
+
+func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
+	reply = StatusReply("PONG")
+	return
+}
 
 // 在数据量大的情况下，keys基本不可用，使用keysearch来分段扫描全部key
 func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
@@ -111,5 +117,11 @@ func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	} else {
 		reply = StatusReply("none")
 	}
+	return
+}
+
+func (server *GoRedisServer) OnGC(cmd *Command) (reply *Reply) {
+	runtime.GC()
+	reply = StatusReply("OK")
 	return
 }
