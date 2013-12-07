@@ -25,12 +25,15 @@ type Session struct {
 	*bufio.ReadWriter // 实现了Read和Write方法即可
 	conn              net.Conn
 	rw                *bufio.ReadWriter
+	curCmd            *Command // 每次ReadCommand使用同一个对象
 }
 
 func NewSession(conn net.Conn) (s *Session) {
 	s = &Session{}
 	s.conn = conn
 	s.rw = bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+	s.curCmd = &Command{}
+	s.curCmd.Args = make([][]byte, 0, 5)
 	return
 }
 
@@ -40,6 +43,18 @@ func (s *Session) LocalAddr() net.Addr {
 
 func (s *Session) RemoteAddr() net.Addr {
 	return s.conn.RemoteAddr()
+}
+
+func (s *Session) reuseCommand(argCount int) (cmd *Command) {
+	if argCount > cap(s.curCmd.Args) {
+		// 扩容
+		s.curCmd.Args = make([][]byte, 0, argCount)
+	} else {
+		// 截断复用
+		s.curCmd.Args = s.curCmd.Args[0:0]
+	}
+	cmd = s.curCmd
+	return
 }
 
 // 返回数据到客户端
@@ -162,8 +177,6 @@ $<number of bytes of argument N> CR LF
 <argument data> CR LF
 */
 func (s *Session) ReadCommand() (cmd *Command, err error) {
-	cmd = &Command{}
-
 	// Read ( *<number of arguments> CR LF )
 	err = s.skipSpecificByte('*')
 	if err != nil { // io.EOF
@@ -175,7 +188,7 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 		return
 	}
 
-	cmd.Args = make([][]byte, argCount)
+	cmd = s.reuseCommand(argCount)
 	for i := 0; i < argCount; i++ {
 		// Read ( $<number of bytes of argument 1> CR LF )
 		err = s.skipSpecificByte('$')
@@ -190,10 +203,12 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 		}
 
 		// Read ( <argument data> CR LF )
-		cmd.Args[i], err = s.BlockReadBytes(argSize)
+		var b []byte
+		b, err = s.BlockReadBytes(argSize)
 		if err != nil {
 			return
 		}
+		cmd.Args = append(cmd.Args, b)
 
 		err = s.skipSpecificBytes([]byte{CR, LF})
 		if err != nil {
