@@ -1,8 +1,8 @@
 package main
 
 import (
-	"../../libs/statlog"
-	// "fmt"
+	// "../../libs/statlog"
+	"github.com/latermoon/GoRedis/libs/statlog"
 	"os"
 	"runtime"
 )
@@ -12,18 +12,18 @@ func main() {
 }
 
 func demo1() {
-	l := statlog.NewStatLogger(os.Stdout)
+	slog := statlog.NewStatLogger(os.Stdout)
 	opt := &statlog.Opt{Padding: 8}
 
-	l.Add(statlog.TimeItem("time"))
-	l.Add(statlog.Item("total", func() interface{} {
+	slog.Add(statlog.TimeItem("time"))
+	slog.Add(statlog.Item("total", func() interface{} {
 		return "10"
 	}, opt))
-	l.Add(statlog.Item("buffer", func() interface{} {
+	slog.Add(statlog.Item("buffer", func() interface{} {
 		return 10342
 	}, opt))
 
-	l.Start()
+	slog.Start()
 }
 
 func memstats() {
