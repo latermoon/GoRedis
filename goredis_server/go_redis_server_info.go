@@ -16,7 +16,7 @@ func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
 	case "memory":
 		reply = BulkReply(server.memoryInfo())
 	default:
-		reply = ErrorReply("no section")
+		reply = BulkReply(fmt.Sprintf("goredis_version:%s", VERSION))
 	}
 	return
 }

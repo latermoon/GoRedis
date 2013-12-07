@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-// go run goredis-stat.go -p 1602 -info memory -field "m_Alloc=Alloc,b;m_Mallocs=Mallocs;m_Frees=Frees;m_HeapAlloc=HeapAlloc;m_HeapReleased=HeapReleased"
+//go run goredis-stat.go -info memory -field "m_Alloc=Alloc;m_Mallocs=Mallocs;m_Frees=Frees;m_HeapAlloc=HeapAlloc;m_HeapIdle=HeapIdle;m_HeapReleased=HeapReleased;m_HeapObjects=HeapObjects" -h goredis-nearby-a001 -p 18400
 func main() {
 	version := flag.Bool("v", false, "print goredis-stat version")
 	hostPtr := flag.String("h", "", "host")

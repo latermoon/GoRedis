@@ -1,10 +1,11 @@
 package stat
 
 import (
-	// "fmt"
+	"fmt"
 	"github.com/latermoon/GoRedis/libs/statlog"
 	"github.com/latermoon/redigo/redis"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -19,8 +20,8 @@ type StatClient struct {
 	pool        *redis.Pool
 	host        string
 	section     string // 要获取的info section
-	fields      []*Field
-	fieldMap    map[string]*Field
+	fields      []string
+	fieldNames  map[string]string
 	fieldValues map[string]string // 从info获取到的内容
 }
 
@@ -76,11 +77,11 @@ func (s *StatClient) Connect() {
 		// copy local variable
 		fn := func(field string) func() interface{} {
 			return func() interface{} {
-				return s.fieldValues[field]
+				return s.formatBytes(s.fieldValues[field])
 			}
 		}(field)
 		padding := 8
-		if len(name) > 8 {
+		if len(name) > 7 {
 			padding = len(name) + 1
 		}
 		opt := &statlog.Opt{Padding: padding}
@@ -88,6 +89,21 @@ func (s *StatClient) Connect() {
 	}
 
 	l.Start()
+}
+
+func (s *StatClient) formatBytes(t string) (str string) {
+	f, err := strconv.ParseFloat(t, 64)
+	if err != nil {
+		return t
+	}
+	if f > 1024*1024 {
+		str = fmt.Sprintf("%0.2fm", f/1024/1024)
+	} else if f > 1024 {
+		str = fmt.Sprintf("%0.1fk", f/1024)
+	} else {
+		str = t
+	}
+	return
 }
 
 func (s *StatClient) updateFieldValues() {
