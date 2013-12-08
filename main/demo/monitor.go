@@ -35,7 +35,8 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(time.Millisecond * 1000)
 		for _ = range ticker.C {
-			fmt.Println("queue:", queue.Len(), "active:", pool.ActiveCount())
+			fmt.Println("queue:", queue.QueueLen())
+			// fmt.Println("queue:", queue.Len(), "active:", pool.ActiveCount())
 		}
 	}()
 
