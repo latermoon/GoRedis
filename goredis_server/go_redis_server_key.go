@@ -3,7 +3,6 @@ package goredis_server
 import (
 	. "../goredis"
 	"./libs/levelredis"
-	"runtime"
 )
 
 func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
@@ -117,11 +116,5 @@ func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	} else {
 		reply = StatusReply("none")
 	}
-	return
-}
-
-func (server *GoRedisServer) OnGC(cmd *Command) (reply *Reply) {
-	runtime.GC()
-	reply = StatusReply("OK")
 	return
 }

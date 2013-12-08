@@ -7,12 +7,19 @@ import (
 	"fmt"
 	"github.com/latermoon/redigo/redis"
 	"net"
+	"os"
+	"runtime/pprof"
 	"time"
 )
 
 var pool *redis.Pool
 
 func main() {
+	if f, err := os.Create("/tmp/monitor.prof"); err == nil {
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	conn, err := net.Dial("tcp", "redis-event-a001:8400")
 	if err != nil {
 		panic(err)
@@ -80,8 +87,8 @@ func init() {
 		MaxIdle:     100,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", "goredis-nearby-a001:18400")
-			// c, err := redis.Dial("tcp", "localhost:1602")
+			// c, err := redis.Dial("tcp", "goredis-nearby-a001:18400")
+			c, err := redis.Dial("tcp", "localhost:1602")
 			return c, err
 		},
 	}

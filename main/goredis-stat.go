@@ -14,6 +14,7 @@ import (
 )
 
 //go run goredis-stat.go -info memory -field "m_Alloc=Alloc;m_Mallocs=Mallocs;m_Frees=Frees;m_HeapAlloc=HeapAlloc;m_HeapIdle=HeapIdle;m_HeapReleased=HeapReleased;m_HeapObjects=HeapObjects" -h goredis-nearby-a001 -p 18400
+//go run goredis-stat.go -info memory -field "m_Alloc=Alloc;m_Mallocs=Mallocs;m_Frees=Frees;m_HeapAlloc=HeapAlloc;m_HeapIdle=HeapIdle;m_HeapReleased=HeapReleased;m_HeapObjects=HeapObjects" -p 1602
 func main() {
 	version := flag.Bool("v", false, "print goredis-stat version")
 	hostPtr := flag.String("h", "", "host")
