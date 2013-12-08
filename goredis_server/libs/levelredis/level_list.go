@@ -288,12 +288,9 @@ func (l *LevelList) Len() int64 {
 func (l *LevelList) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
-	min := l.keyPrefix()
-	max := append(min, MAXBYTE)
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.PrefixEnumerate(l.keyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
 		batch.Delete(key)
 	})
 	batch.Delete(l.infoKey())

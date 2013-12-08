@@ -93,10 +93,8 @@ func (l *LevelHash) Set(fieldVals ...[]byte) (n int) {
 }
 
 func (l *LevelHash) GetAll(limit int) (elems []*HashElem) {
-	min := l.fieldPrefix()
-	max := append(min, MAXBYTE)
 	elems = make([]*HashElem, 0, 10)
-	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.PrefixEnumerate(l.fieldPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
 		if limit != -1 && i >= limit {
 			*quit = true
 			return
@@ -128,9 +126,7 @@ func (l *LevelHash) Remove(fields ...[]byte) (n int) {
 	}
 	// 检查是否已经删除完
 	hasElem := false
-	min := l.fieldPrefix()
-	max := append(min, MAXBYTE)
-	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.PrefixEnumerate(l.fieldPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
 		hasElem = true
 		*quit = true
 	})
@@ -143,9 +139,7 @@ func (l *LevelHash) Remove(fields ...[]byte) (n int) {
 // 为了数据管理方便，这里不持久化count，每次都是枚举实现
 // 为了性能保障，对于大于1000返回-1，不再扫描
 func (l *LevelHash) Count() (n int) {
-	min := l.fieldPrefix()
-	max := append(min, MAXBYTE)
-	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.PrefixEnumerate(l.fieldPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
 		n++
 		if n > 1000 {
 			n = -1
@@ -162,9 +156,7 @@ func (l *LevelHash) Drop() (ok bool) {
 
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	min := l.fieldPrefix()
-	max := append(min, MAXBYTE)
-	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.PrefixEnumerate(l.fieldPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
 		batch.Delete(key)
 	})
 	batch.Delete(l.infoKey())

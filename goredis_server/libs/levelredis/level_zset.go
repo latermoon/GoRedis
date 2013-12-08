@@ -229,11 +229,9 @@ func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.initOnce()
-	min := l.scoreKeyPrefix()
-	max := append(min, MAXBYTE)
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
 		if i < start {
 			return
 		} else if i >= start && (stop == -1 || i <= stop) {
@@ -292,9 +290,8 @@ func (l *LevelZSet) Drop() (ok bool) {
 	}
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	min := joinStringBytes(KEY_PREFIX, SEP_LEFT, l.key, SEP_RIGHT)
-	max := append(min, MAXBYTE)
-	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	prefix := joinStringBytes(KEY_PREFIX, SEP_LEFT, l.key, SEP_RIGHT)
+	l.redis.PrefixEnumerate(prefix, IteratorForward, func(i int, key, value []byte, quit *bool) {
 		batch.Delete(key)
 	})
 	batch.Delete(l.zsetKey())

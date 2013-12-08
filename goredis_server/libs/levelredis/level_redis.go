@@ -212,9 +212,8 @@ func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
 
 // keys前缀扫描
 func (l *LevelRedis) Keys(prefix []byte, fn func(i int, key, keytype []byte, quit *bool)) {
-	min := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(prefix))
-	max := append(min, 254)
-	l.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	rawprefix := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(prefix))
+	l.PrefixEnumerate(rawprefix, IteratorForward, func(i int, key, value []byte, quit *bool) {
 		left := bytes.Index(key, []byte(SEP_LEFT))
 		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
 		fn(i, key[left+1:right], key[right+1:], quit)
