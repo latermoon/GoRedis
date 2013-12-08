@@ -25,15 +25,12 @@ type Session struct {
 	*bufio.ReadWriter // 实现了Read和Write方法即可
 	conn              net.Conn
 	rw                *bufio.ReadWriter
-	curCmd            *Command // 每次ReadCommand使用同一个对象
 }
 
 func NewSession(conn net.Conn) (s *Session) {
 	s = &Session{}
 	s.conn = conn
 	s.rw = bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
-	s.curCmd = &Command{}
-	s.curCmd.Args = make([][]byte, 0, 5)
 	return
 }
 
@@ -43,18 +40,6 @@ func (s *Session) LocalAddr() net.Addr {
 
 func (s *Session) RemoteAddr() net.Addr {
 	return s.conn.RemoteAddr()
-}
-
-func (s *Session) reuseCommand(argCount int) (cmd *Command) {
-	if argCount > cap(s.curCmd.Args) {
-		// 扩容
-		s.curCmd.Args = make([][]byte, 0, argCount)
-	} else {
-		// 截断复用
-		s.curCmd.Args = s.curCmd.Args[0:0]
-	}
-	cmd = s.curCmd
-	return
 }
 
 // 返回数据到客户端
@@ -177,6 +162,8 @@ $<number of bytes of argument N> CR LF
 <argument data> CR LF
 */
 func (s *Session) ReadCommand() (cmd *Command, err error) {
+	cmd = &Command{}
+
 	// Read ( *<number of arguments> CR LF )
 	err = s.skipSpecificByte('*')
 	if err != nil { // io.EOF
@@ -188,7 +175,7 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 		return
 	}
 
-	cmd = s.reuseCommand(argCount)
+	cmd.Args = make([][]byte, argCount)
 	for i := 0; i < argCount; i++ {
 		// Read ( $<number of bytes of argument 1> CR LF )
 		err = s.skipSpecificByte('$')
@@ -203,12 +190,10 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 		}
 
 		// Read ( <argument data> CR LF )
-		var b []byte
-		b, err = s.BlockReadBytes(argSize)
+		cmd.Args[i], err = s.BlockReadBytes(argSize)
 		if err != nil {
 			return
 		}
-		cmd.Args = append(cmd.Args, b)
 
 		err = s.skipSpecificBytes([]byte{CR, LF})
 		if err != nil {
@@ -225,7 +210,7 @@ func (s *Session) replyStatus(status string) (err error) {
 	buf.WriteString("+")
 	buf.WriteString(status)
 	buf.WriteString(CRLF)
-	buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s.conn)
 	return
 }
 
@@ -235,7 +220,7 @@ func (s *Session) replyError(errmsg string) (err error) {
 	buf.WriteString("-")
 	buf.WriteString(errmsg)
 	buf.WriteString(CRLF)
-	buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s.conn)
 	return
 }
 
@@ -245,7 +230,7 @@ func (s *Session) replyInteger(i int) (err error) {
 	buf.WriteString(":")
 	buf.WriteString(strconv.Itoa(i))
 	buf.WriteString(CRLF)
-	buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s.conn)
 	return
 }
 
@@ -253,7 +238,7 @@ func (s *Session) replyInteger(i int) (err error) {
 func (s *Session) replyBulk(bulk interface{}) (err error) {
 	// NULL Bulk Reply
 	if bulk == nil {
-		s.conn.Write([]byte("$-1\r\n"))
+		_, err = s.conn.Write([]byte("$-1\r\n"))
 		return
 	}
 	buf := bytes.Buffer{}
@@ -271,7 +256,7 @@ func (s *Session) replyBulk(bulk interface{}) (err error) {
 		buf.Write(b)
 	}
 	buf.WriteString(CRLF)
-	buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s.conn)
 	return
 }
 
@@ -279,13 +264,13 @@ func (s *Session) replyBulk(bulk interface{}) (err error) {
 func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 	// Null Multi Bulk Reply
 	if bulks == nil {
-		s.conn.Write([]byte("*-1\r\n"))
+		_, err = s.conn.Write([]byte("*-1\r\n"))
 		return
 	}
 	bulkCount := len(bulks)
 	// Empty Multi Bulk Reply
 	if bulkCount == 0 {
-		s.conn.Write([]byte("*0\r\n"))
+		_, err = s.conn.Write([]byte("*0\r\n"))
 		return
 	}
 	buf := bytes.Buffer{}
@@ -320,7 +305,7 @@ func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 		}
 	}
 	// flush
-	buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s.conn)
 	return
 }
 

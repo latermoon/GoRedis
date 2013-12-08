@@ -1,3 +1,9 @@
+
+go tool pprof goredis-server /tmp/goredis_1602/mem.prof
+
+
+
+
 ## Commands
 http://redis.io/commands
 

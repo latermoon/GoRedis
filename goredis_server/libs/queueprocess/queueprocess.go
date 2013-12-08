@@ -2,6 +2,7 @@ package queueprocess
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -46,6 +47,9 @@ func (q *QueueProcess) processQueue(i int) {
 		// LPop
 		mu.Lock()
 		elem := queue.Front()
+		if queue.Len() > 200 {
+			fmt.Println(elem.Value)
+		}
 		if elem == nil {
 			mu.Unlock()
 			sleepCount++
@@ -78,6 +82,14 @@ func (q *QueueProcess) Process(hash int, t Task) {
 
 func (q *QueueProcess) Stop() {
 	q.shouldStop = true
+}
+
+func (q *QueueProcess) QueueLen() (ns []int) {
+	ns = make([]int, 0, q.thread)
+	for i := 0; i < q.thread; i++ {
+		ns = append(ns, q.queues[i].Len())
+	}
+	return
 }
 
 func (q *QueueProcess) Len() (n int) {

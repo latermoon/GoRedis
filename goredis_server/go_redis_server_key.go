@@ -1,9 +1,13 @@
 package goredis_server
 
+/*
+keysearch [prefix] [count]
+keynext [min] [count]
+*/
+
 import (
 	. "../goredis"
 	"./libs/levelredis"
-	"runtime"
 )
 
 func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
@@ -11,13 +15,14 @@ func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
 	return
 }
 
-// 在数据量大的情况下，keys基本不可用，使用keysearch来分段扫描全部key
+// 命名上使用keys来提供keysearch的扫描功能比较合理，
+// 但是为了防止开发人员错误把适用与GoRedis的keys处理代码误用到官方redis上造成卡死
+// 这里还是把keys禁用
 func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 	return ErrorReply("keys is not supported by GoRedis, use 'keysearch [prefix] [count] [withtype]' instead")
 }
 
 // 找出下一个key
-// @return ["user:100422:name", "string", "user:100428:name", "string", "user:100422:setting", "hash", ...]
 func (server *GoRedisServer) OnKEYSEARCH(cmd *Command) (reply *Reply) {
 	seekkey, err := cmd.ArgAtIndex(1)
 	if err != nil {
@@ -117,11 +122,5 @@ func (server *GoRedisServer) OnTYPE(cmd *Command) (reply *Reply) {
 	} else {
 		reply = StatusReply("none")
 	}
-	return
-}
-
-func (server *GoRedisServer) OnGC(cmd *Command) (reply *Reply) {
-	runtime.GC()
-	reply = StatusReply("OK")
 	return
 }
