@@ -161,6 +161,7 @@ func (l *LevelHash) Drop() (ok bool) {
 	defer l.mu.Unlock()
 
 	batch := levigo.NewWriteBatch()
+	defer batch.Close()
 	min := l.fieldPrefix()
 	max := append(min, MAXBYTE)
 	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {

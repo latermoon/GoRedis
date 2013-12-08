@@ -107,6 +107,7 @@ func (l *LevelList) LPush(values ...[]byte) (err error) {
 	// 左游标
 	oldstart := l.start
 	batch := levigo.NewWriteBatch()
+	defer batch.Close()
 	for _, value := range values {
 		l.start--
 		batch.Put(l.idxKey(l.start), value)
@@ -129,6 +130,7 @@ func (l *LevelList) RPush(values ...[]byte) (err error) {
 	// 右游标
 	oldend := l.end
 	batch := levigo.NewWriteBatch()
+	defer batch.Close()
 	for _, value := range values {
 		l.end++
 		batch.Put(l.idxKey(l.end), value)
@@ -166,6 +168,7 @@ func (l *LevelList) RPop() (e *Element, err error) {
 	shouldReset := l.len() == 1
 	// 删除数据, 更新左游标
 	batch := levigo.NewWriteBatch()
+	defer batch.Close()
 	batch.Delete(l.idxKey(idx))
 	if shouldReset {
 		l.start = 0
@@ -204,6 +207,7 @@ func (l *LevelList) LPop() (e *Element, err error) {
 	shouldReset := l.len() == 1
 	// 删除数据, 更新左游标
 	batch := levigo.NewWriteBatch()
+	defer batch.Close()
 	batch.Delete(l.idxKey(idx))
 	if shouldReset {
 		l.start = 0
@@ -231,6 +235,7 @@ func (l *LevelList) TrimLeft(count uint) (n int) {
 	}
 	oldstart, oldend := l.start, l.end
 	batch := levigo.NewWriteBatch()
+	defer batch.Close()
 	for idx := oldstart; idx < (oldstart+int64(count)) && idx <= oldend; idx++ {
 		batch.Delete(l.idxKey(idx))
 		l.start++
@@ -287,6 +292,7 @@ func (l *LevelList) Drop() (ok bool) {
 	min := l.keyPrefix()
 	max := append(min, MAXBYTE)
 	batch := levigo.NewWriteBatch()
+	defer batch.Close()
 	l.redis.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
 		batch.Delete(key)
 	})
