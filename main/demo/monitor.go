@@ -30,7 +30,7 @@ func main() {
 		fmt.Println(string(line))
 	}
 
-	queue := qp.NewQueueProcess(300, writeCommand)
+	queue := qp.NewQueueProcess(100, writeCommand)
 
 	go func() {
 		ticker := time.NewTicker(time.Millisecond * 1000)
@@ -111,8 +111,8 @@ func init() {
 		MaxIdle:     500,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
-			// c, err := redis.Dial("tcp", "goredis-nearby-a001:18400")
-			c, err := redis.Dial("tcp", "localhost:1602")
+			c, err := redis.Dial("tcp", "goredis-nearby-a001:18400")
+			// c, err := redis.Dial("tcp", "localhost:1602")
 			return c, err
 		},
 	}
