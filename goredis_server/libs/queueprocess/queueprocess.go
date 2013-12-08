@@ -2,7 +2,6 @@ package queueprocess
 
 import (
 	"container/list"
-	"fmt"
 	"sync"
 	"time"
 )
@@ -47,9 +46,6 @@ func (q *QueueProcess) processQueue(i int) {
 		// LPop
 		mu.Lock()
 		elem := queue.Front()
-		if queue.Len() > 200 {
-			fmt.Println(elem.Value)
-		}
 		if elem == nil {
 			mu.Unlock()
 			sleepCount++
@@ -67,6 +63,7 @@ func (q *QueueProcess) processQueue(i int) {
 	}
 }
 
+// 外部传入用于队列hash的值，以及任务数据即可
 func (q *QueueProcess) Process(hash int, t Task) {
 	if q.shouldStop {
 		panic("queue already stop")
@@ -84,6 +81,7 @@ func (q *QueueProcess) Stop() {
 	q.shouldStop = true
 }
 
+// 返回全部队列的剩余任务
 func (q *QueueProcess) QueueLen() (ns []int) {
 	ns = make([]int, 0, q.thread)
 	for i := 0; i < q.thread; i++ {
@@ -92,6 +90,7 @@ func (q *QueueProcess) QueueLen() (ns []int) {
 	return
 }
 
+// 返回剩余任务总数
 func (q *QueueProcess) Len() (n int) {
 	for i := 0; i < q.thread; i++ {
 		n += q.queues[i].Len()
