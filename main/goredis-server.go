@@ -5,6 +5,7 @@ package main
 
 import (
 	"../goredis_server"
+	stdlog "../libs/stdlog"
 	"flag"
 	"fmt"
 	"os"
@@ -21,7 +22,7 @@ func main() {
 	flag.Parse()
 
 	if *version {
-		fmt.Println("goredis-server", goredis_server.VERSION)
+		stdlog.Println("goredis-server", goredis_server.VERSION)
 		return
 	}
 
