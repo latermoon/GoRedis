@@ -18,6 +18,9 @@ func (server *GoRedisServer) OnGC(cmd *Command) (reply *Reply) {
 	return
 }
 
+// http://1234n.com/?post/wgskfs
+// http://blog.golang.org/profiling-go-programs
+// http://www.cnblogs.com/yjf512/archive/2012/12/27/2835331.html
 func (server *GoRedisServer) OnPPROF(cmd *Command) (reply *Reply) {
 	action := cmd.StringAtIndex(1)
 	switch action {

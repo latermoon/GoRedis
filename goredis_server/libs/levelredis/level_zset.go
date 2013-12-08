@@ -290,7 +290,7 @@ func (l *LevelZSet) Drop() (ok bool) {
 	}
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	prefix := joinStringBytes(KEY_PREFIX, SEP_LEFT, l.key, SEP_RIGHT)
+	prefix := joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT)
 	l.redis.PrefixEnumerate(prefix, IteratorForward, func(i int, key, value []byte, quit *bool) {
 		batch.Delete(key)
 	})

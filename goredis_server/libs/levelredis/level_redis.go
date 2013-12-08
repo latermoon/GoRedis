@@ -19,12 +19,12 @@ list
 	_l[list]#3 = "d"
 zset
 	+[user_rank]zset = "2"
-	_z[user_rank]s#1002#100422 = ""
-	_z[user_rank]s#1006#100423 = ""
-	_z[user_rank]s#10102#300000 = ""
 	_z[user_rank]m#100422 = "1002"
 	_z[user_rank]m#100423 = "1006"
 	_z[user_rank]m#300000 = "10102"
+	_z[user_rank]s#1002#100422 = ""
+	_z[user_rank]s#1006#100423 = ""
+	_z[user_rank]s#10102#300000 = ""
 */
 
 import (
@@ -89,6 +89,10 @@ func NewLevelRedis(db *levigo.DB) (l *LevelRedis) {
 	l.wo = levigo.NewWriteOptions()
 	l.lstring = NewLevelString(l)
 	l.lruCache = lru.NewLRUCache(10000)
+	// 初始化最大的key，对于Enumerate从后面开始扫描key非常重要
+	// 使iter.Seek(key)必定Valid=true
+	maxkey := []byte{MAXBYTE}
+	l.RawSet(maxkey, nil)
 	return
 }
 
@@ -104,6 +108,10 @@ func (l *LevelRedis) Strings() (s *LevelString) {
 func (l *LevelRedis) RawGet(key []byte) (value []byte) {
 	value, _ = l.db.Get(l.ro, key)
 	return
+}
+
+func (l *LevelRedis) RawSet(key []byte, value []byte) {
+	l.db.Put(l.wo, key, value)
 }
 
 // 使用LRUCache管理string以外的数据结构实例
@@ -155,9 +163,8 @@ func (l *LevelRedis) GetDoc(key string) (d *LevelDocument) {
 }
 
 func (l *LevelRedis) TypeOf(key []byte) (t string) {
-	min := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(key), SEP_RIGHT)
-	max := min
-	l.Enumerate(min, max, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	prefix := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(key), SEP_RIGHT)
+	l.PrefixEnumerate(prefix, IteratorForward, func(i int, key, value []byte, quit *bool) {
 		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
 		t = string(key[right+1:])
 		*quit = true
@@ -217,30 +224,42 @@ func (l *LevelRedis) Keys(prefix []byte, fn func(i int, key, keytype []byte, qui
 		left := bytes.Index(key, []byte(SEP_LEFT))
 		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
 		fn(i, key[left+1:right], key[right+1:], quit)
-		// fmt.Println(string(min), string(max), i, string(key), string(value), string(keytype), *quit)
 	})
 }
 
+// 前缀扫描
 func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IteratorDirection, fn func(i int, key, value []byte, quit *bool)) {
+	min := prefix
+	max := append(prefix, MAXBYTE)
+	j := -1
+	l.Enumerate(min, max, direction, func(i int, key, value []byte, quit *bool) {
+		if bytes.HasPrefix(key, prefix) {
+			j++
+			fn(j, key, value, quit)
+		}
+	})
+	return
+}
+
+// 范围扫描
+func (l *LevelRedis) Enumerate(min, max []byte, direction IteratorDirection, fn func(i int, key, value []byte, quit *bool)) {
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Close()
+
 	found := false
-	if direction == IteratorForward {
-		iter.Seek(prefix)
-	} else {
-		var seek []byte
-		// 从后面搜索时，设定适合的最大值
-		if len(prefix) > 0 {
-			seek = copyBytes(prefix)
-			if prefix[len(prefix)-1] < MAXBYTE {
-				// seek[len(seek)-1] = MAXBYTE
-				seek = append(seek, MAXBYTE)
-			}
+	if direction == IteratorBackward {
+		if len(max) == 0 {
+			iter.SeekToLast()
 		} else {
-			seek = []byte{MAXBYTE}
+			iter.Seek(max)
 		}
-		// fmt.Println("seek ", string(prefix), " ", string(seek))
-		iter.Seek(seek)
+	} else {
+		if len(min) == 0 {
+			iter.SeekToFirst()
+		} else {
+			iter.Seek(min)
+		}
+
 	}
 	found = iter.Valid()
 	if !found {
@@ -248,59 +267,16 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IteratorDirection,
 	}
 
 	i := -1
-	if found && bytes.HasPrefix(iter.Key(), prefix) {
-		i++
-		quit := false
-		fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
-		if quit {
-			return
-		}
-	}
-	for {
-		found = false
-		if direction == IteratorBackward {
-			iter.Prev()
-			found = iter.Valid()
-			if !found || !bytes.HasPrefix(iter.Key(), prefix) {
-				break
-			}
-		} else {
-			iter.Next()
-			found = iter.Valid()
-			if !found || !bytes.HasPrefix(iter.Key(), prefix) {
-				break
-			}
-		}
-		i++
-		quit := false
-		fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
-		if quit {
-			return
-		}
-	}
-
-	return
-}
-
-// key范围枚举
-func (l *LevelRedis) Enumerate(min, max []byte, direction IteratorDirection, fn func(i int, key, value []byte, quit *bool)) {
-	iter := l.db.NewIterator(l.ro)
-	defer iter.Close()
-	found := false
-	if direction == IteratorBackward {
-		iter.Seek(max)
-	} else {
-		iter.Seek(min)
-	}
-	found = iter.Valid()
-
-	i := -1
 	if found {
-		i++
-		quit := false
-		fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
-		if quit {
-			return
+		// 范围判断
+		if (direction == IteratorForward && bytes.Compare(iter.Key(), min) >= 0) ||
+			(direction == IteratorBackward && bytes.Compare(iter.Key(), max) <= 0) {
+			i++
+			quit := false
+			fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
+			if quit {
+				return
+			}
 		}
 	}
 	for {

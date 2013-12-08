@@ -195,5 +195,5 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) {
 }
 
 func (server *GoRedisServer) OnUndefined(session *Session, cmd *Command) (reply *Reply) {
-	return ErrorReply("Not Supported: " + cmd.String())
+	return ErrorReply("NotSupported: " + strings.ToUpper(cmd.Name()))
 }
