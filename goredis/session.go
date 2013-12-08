@@ -210,7 +210,7 @@ func (s *Session) replyStatus(status string) (err error) {
 	buf.WriteString("+")
 	buf.WriteString(status)
 	buf.WriteString(CRLF)
-	buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s.conn)
 	return
 }
 
@@ -220,7 +220,7 @@ func (s *Session) replyError(errmsg string) (err error) {
 	buf.WriteString("-")
 	buf.WriteString(errmsg)
 	buf.WriteString(CRLF)
-	buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s.conn)
 	return
 }
 
@@ -230,7 +230,7 @@ func (s *Session) replyInteger(i int) (err error) {
 	buf.WriteString(":")
 	buf.WriteString(strconv.Itoa(i))
 	buf.WriteString(CRLF)
-	buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s.conn)
 	return
 }
 
@@ -238,7 +238,7 @@ func (s *Session) replyInteger(i int) (err error) {
 func (s *Session) replyBulk(bulk interface{}) (err error) {
 	// NULL Bulk Reply
 	if bulk == nil {
-		s.conn.Write([]byte("$-1\r\n"))
+		_, err = s.conn.Write([]byte("$-1\r\n"))
 		return
 	}
 	buf := bytes.Buffer{}
@@ -256,7 +256,7 @@ func (s *Session) replyBulk(bulk interface{}) (err error) {
 		buf.Write(b)
 	}
 	buf.WriteString(CRLF)
-	buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s.conn)
 	return
 }
 
@@ -264,13 +264,13 @@ func (s *Session) replyBulk(bulk interface{}) (err error) {
 func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 	// Null Multi Bulk Reply
 	if bulks == nil {
-		s.conn.Write([]byte("*-1\r\n"))
+		_, err = s.conn.Write([]byte("*-1\r\n"))
 		return
 	}
 	bulkCount := len(bulks)
 	// Empty Multi Bulk Reply
 	if bulkCount == 0 {
-		s.conn.Write([]byte("*0\r\n"))
+		_, err = s.conn.Write([]byte("*0\r\n"))
 		return
 	}
 	buf := bytes.Buffer{}
@@ -305,7 +305,7 @@ func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 		}
 	}
 	// flush
-	buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s.conn)
 	return
 }
 
