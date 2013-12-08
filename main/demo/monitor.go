@@ -14,9 +14,14 @@ import (
 
 var pool *redis.Pool
 
+var srchost = "redis-event-a001:8400"
+
+// var dsthost = "goredis-nearby-a001:18400"
+var dsthost = "localhost:1602"
+
 func main() {
 	runtime.GOMAXPROCS(8)
-	conn, err := net.Dial("tcp", "redis-event-a001:8400")
+	conn, err := net.Dial("tcp", srchost)
 	if err != nil {
 		panic(err)
 	}
@@ -111,8 +116,7 @@ func init() {
 		MaxIdle:     500,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", "goredis-nearby-a001:18400")
-			// c, err := redis.Dial("tcp", "localhost:1602")
+			c, err := redis.Dial("tcp", dsthost)
 			return c, err
 		},
 	}

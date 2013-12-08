@@ -57,11 +57,29 @@ func (server *GoRedisServer) formatMonitorCommand(session *Session, cmd *Command
 	return
 }
 
+// redis-cli对monitor指令进行特殊处理，只要monitor不断输出StatusReply，可以实现不间断的流输出
+// 适用于海量数据的扫描输出，比如iterator扫描整个数据库
 func (server *GoRedisServer) OnMONITOR(session *Session, cmd *Command) (reply *Reply) {
-	session.WriteReply(StatusReply("OK"))
+	// 特殊使用，monitor输出全部key
+	if len(cmd.Args) > 1 && strings.ToLower(cmd.StringAtIndex(1)) == "keys" {
+		server.monitorKeys(session, cmd)
+		return
+	}
 
+	session.WriteReply(StatusReply("OK"))
 	server.monitorMutex.Lock()
 	defer server.monitorMutex.Unlock()
 	server.monitorlist.PushBack(session)
 	return
+}
+
+func (server *GoRedisServer) monitorKeys(session *Session, cmd *Command) {
+	prefix, _ := cmd.ArgAtIndex(2)
+	server.levelRedis.Keys(prefix, func(i int, key, keytype []byte, quit *bool) {
+		err := session.WriteReply(StatusReply(string(key)))
+		if err != nil {
+			*quit = true
+		}
+	})
+	session.Close()
 }
