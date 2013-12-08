@@ -2,24 +2,20 @@ package main
 
 import (
 	. "../../goredis"
+	qp "../../goredis_server/libs/queueprocess"
 	"bufio"
 	"bytes"
 	"fmt"
 	"github.com/latermoon/redigo/redis"
 	"net"
-	"os"
-	"runtime/pprof"
+	"runtime"
 	"time"
 )
 
 var pool *redis.Pool
 
 func main() {
-	if f, err := os.Create("/tmp/monitor.prof"); err == nil {
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
-
+	runtime.GOMAXPROCS(8)
 	conn, err := net.Dial("tcp", "redis-event-a001:8400")
 	if err != nil {
 		panic(err)
@@ -34,33 +30,60 @@ func main() {
 		fmt.Println(string(line))
 	}
 
-	cmd := &Command{}
-	cmd.Args = make([][]byte, 0)
+	queue := qp.NewQueueProcess(300, writeCommand)
+
+	go func() {
+		ticker := time.NewTicker(time.Millisecond * 1000)
+		for _ = range ticker.C {
+			fmt.Println("queue:", queue.Len(), "active:", pool.ActiveCount())
+		}
+	}()
+
 	for {
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			break
 		}
-		cmd.Args = cmd.Args[0:0]
+
+		cmd := &Command{}
+		cmd.Args = make([][]byte, 0, 5)
 		splitMonitorLine(line, cmd)
 
-		rd := pool.Get()
-		objs := make([]interface{}, 0, len(cmd.Args)-1)
-		for _, arg := range cmd.Args[1:] {
-			objs = append(objs, arg)
-		}
-		reply, err := rd.Do(cmd.Name(), objs...)
-		rd.Close()
-
-		fmt.Println(len(cmd.Args), cmd)
-		if err == nil {
-			// fmt.Println("+reply:", reply)
-			printReply(reply)
-		} else {
-			fmt.Println("-err:", err)
-			panic(err)
+		if len(cmd.Args) >= 2 {
+			// fmt.Println(SumOfBytesChars(cmd.Args[1]), cmd)
+			queue.Process(SumOfBytesChars(cmd.Args[1]), cmd)
 		}
 	}
+}
+
+func writeCommand(t qp.Task) {
+	cmd := t.(*Command)
+
+	objs := make([]interface{}, 0, len(cmd.Args)-1)
+	for _, arg := range cmd.Args[1:] {
+		objs = append(objs, arg)
+	}
+
+	rd := pool.Get()
+	defer rd.Close()
+	_, err := rd.Do(cmd.Name(), objs...)
+
+	// fmt.Println(len(cmd.Args), cmd)
+	if err == nil {
+		// fmt.Println("+reply:", reply)
+		// printReply(reply)
+	} else {
+		fmt.Println("-err:", err)
+		panic(err)
+	}
+}
+
+func SumOfBytesChars(bs []byte) (n int) {
+	count := len(bs)
+	for i := 0; i < count; i++ {
+		n += int(bs[i])
+	}
+	return
 }
 
 func printReply(reply interface{}) {
@@ -84,7 +107,7 @@ func printReply(reply interface{}) {
 
 func init() {
 	pool = &redis.Pool{
-		MaxIdle:     100,
+		MaxIdle:     500,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			// c, err := redis.Dial("tcp", "goredis-nearby-a001:18400")

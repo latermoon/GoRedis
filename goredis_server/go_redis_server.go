@@ -43,6 +43,9 @@ type GoRedisServer struct {
 	needSyncCmdTable map[string]bool // 需要同步的指令
 	// locks
 	stringMutex sync.Mutex
+	// monitor
+	monitorlist  *list.List
+	monitorMutex sync.Mutex
 }
 
 /*
@@ -58,6 +61,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.directory = directory
 	server.needSyncCmdTable = make(map[string]bool)
 	server.slavelist = list.New()
+	server.monitorlist = list.New()
 	for _, cmd := range needSyncCmds {
 		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
 	}
@@ -185,6 +189,9 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) {
 			}
 		}
 	}()
+
+	// monitor
+	go server.monitorOutput(session, cmd)
 }
 
 func (server *GoRedisServer) OnUndefined(session *Session, cmd *Command) (reply *Reply) {
