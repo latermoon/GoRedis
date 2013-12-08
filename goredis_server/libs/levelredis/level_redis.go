@@ -77,7 +77,7 @@ type LevelRedis struct {
 	db       *levigo.DB
 	ro       *levigo.ReadOptions
 	wo       *levigo.WriteOptions
-	lruCache *lru.LRUCache // LRU缓存层
+	lruCache *lru.LRUCache // LRU缓存层，管理string以外的key
 	mu       sync.Mutex
 	lstring  *LevelString
 }

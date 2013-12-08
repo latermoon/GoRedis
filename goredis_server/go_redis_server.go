@@ -75,18 +75,6 @@ func (server *GoRedisServer) Init() (err error) {
 	server.initLogger()
 	server.stdlog.Info("========================================")
 	server.stdlog.Info("server init ...")
-	// leveldb
-	// options := opt.Options{
-	// 	MaxOpenFiles: 100000,
-	// 	BlockCache:   cache.NewLRUCache(32 * opt.MiB),
-	// 	BlockSize:    32 * opt.KiB,
-	// 	WriteBuffer:  120 << 20,
-	// }
-	// server.db, err = leveldb.OpenFile(server.directory+"/db0", &options)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// server.levelRedis = leveltool.NewLevelRedis(server.db)
 	err = server.initLevelDB()
 	if err != nil {
 		return
