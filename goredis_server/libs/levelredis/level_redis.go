@@ -3,6 +3,18 @@ package levelredis
 /*
 基于leveldb实现的redis持久化层
 
+1、key存储规则
+为了提供keys、type等基本操作，每个存入的数据都会有这样的结构 +[key]type，用于表达key以及数据类型
+比如一个set name latermoon，会在leveldb里产生 +[name]string = latermoon 的数据
+对于string以外的复杂结构，还会有另外的字段，比如 hash 会有以_h开头的key，list会有_l开头的key
+
+2、leveldb存储原则
+因为整个设计都是为了海量存储的，所以所有支持的redis指令，都必须使用leveldb实现，不能消耗内存
+必要的时候，会牺牲掉一些redis特性，比如list结构需要lindex的话，就必须放弃lrem和linsert
+
+同时会对使用场景进行一些取舍，比如zset要提供zcard的话，就需要每次操作后更新len，但增加的一次leveldb会降低zadd性能
+因此对于hash、set这种很少取count的数据，放弃hlen、scard的性能（但也可以提供1000以内的枚举统计）,来提高hset/sadd的性能
+
 string
 	+[name]string = "latermoon"
 	+[name]string#e1083 = "latermoon"
