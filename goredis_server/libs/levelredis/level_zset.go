@@ -31,8 +31,8 @@ func (l *LevelZSet) Size() int {
 
 func (l *LevelZSet) initOnce() {
 	if l.totalCount == -1 {
-		data, _ := l.redis.db.Get(l.redis.ro, l.zsetKey())
-		if data != nil {
+		data, err := l.redis.db.Get(l.redis.ro, l.zsetKey())
+		if err == nil && data != nil {
 			l.totalCount, _ = strconv.Atoi(string(data))
 		} else {
 			l.totalCount = 0
@@ -83,8 +83,6 @@ func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 	for i := 0; i < count; i += 2 {
 		score := scoreMembers[i]
 		member, memberkey := scoreMembers[i+1], l.memberKey(scoreMembers[i+1])
-		// set member
-		batch.Put(memberkey, score)
 		// remove old score
 		oldscore, e1 := l.redis.db.Get(l.redis.ro, memberkey)
 		if e1 == nil && oldscore != nil {
@@ -92,12 +90,17 @@ func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 		} else {
 			l.totalCount++
 		}
+		// set member
+		batch.Put(memberkey, score)
 		// new score
 		batch.Put(l.scoreKey(member, score), nil)
 		n++
 	}
 	batch.Put(l.zsetKey(), l.zsetValue())
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
@@ -130,7 +133,10 @@ func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 	}
 	batch.Put(l.memberKey(member), newscore)
 	batch.Put(l.scoreKey(member, newscore), nil)
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
@@ -237,7 +243,10 @@ func (l *LevelZSet) Remove(members ...[]byte) (n int) {
 	} else {
 		batch.Put(l.zsetKey(), l.zsetValue())
 	}
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
@@ -268,7 +277,10 @@ func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 	} else {
 		batch.Put(l.zsetKey(), l.zsetValue())
 	}
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
@@ -295,7 +307,10 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 	} else {
 		batch.Put(l.zsetKey(), l.zsetValue())
 	}
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
@@ -316,7 +331,10 @@ func (l *LevelZSet) Drop() (ok bool) {
 		batch.Delete(key)
 	})
 	batch.Delete(l.zsetKey())
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	l.totalCount = 0
 	ok = true
 	return
