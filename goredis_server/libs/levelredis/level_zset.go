@@ -260,6 +260,9 @@ func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 		}
 	})
 	l.totalCount -= n
+	if l.totalCount < 0 {
+		fmt.Println("rembyindex", l.key, l.totalCount, "n:", n)
+	}
 	if l.totalCount == 0 {
 		batch.Delete(l.zsetKey())
 	} else {
@@ -284,6 +287,9 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 		n++
 	})
 	l.totalCount -= n
+	if l.totalCount < 0 {
+		fmt.Println("rembyscore", l.key, l.totalCount, "n:", n)
+	}
 	if l.totalCount == 0 {
 		batch.Delete(l.zsetKey())
 	} else {
@@ -303,9 +309,6 @@ func (l *LevelZSet) Len() (n int) {
 func (l *LevelZSet) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.totalCount == 0 {
-		return true
-	}
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	prefix := joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT)
