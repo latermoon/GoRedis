@@ -94,6 +94,7 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 	opts.SetCompression(levigo.SnappyCompression)
 	opts.SetBlockSize(32 * 1024)
 	opts.SetWriteBufferSize(128 * 1024 * 1024)
+	opts.SetMaxOpenFiles(100000)
 	opts.SetCreateIfMissing(true)
 	db, e1 := levigo.Open(server.directory+"/db0", opts)
 	if e1 != nil {

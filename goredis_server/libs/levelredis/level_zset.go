@@ -8,6 +8,7 @@ import (
 	"github.com/latermoon/levigo"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type LevelZSet struct {
@@ -22,6 +23,14 @@ func NewLevelZSet(redis *LevelRedis, key string) (l *LevelZSet) {
 	l.redis = redis
 	l.key = key
 	l.totalCount = -1
+	if key == "user:update:timestamp" {
+		go func() {
+			ticker := time.NewTicker(time.Millisecond * 1000)
+			for _ = range ticker.C {
+				fmt.Println("user:update:timestamp, len:", l.totalCount)
+			}
+		}()
+	}
 	return
 }
 
