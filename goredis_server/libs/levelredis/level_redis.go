@@ -188,7 +188,6 @@ func (l *LevelRedis) TypeOf(key []byte) (t string) {
 }
 
 func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
-	n = 0
 	for _, keybytes := range keys {
 		key := string(keybytes)
 		t := l.TypeOf(keybytes)
@@ -196,28 +195,23 @@ func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
 		case "string":
 			n += l.Strings().Delete(keybytes)
 		case "hash":
-			ok := l.GetHash(key).Drop()
-			if ok {
+			if ok := l.GetHash(key).Drop(); ok {
 				n++
 			}
 		case "set":
-			ok := l.GetSet(key).Drop()
-			if ok {
+			if ok := l.GetSet(key).Drop(); ok {
 				n++
 			}
 		case "list":
-			ok := l.GetList(key).Drop()
-			if ok {
+			if ok := l.GetList(key).Drop(); ok {
 				n++
 			}
 		case "zset":
-			ok := l.GetSortedSet(key).Drop()
-			if ok {
+			if ok := l.GetSortedSet(key).Drop(); ok {
 				n++
 			}
 		case "doc":
-			ok := l.GetDoc(key).Drop()
-			if ok {
+			if ok := l.GetDoc(key).Drop(); ok {
 				n++
 			}
 		default:
@@ -279,38 +273,32 @@ func (l *LevelRedis) Enumerate(min, max []byte, direction IteratorDirection, fn 
 	}
 
 	i := -1
-	if found {
-		// 范围判断
-		if (direction == IteratorForward && bytes.Compare(iter.Key(), min) >= 0) ||
-			(direction == IteratorBackward && bytes.Compare(iter.Key(), max) <= 0) {
-			i++
-			quit := false
-			fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
-			if quit {
-				return
-			}
+	// 范围判断
+	if found && between(iter.Key(), min, max) {
+		i++
+		quit := false
+		fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
+		if quit {
+			return
 		}
 	}
 	for {
 		found = false
 		if direction == IteratorBackward {
 			iter.Prev()
-			found = iter.Valid()
-			if !found || bytes.Compare(iter.Key(), min) < 0 {
-				break
-			}
 		} else {
 			iter.Next()
-			found = iter.Valid()
-			if !found || bytes.Compare(iter.Key(), max) > 0 {
-				break
-			}
 		}
-		i++
-		quit := false
-		fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
-		if quit {
-			return
+		found = iter.Valid()
+		if found && between(iter.Key(), min, max) {
+			i++
+			quit := false
+			fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
+			if quit {
+				return
+			}
+		} else {
+			break
 		}
 	}
 
