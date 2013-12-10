@@ -311,6 +311,12 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 		batch.Delete(l.scoreKey(member, score))
 		n++
 	})
+	if n > 1000 {
+		fmt.Println("del more than", n, l.key, BytesToInt64(min), BytesToInt64(max))
+	} else if n > 3000 {
+		fmt.Println("del more than", n, l.key, BytesToInt64(min), BytesToInt64(max))
+		panic("del more than 3000")
+	}
 	l.totalCount -= n
 	if l.totalCount < 0 {
 		fmt.Println("rembyscore", l.key, l.totalCount, "n:", n)
