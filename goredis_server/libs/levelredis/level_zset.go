@@ -288,11 +288,15 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.initOnce()
+	scoreprefix := l.scoreKeyPrefix()
 	min2 := joinBytes(l.scoreKeyPrefix(), min)
 	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	l.redis.Enumerate(min2, max2, IteratorForward, func(i int, key, value []byte, quit *bool) {
+		if !bytes.HasPrefix(key, scoreprefix) {
+			fmt.Println("cup, no prefix", string(key), string(scoreprefix))
+		}
 		score, member := l.splitScoreKey(key)
 		batch.Delete(l.memberKey(member))
 		batch.Delete(l.scoreKey(member, score))
