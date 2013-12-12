@@ -4,11 +4,10 @@ package levelredis
 
 import (
 	"bytes"
-	"fmt"
+	// "fmt"
 	"github.com/latermoon/levigo"
 	"strconv"
 	"sync"
-	"time"
 )
 
 type LevelZSet struct {
@@ -23,14 +22,14 @@ func NewLevelZSet(redis *LevelRedis, key string) (l *LevelZSet) {
 	l.redis = redis
 	l.key = key
 	l.totalCount = -1
-	if key == "user:update:timestamp" {
-		go func() {
-			ticker := time.NewTicker(time.Millisecond * 1000)
-			for _ = range ticker.C {
-				fmt.Println("user:update:timestamp, len:", l.totalCount)
-			}
-		}()
-	}
+	// if key == "user:update:timestamp" {
+	// 	go func() {
+	// 		ticker := time.NewTicker(time.Millisecond * 1000)
+	// 		for _ = range ticker.C {
+	// 			fmt.Println("user:update:timestamp, len:", l.totalCount)
+	// 		}
+	// 	}()
+	// }
 	return
 }
 
@@ -54,9 +53,6 @@ func (l *LevelZSet) zsetKey() []byte {
 }
 
 func (l *LevelZSet) zsetValue() []byte {
-	if l.totalCount < 0 {
-		fmt.Println("ca!", l.key, "score:", l.totalCount)
-	}
 	s := strconv.Itoa(l.totalCount)
 	return []byte(s)
 }
@@ -278,9 +274,6 @@ func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 		}
 	})
 	l.totalCount -= n
-	if l.totalCount < 0 {
-		fmt.Println("rembyindex", l.key, l.totalCount, "n:", n)
-	}
 	if l.totalCount == 0 {
 		batch.Delete(l.zsetKey())
 	} else {
@@ -297,30 +290,17 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.initOnce()
-	scoreprefix := l.scoreKeyPrefix()
 	min2 := joinBytes(l.scoreKeyPrefix(), min)
 	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	l.redis.Enumerate(min2, max2, IteratorForward, func(i int, key, value []byte, quit *bool) {
-		if !bytes.HasPrefix(key, scoreprefix) {
-			fmt.Println("cup, no prefix", string(key), string(scoreprefix))
-		}
 		score, member := l.splitScoreKey(key)
 		batch.Delete(l.memberKey(member))
 		batch.Delete(l.scoreKey(member, score))
 		n++
 	})
-	if n > 1000 {
-		fmt.Println("del more than", n, l.key, BytesToInt64(min), BytesToInt64(max))
-	} else if n > 3000 {
-		fmt.Println("del more than", n, l.key, BytesToInt64(min), BytesToInt64(max))
-		panic("del more than 3000")
-	}
 	l.totalCount -= n
-	if l.totalCount < 0 {
-		fmt.Println("rembyscore", l.key, l.totalCount, "n:", n)
-	}
 	if l.totalCount == 0 {
 		batch.Delete(l.zsetKey())
 	} else {
