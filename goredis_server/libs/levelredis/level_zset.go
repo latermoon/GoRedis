@@ -4,7 +4,7 @@ package levelredis
 
 import (
 	"bytes"
-	// "fmt"
+	"fmt"
 	"github.com/latermoon/levigo"
 	"strconv"
 	"sync"
@@ -53,6 +53,9 @@ func (l *LevelZSet) zsetKey() []byte {
 }
 
 func (l *LevelZSet) zsetValue() []byte {
+	if l.totalCount < 0 {
+		fmt.Println("zset ", l.key, "wrong count:", l.totalCount)
+	}
 	s := strconv.Itoa(l.totalCount)
 	return []byte(s)
 }
