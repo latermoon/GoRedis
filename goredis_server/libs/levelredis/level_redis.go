@@ -30,7 +30,7 @@ list
 	_l[list]#2 = "c"
 	_l[list]#3 = "d"
 zset
-	+[user_rank]zset = "2"
+	+[user_rank]zset = ""
 	_z[user_rank]m#100422 = "1002"
 	_z[user_rank]m#100423 = "1006"
 	_z[user_rank]m#300000 = "10102"

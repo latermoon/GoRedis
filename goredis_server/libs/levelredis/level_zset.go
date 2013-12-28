@@ -4,32 +4,20 @@ package levelredis
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/latermoon/levigo"
-	"strconv"
 	"sync"
 )
 
 type LevelZSet struct {
-	redis      *LevelRedis
-	key        string
-	totalCount int
-	mu         sync.Mutex
+	redis *LevelRedis
+	key   string
+	mu    sync.Mutex
 }
 
 func NewLevelZSet(redis *LevelRedis, key string) (l *LevelZSet) {
 	l = &LevelZSet{}
 	l.redis = redis
 	l.key = key
-	l.totalCount = -1
-	// if key == "user:update:timestamp" {
-	// 	go func() {
-	// 		ticker := time.NewTicker(time.Millisecond * 1000)
-	// 		for _ = range ticker.C {
-	// 			fmt.Println("user:update:timestamp, len:", l.totalCount)
-	// 		}
-	// 	}()
-	// }
 	return
 }
 
@@ -37,27 +25,12 @@ func (l *LevelZSet) Size() int {
 	return 0
 }
 
-func (l *LevelZSet) initOnce() {
-	if l.totalCount == -1 {
-		data, err := l.redis.db.Get(l.redis.ro, l.zsetKey())
-		if err == nil && data != nil {
-			l.totalCount, _ = strconv.Atoi(string(data))
-		} else {
-			l.totalCount = 0
-		}
-	}
-}
-
 func (l *LevelZSet) zsetKey() []byte {
 	return joinStringBytes(KEY_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, ZSET_SUFFIX)
 }
 
 func (l *LevelZSet) zsetValue() []byte {
-	if l.totalCount < 0 {
-		fmt.Println("zset ", l.key, "wrong count:", l.totalCount)
-	}
-	s := strconv.Itoa(l.totalCount)
-	return []byte(s)
+	return []byte("")
 }
 
 func (l *LevelZSet) memberKey(member []byte) []byte {
@@ -84,7 +57,6 @@ func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
 func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	count := len(scoreMembers)
@@ -95,8 +67,6 @@ func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 		oldscore, e1 := l.redis.db.Get(l.redis.ro, memberkey)
 		if e1 == nil && oldscore != nil {
 			batch.Delete(l.scoreKey(member, oldscore))
-		} else {
-			l.totalCount++
 		}
 		// set member
 		batch.Put(memberkey, score)
@@ -128,7 +98,6 @@ func (l *LevelZSet) score(member []byte) (score []byte) {
 func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
 	score := l.score(member)
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
@@ -152,7 +121,6 @@ func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 func (l *LevelZSet) Rank(high2low bool, member []byte) (idx int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
 	// 对于不存在的key，先检查一次，减少扫描成本
 	if l.score(member) == nil {
 		return -1
@@ -183,7 +151,6 @@ func (l *LevelZSet) Rank(high2low bool, member []byte) (idx int) {
 func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [][]byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
 	direction := IteratorForward
 	if high2low {
 		direction = IteratorBackward
@@ -207,7 +174,6 @@ func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [
 func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count int) (scoreMembers [][]byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
 	direction := IteratorForward
 	if high2low {
 		direction = IteratorBackward
@@ -233,7 +199,6 @@ func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count i
 func (l *LevelZSet) Remove(members ...[]byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	for _, member := range members {
@@ -245,15 +210,12 @@ func (l *LevelZSet) Remove(members ...[]byte) (n int) {
 		batch.Delete(l.scoreKey(member, score))
 		n++
 	}
-	l.totalCount -= n
-	if l.totalCount == 0 {
-		batch.Delete(l.zsetKey())
-	} else {
-		batch.Put(l.zsetKey(), l.zsetValue())
-	}
 	err := l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		panic(err)
+	}
+	if l.isEmpty() {
+		batch.Delete(l.zsetKey())
 	}
 	return
 }
@@ -261,7 +223,6 @@ func (l *LevelZSet) Remove(members ...[]byte) (n int) {
 func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
@@ -276,15 +237,12 @@ func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 			*quit = true
 		}
 	})
-	l.totalCount -= n
-	if l.totalCount == 0 {
-		batch.Delete(l.zsetKey())
-	} else {
-		batch.Put(l.zsetKey(), l.zsetValue())
-	}
 	err := l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		panic(err)
+	}
+	if l.isEmpty() {
+		batch.Delete(l.zsetKey())
 	}
 	return
 }
@@ -292,7 +250,6 @@ func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
 	min2 := joinBytes(l.scoreKeyPrefix(), min)
 	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
 	batch := levigo.NewWriteBatch()
@@ -303,24 +260,41 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 		batch.Delete(l.scoreKey(member, score))
 		n++
 	})
-	l.totalCount -= n
-	if l.totalCount == 0 {
-		batch.Delete(l.zsetKey())
-	} else {
-		batch.Put(l.zsetKey(), l.zsetValue())
-	}
 	err := l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		panic(err)
 	}
+	if l.isEmpty() {
+		batch.Delete(l.zsetKey())
+	}
+	return
+}
+
+// 返回是否空集合
+func (l *LevelZSet) isEmpty() (empty bool) {
+	empty = true
+	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
+		empty = false
+		*quit = true // 找到一个元素就退出
+	})
+	return
+}
+
+// 保障扫描性能，对于100以内的返回真实数量，大于100返回-1
+func (l *LevelZSet) len() (n int) {
+	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
+		n++
+		if n > 100 {
+			n = -1
+			*quit = true
+			return
+		}
+	})
 	return
 }
 
 func (l *LevelZSet) Len() (n int) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.initOnce()
-	return l.totalCount
+	return l.len()
 }
 
 func (l *LevelZSet) Drop() (ok bool) {
@@ -337,7 +311,6 @@ func (l *LevelZSet) Drop() (ok bool) {
 	if err != nil {
 		panic(err)
 	}
-	l.totalCount = 0
 	ok = true
 	return
 }
