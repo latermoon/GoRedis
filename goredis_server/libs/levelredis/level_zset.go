@@ -45,7 +45,7 @@ func (l *LevelZSet) scoreKeyPrefix() []byte {
 	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, "s", SEP)
 }
 
-// __zset[user_rank]s#1378000907596#100428 = ""
+// _z[user_rank]s#1378000907596#100428 = ""
 func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
 	pos2 := bytes.LastIndex(scorekey, []byte(SEP))
 	pos1 := bytes.LastIndex(scorekey[:pos2], []byte(SEP))

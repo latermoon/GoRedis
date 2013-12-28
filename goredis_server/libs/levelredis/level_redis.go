@@ -24,11 +24,11 @@ hash
 	_h[info]age = "27"
 	_h[info]sex = "M"
 list
-	+[list]list = "0,1"
-	_l[list]#0 = "a"
-	_l[list]#1 = "b"
-	_l[list]#2 = "c"
-	_l[list]#3 = "d"
+	+[list]list = ""
+	_l[list]#0#-2 = "a"
+	_l[list]#0#-1 = "b"
+	_l[list]#1#0 = "c"
+	_l[list]#1#1 = "d"
 zset
 	+[user_rank]zset = ""
 	_z[user_rank]m#100422 = "1002"
