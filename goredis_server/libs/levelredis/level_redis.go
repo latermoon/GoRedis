@@ -148,14 +148,14 @@ func (l *LevelRedis) GetList(key string) (lst *LevelList) {
 
 func (l *LevelRedis) GetHash(key string) (h *LevelHash) {
 	obj := l.objFromCache(key, func() interface{} {
-		return NewLevelHash(l, key, false)
+		return NewLevelHash(l, key)
 	})
 	return obj.(*LevelHash)
 }
 
 func (l *LevelRedis) GetSet(key string) (s *LevelHash) {
 	obj := l.objFromCache(key, func() interface{} {
-		return NewLevelHash(l, key, true)
+		return NewLevelSet(l, key)
 	})
 	return obj.(*LevelHash)
 }

@@ -22,11 +22,21 @@ type LevelHash struct {
 	userForSet bool
 }
 
-func NewLevelHash(redis *LevelRedis, entryKey string, userForSet bool) (l *LevelHash) {
+// 构造方法1
+func NewLevelSet(redis *LevelRedis, key string) (l *LevelHash) {
+	l = &LevelHash{}
+	l.redis = redis
+	l.entryKey = key
+	l.userForSet = true
+	return
+}
+
+// 构造方法2
+func NewLevelHash(redis *LevelRedis, entryKey string) (l *LevelHash) {
 	l = &LevelHash{}
 	l.redis = redis
 	l.entryKey = entryKey
-	l.userForSet = userForSet
+	l.userForSet = false
 	return
 }
 
