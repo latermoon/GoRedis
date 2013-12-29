@@ -31,12 +31,12 @@ list
 	_l[list]#1#1 = "d"
 zset
 	+[user_rank]zset = ""
-	_z[user_rank]m#100422 = "1002"
-	_z[user_rank]m#100423 = "1006"
-	_z[user_rank]m#300000 = "10102"
-	_z[user_rank]s#1002#100422 = ""
-	_z[user_rank]s#1006#100423 = ""
-	_z[user_rank]s#10102#300000 = ""
+	_z[user_rank]m#100422 = "-2"
+	_z[user_rank]m#100423 = "1"
+	_z[user_rank]m#300000 = "2"
+	_z[user_rank]s#0#-2#100422 = ""
+	_z[user_rank]s#1#1#100423 = ""
+	_z[user_rank]s#1#2#300000 = ""
 */
 
 import (
