@@ -38,7 +38,14 @@ func (l *LevelZSet) memberKey(member []byte) []byte {
 }
 
 func (l *LevelZSet) scoreKey(member []byte, score []byte) []byte {
-	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, "s", SEP, string(score), SEP, string(member))
+	scoreint := BytesToInt64(score)
+	var sign string // 正负数
+	if scoreint < 0 {
+		sign = "0"
+	} else {
+		sign = "1"
+	}
+	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, "s", SEP, sign, string(score), SEP, string(member))
 }
 
 func (l *LevelZSet) scoreKeyPrefix() []byte {
@@ -50,7 +57,7 @@ func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
 	pos2 := bytes.LastIndex(scorekey, []byte(SEP))
 	pos1 := bytes.LastIndex(scorekey[:pos2], []byte(SEP))
 	member = copyBytes(scorekey[pos2+1:])
-	score = copyBytes(scorekey[pos1+1 : pos2])
+	score = copyBytes(scorekey[pos1+1+1 : pos2]) // +1 skip sign "0/1"
 	return
 }
 

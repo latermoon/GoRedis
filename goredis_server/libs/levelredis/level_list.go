@@ -52,7 +52,7 @@ func (l *LevelList) keyPrefix() []byte {
 	return joinStringBytes(LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT)
 }
 
-// _l[key]0#1005 = hello
+// _l[key]#11005 = hello
 func (l *LevelList) idxKey(idx int64) []byte {
 	// 正负符号, 因为经过uint64转换后，负数的字典顺序比整数大，所以需要前置一个0、1保障顺序
 	var sign string
@@ -62,12 +62,12 @@ func (l *LevelList) idxKey(idx int64) []byte {
 		sign = "1"
 	}
 	idxStr := string(Int64ToBytes(idx))
-	return joinStringBytes(LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, SEP, sign, SEP, idxStr)
+	return joinStringBytes(LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, SEP, sign, idxStr)
 }
 
 func (l *LevelList) splitIndexKey(idxkey []byte) (idx int64) {
 	pos := bytes.LastIndex(idxkey, []byte(SEP))
-	idx = BytesToInt64(idxkey[pos+1:]) // +1 skip SEP "#"
+	idx = BytesToInt64(idxkey[pos+1+1:]) // +1 skip sign "0/1"
 	return
 }
 

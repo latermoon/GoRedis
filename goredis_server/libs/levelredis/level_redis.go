@@ -25,18 +25,18 @@ hash
 	_h[info]sex = "M"
 list
 	+[list]list = ""
-	_l[list]#0#-2 = "a"
-	_l[list]#0#-1 = "b"
-	_l[list]#1#0 = "c"
-	_l[list]#1#1 = "d"
+	_l[list]#-2 = "a"
+	_l[list]#-1 = "b"
+	_l[list]#0 = "c"
+	_l[list]#1 = "d"
 zset
 	+[user_rank]zset = ""
 	_z[user_rank]m#100422 = "-2"
 	_z[user_rank]m#100423 = "1"
 	_z[user_rank]m#300000 = "2"
-	_z[user_rank]s#0#-2#100422 = ""
-	_z[user_rank]s#1#1#100423 = ""
-	_z[user_rank]s#1#2#300000 = ""
+	_z[user_rank]s#-2#100422 = ""
+	_z[user_rank]s#1#100423 = ""
+	_z[user_rank]s#2#300000 = ""
 */
 
 import (
