@@ -6,18 +6,22 @@ import (
 	"bytes"
 	"github.com/latermoon/levigo"
 	"sync"
+	"strconv"
 )
 
 type LevelZSet struct {
 	redis *LevelRedis
 	key   string
 	mu    sync.Mutex
+	totalCount int
 }
 
 func NewLevelZSet(redis *LevelRedis, key string) (l *LevelZSet) {
 	l = &LevelZSet{}
 	l.redis = redis
 	l.key = key
+	l.totalCount = -1
+	l.initOnce()
 	return
 }
 
@@ -25,12 +29,25 @@ func (l *LevelZSet) Size() int {
 	return 0
 }
 
+func (l *LevelZSet) initOnce() {
+	if l.totalCount == -1 {
+		data, _ := l.redis.db.Get(l.redis.ro, l.zsetKey())
+		if data != nil {
+			l.totalCount, _ = strconv.Atoi(string(data))
+		} else {
+			l.totalCount = 0
+		}
+	}
+}
+
+
 func (l *LevelZSet) zsetKey() []byte {
 	return joinStringBytes(KEY_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, ZSET_SUFFIX)
 }
 
 func (l *LevelZSet) zsetValue() []byte {
-	return []byte("")
+	s := strconv.Itoa(l.totalCount)
+	return []byte(s)
 }
 
 func (l *LevelZSet) memberKey(member []byte) []byte {
@@ -74,6 +91,8 @@ func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 		oldscore, e1 := l.redis.db.Get(l.redis.ro, memberkey)
 		if e1 == nil && oldscore != nil {
 			batch.Delete(l.scoreKey(member, oldscore))
+		}else {
+			l.totalCount++
 		}
 		// set member
 		batch.Put(memberkey, score)
@@ -217,12 +236,15 @@ func (l *LevelZSet) Remove(members ...[]byte) (n int) {
 		batch.Delete(l.scoreKey(member, score))
 		n++
 	}
+	l.totalCount -= n
+	if l.totalCount == 0 {
+		batch.Delete(l.zsetKey())
+	} else {
+		batch.Put(l.zsetKey(), l.zsetValue())
+	}
 	err := l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		panic(err)
-	}
-	if l.isEmpty() {
-		batch.Delete(l.zsetKey())
 	}
 	return
 }
@@ -244,12 +266,15 @@ func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 			*quit = true
 		}
 	})
+	l.totalCount -= n
+	if l.totalCount == 0 {
+		batch.Delete(l.zsetKey())
+	} else {
+		batch.Put(l.zsetKey(), l.zsetValue())
+	}
 	err := l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		panic(err)
-	}
-	if l.isEmpty() {
-		batch.Delete(l.zsetKey())
 	}
 	return
 }
@@ -267,38 +292,21 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 		batch.Delete(l.scoreKey(member, score))
 		n++
 	})
+	l.totalCount -= n
+	if l.totalCount == 0 {
+		batch.Delete(l.zsetKey())
+	} else {
+		batch.Put(l.zsetKey(), l.zsetValue())
+	}
 	err := l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		panic(err)
 	}
-	if l.isEmpty() {
-		batch.Delete(l.zsetKey())
-	}
 	return
 }
 
-// 返回是否空集合
-func (l *LevelZSet) isEmpty() (empty bool) {
-	return false
-	empty = true
-	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
-		empty = false
-		*quit = true // 找到一个元素就退出
-	})
-	return
-}
-
-// 保障扫描性能，对于100以内的返回真实数量，大于100返回-1
 func (l *LevelZSet) len() (n int) {
-	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
-		n++
-		if n > 100 {
-			n = -1
-			*quit = true
-			return
-		}
-	})
-	return
+	return l.totalCount
 }
 
 func (l *LevelZSet) Len() (n int) {
@@ -308,6 +316,9 @@ func (l *LevelZSet) Len() (n int) {
 func (l *LevelZSet) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.totalCount == 0 {
+		return true
+	}
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	prefix := joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT)
@@ -319,6 +330,7 @@ func (l *LevelZSet) Drop() (ok bool) {
 	if err != nil {
 		panic(err)
 	}
+	l.totalCount = 0
 	ok = true
 	return
 }
