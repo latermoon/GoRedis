@@ -279,6 +279,7 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 
 // 返回是否空集合
 func (l *LevelZSet) isEmpty() (empty bool) {
+	return false
 	empty = true
 	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
 		empty = false
