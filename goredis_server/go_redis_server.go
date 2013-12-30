@@ -90,7 +90,7 @@ func (server *GoRedisServer) Init() (err error) {
 
 func (server *GoRedisServer) initLevelDB() (err error) {
 	opts := levigo.NewOptions()
-	opts.SetCache(levigo.NewLRUCache(32 * 1024 * 1024))
+	opts.SetCache(levigo.NewLRUCache(128 * 1024 * 1024))
 	opts.SetCompression(levigo.SnappyCompression)
 	opts.SetBlockSize(32 * 1024)
 	opts.SetWriteBufferSize(128 * 1024 * 1024)
