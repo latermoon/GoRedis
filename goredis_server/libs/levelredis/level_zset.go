@@ -5,14 +5,14 @@ package levelredis
 import (
 	"bytes"
 	"github.com/latermoon/levigo"
-	"sync"
 	"strconv"
+	"sync"
 )
 
 type LevelZSet struct {
-	redis *LevelRedis
-	key   string
-	mu    sync.Mutex
+	redis      *LevelRedis
+	key        string
+	mu         sync.Mutex
 	totalCount int
 }
 
@@ -39,7 +39,6 @@ func (l *LevelZSet) initOnce() {
 		}
 	}
 }
-
 
 func (l *LevelZSet) zsetKey() []byte {
 	return joinStringBytes(KEY_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, ZSET_SUFFIX)
@@ -91,7 +90,7 @@ func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 		oldscore, e1 := l.redis.db.Get(l.redis.ro, memberkey)
 		if e1 == nil && oldscore != nil {
 			batch.Delete(l.scoreKey(member, oldscore))
-		}else {
+		} else {
 			l.totalCount++
 		}
 		// set member
