@@ -64,6 +64,8 @@ func main() {
 
 func writeCommand(t qp.Task) {
 	cmd := t.(*Command)
+	fmt.Println(len(cmd.Args), cmd)
+	return
 
 	objs := make([]interface{}, 0, len(cmd.Args)-1)
 	for _, arg := range cmd.Args[1:] {
@@ -71,10 +73,10 @@ func writeCommand(t qp.Task) {
 	}
 
 	rd := pool.Get()
-	defer rd.Close()
 	_, err := rd.Do(cmd.Name(), objs...)
+	rd.Close()
 
-	// fmt.Println(len(cmd.Args), cmd)
+	fmt.Println(len(cmd.Args), cmd)
 	if err == nil {
 		// fmt.Println("+reply:", reply)
 		// printReply(reply)
