@@ -4,7 +4,6 @@ package levelredis
 
 import (
 	"bytes"
-	// "fmt"
 	"github.com/latermoon/levigo"
 	"strconv"
 	"sync"
@@ -13,8 +12,8 @@ import (
 type LevelZSet struct {
 	redis      *LevelRedis
 	key        string
-	totalCount int
 	mu         sync.Mutex
+	totalCount int
 }
 
 func NewLevelZSet(redis *LevelRedis, key string) (l *LevelZSet) {
@@ -22,6 +21,7 @@ func NewLevelZSet(redis *LevelRedis, key string) (l *LevelZSet) {
 	l.redis = redis
 	l.key = key
 	l.totalCount = -1
+	l.initOnce()
 	return
 }
 
@@ -54,34 +54,38 @@ func (l *LevelZSet) memberKey(member []byte) []byte {
 }
 
 func (l *LevelZSet) scoreKey(member []byte, score []byte) []byte {
-	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, "s", SEP, string(score), SEP, string(member))
+	scoreint := BytesToInt64(score)
+	var sign string // 正负数
+	if scoreint < 0 {
+		sign = "0"
+	} else {
+		sign = "1"
+	}
+	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, "s", SEP, sign, string(score), SEP, string(member))
 }
 
 func (l *LevelZSet) scoreKeyPrefix() []byte {
 	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, "s", SEP)
 }
 
-// __zset[user_rank]s#1378000907596#100428 = ""
+// _z[user_rank]s#1378000907596#100428 = ""
 func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
 	pos2 := bytes.LastIndex(scorekey, []byte(SEP))
 	pos1 := bytes.LastIndex(scorekey[:pos2], []byte(SEP))
 	member = copyBytes(scorekey[pos2+1:])
-	score = copyBytes(scorekey[pos1+1 : pos2])
+	score = copyBytes(scorekey[pos1+1+1 : pos2]) // +1 skip sign "0/1"
 	return
 }
 
 func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	count := len(scoreMembers)
 	for i := 0; i < count; i += 2 {
 		score := scoreMembers[i]
 		member, memberkey := scoreMembers[i+1], l.memberKey(scoreMembers[i+1])
-		// set member
-		batch.Put(memberkey, score)
 		// remove old score
 		oldscore, e1 := l.redis.db.Get(l.redis.ro, memberkey)
 		if e1 == nil && oldscore != nil {
@@ -89,16 +93,25 @@ func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 		} else {
 			l.totalCount++
 		}
+		// set member
+		batch.Put(memberkey, score)
 		// new score
 		batch.Put(l.scoreKey(member, score), nil)
 		n++
 	}
 	batch.Put(l.zsetKey(), l.zsetValue())
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
 func (l *LevelZSet) Score(member []byte) (score []byte) {
+	return l.score(member)
+}
+
+func (l *LevelZSet) score(member []byte) (score []byte) {
 	var err error
 	score, err = l.redis.db.Get(l.redis.ro, l.memberKey(member))
 	if err != nil || score == nil {
@@ -110,8 +123,7 @@ func (l *LevelZSet) Score(member []byte) (score []byte) {
 func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
-	score := l.Score(member)
+	score := l.score(member)
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	if score == nil {
@@ -123,14 +135,19 @@ func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 	}
 	batch.Put(l.memberKey(member), newscore)
 	batch.Put(l.scoreKey(member, newscore), nil)
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
 // 返回-1表示member不存在
 func (l *LevelZSet) Rank(high2low bool, member []byte) (idx int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	// 对于不存在的key，先检查一次，减少扫描成本
-	if l.Score(member) == nil {
+	if l.score(member) == nil {
 		return -1
 	}
 	direction := IteratorForward
@@ -157,6 +174,8 @@ func (l *LevelZSet) Rank(high2low bool, member []byte) (idx int) {
 }
 
 func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [][]byte) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	direction := IteratorForward
 	if high2low {
 		direction = IteratorBackward
@@ -178,12 +197,14 @@ func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [
 }
 
 func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count int) (scoreMembers [][]byte) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	direction := IteratorForward
 	if high2low {
 		direction = IteratorBackward
 	}
-	min2 := bytes.Join([][]byte{l.scoreKeyPrefix(), min}, nil)
-	max2 := bytes.Join([][]byte{l.scoreKeyPrefix(), max, []byte{MAXBYTE}}, nil)
+	min2 := joinBytes(l.scoreKeyPrefix(), min)
+	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
 	scoreMembers = make([][]byte, 0, 2)
 	l.redis.Enumerate(min2, max2, direction, func(i int, key, value []byte, quit *bool) {
 		if i < offset { // skip
@@ -203,7 +224,6 @@ func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count i
 func (l *LevelZSet) Remove(members ...[]byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	for _, member := range members {
@@ -221,14 +241,16 @@ func (l *LevelZSet) Remove(members ...[]byte) (n int) {
 	} else {
 		batch.Put(l.zsetKey(), l.zsetValue())
 	}
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
 func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
@@ -249,16 +271,18 @@ func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 	} else {
 		batch.Put(l.zsetKey(), l.zsetValue())
 	}
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
 func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.initOnce()
-	min2 := bytes.Join([][]byte{l.scoreKeyPrefix(), min}, nil)
-	max2 := bytes.Join([][]byte{l.scoreKeyPrefix(), max, []byte{254}}, nil)
+	min2 := joinBytes(l.scoreKeyPrefix(), min)
+	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	l.redis.Enumerate(min2, max2, IteratorForward, func(i int, key, value []byte, quit *bool) {
@@ -273,13 +297,19 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 	} else {
 		batch.Put(l.zsetKey(), l.zsetValue())
 	}
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
-func (l *LevelZSet) Len() (n int) {
-	l.initOnce()
+func (l *LevelZSet) len() (n int) {
 	return l.totalCount
+}
+
+func (l *LevelZSet) Len() (n int) {
+	return l.len()
 }
 
 func (l *LevelZSet) Drop() (ok bool) {
@@ -295,7 +325,10 @@ func (l *LevelZSet) Drop() (ok bool) {
 		batch.Delete(key)
 	})
 	batch.Delete(l.zsetKey())
-	l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.db.Write(l.redis.wo, batch)
+	if err != nil {
+		panic(err)
+	}
 	l.totalCount = 0
 	ok = true
 	return

@@ -14,7 +14,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.7"
+const VERSION = "1.0.8"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -75,18 +75,6 @@ func (server *GoRedisServer) Init() (err error) {
 	server.initLogger()
 	server.stdlog.Info("========================================")
 	server.stdlog.Info("server init ...")
-	// leveldb
-	// options := opt.Options{
-	// 	MaxOpenFiles: 100000,
-	// 	BlockCache:   cache.NewLRUCache(32 * opt.MiB),
-	// 	BlockSize:    32 * opt.KiB,
-	// 	WriteBuffer:  120 << 20,
-	// }
-	// server.db, err = leveldb.OpenFile(server.directory+"/db0", &options)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// server.levelRedis = leveltool.NewLevelRedis(server.db)
 	err = server.initLevelDB()
 	if err != nil {
 		return
@@ -102,10 +90,11 @@ func (server *GoRedisServer) Init() (err error) {
 
 func (server *GoRedisServer) initLevelDB() (err error) {
 	opts := levigo.NewOptions()
-	opts.SetCache(levigo.NewLRUCache(32 * 1024 * 1024))
+	opts.SetCache(levigo.NewLRUCache(128 * 1024 * 1024))
 	opts.SetCompression(levigo.SnappyCompression)
 	opts.SetBlockSize(32 * 1024)
 	opts.SetWriteBufferSize(128 * 1024 * 1024)
+	opts.SetMaxOpenFiles(100000)
 	opts.SetCreateIfMissing(true)
 	db, e1 := levigo.Open(server.directory+"/db0", opts)
 	if e1 != nil {

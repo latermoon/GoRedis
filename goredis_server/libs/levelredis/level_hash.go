@@ -22,11 +22,21 @@ type LevelHash struct {
 	userForSet bool
 }
 
-func NewLevelHash(redis *LevelRedis, entryKey string, userForSet bool) (l *LevelHash) {
+// 构造方法1
+func NewLevelSet(redis *LevelRedis, key string) (l *LevelHash) {
+	l = &LevelHash{}
+	l.redis = redis
+	l.entryKey = key
+	l.userForSet = true
+	return
+}
+
+// 构造方法2
+func NewLevelHash(redis *LevelRedis, entryKey string) (l *LevelHash) {
 	l = &LevelHash{}
 	l.redis = redis
 	l.entryKey = entryKey
-	l.userForSet = userForSet
+	l.userForSet = false
 	return
 }
 
@@ -137,11 +147,11 @@ func (l *LevelHash) Remove(fields ...[]byte) (n int) {
 }
 
 // 为了数据管理方便，这里不持久化count，每次都是枚举实现
-// 为了性能保障，对于大于1000返回-1，不再扫描
+// 为了性能保障，对于大于100返回-1，不再扫描
 func (l *LevelHash) Count() (n int) {
 	l.redis.PrefixEnumerate(l.fieldPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
 		n++
-		if n > 1000 {
+		if n > 100 {
 			n = -1
 			*quit = true
 			return

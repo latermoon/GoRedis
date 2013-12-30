@@ -64,7 +64,6 @@ func (s *SlaveSessionClient) initSlaveDb() (err error) {
 	for i := 0; i < s.queueCount; i++ {
 		aofkey := fmt.Sprintf("queue_%d", i)
 		s.queueLists[i] = s.aofRedis.GetList(aofkey)
-		s.queueLists[i].BeginTransaction()
 	}
 	return
 }
@@ -121,7 +120,6 @@ func (s *SlaveSessionClient) didRecvCommand(cmd *Command, count int64, isrdb boo
 // 当rdb同步结束后，开始启动消费队列
 func (s *SlaveSessionClient) rdbFinished(count int64) {
 	for i := 0; i < s.queueCount; i++ {
-		s.queueLists[i].Commit()
 		go s.queueProcess(i)
 	}
 }

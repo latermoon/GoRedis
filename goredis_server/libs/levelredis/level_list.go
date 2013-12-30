@@ -7,7 +7,6 @@ import (
 	"bytes"
 	// "fmt"
 	"github.com/latermoon/levigo"
-	"strconv"
 	"sync"
 )
 
@@ -22,37 +21,22 @@ type LevelList struct {
 	redis    *LevelRedis
 	entryKey string
 	// 游标控制
-	start         int64
-	end           int64
-	mu            sync.Mutex
-	inTransaction bool // 处于事务过程
+	start int64
+	end   int64
+	mu    sync.Mutex
 }
 
 func NewLevelList(redis *LevelRedis, entryKey string) (l *LevelList) {
 	l = &LevelList{}
 	l.redis = redis
 	l.entryKey = entryKey
-	l.start = 0
-	l.end = -1
-	l.initInfo()
+	l.start = l.firstIndex() // default 0
+	l.end = l.lastIndex()    // default -1
 	return
 }
 
 func (l *LevelList) Size() int {
 	return 0
-}
-
-func (l *LevelList) initInfo() {
-	data, err := l.redis.db.Get(l.redis.ro, l.infoKey())
-	if err != nil {
-		return
-	}
-	pairs := bytes.Split(data, []byte(","))
-	if len(pairs) < 2 {
-		return
-	}
-	l.start, _ = strconv.ParseInt(string(pairs[0]), 10, 64)
-	l.end, _ = strconv.ParseInt(string(pairs[1]), 10, 64)
 }
 
 // __key:[entry key]:list =
@@ -61,43 +45,30 @@ func (l *LevelList) infoKey() []byte {
 }
 
 func (l *LevelList) infoValue() []byte {
-	s := strconv.FormatInt(l.start, 10)
-	e := strconv.FormatInt(l.end, 10)
-	return []byte(s + "," + e)
+	return []byte("")
 }
 
 func (l *LevelList) keyPrefix() []byte {
 	return joinStringBytes(LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT)
 }
 
-// __list:[key]:idx:1005 = hello
+// _l[key]#11005 = hello
 func (l *LevelList) idxKey(idx int64) []byte {
-	idxStr := strconv.FormatInt(idx, 10)
-	return joinStringBytes(LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, "idx", ":", idxStr)
-}
-
-// 打开事务后，每次push不会更新infoKey()的内容，以达到提速和事务效果
-func (l *LevelList) BeginTransaction() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.inTransaction {
-		return
-	}
-	l.inTransaction = true
-}
-
-func (l *LevelList) Commit() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if !l.inTransaction {
-		return
-	}
-	if l.len() == 0 {
-		l.redis.db.Delete(l.redis.wo, l.infoKey())
+	// 正负符号, 因为经过uint64转换后，负数的字典顺序比整数大，所以需要前置一个0、1保障顺序
+	var sign string
+	if idx < 0 {
+		sign = "0"
 	} else {
-		l.redis.db.Put(l.redis.wo, l.infoKey(), l.infoValue())
+		sign = "1"
 	}
-	l.inTransaction = false
+	idxStr := string(Int64ToBytes(idx))
+	return joinStringBytes(LIST_PREFIX, SEP_LEFT, l.entryKey, SEP_RIGHT, SEP, sign, idxStr)
+}
+
+func (l *LevelList) splitIndexKey(idxkey []byte) (idx int64) {
+	pos := bytes.LastIndex(idxkey, []byte(SEP))
+	idx = BytesToInt64(idxkey[pos+1+1:]) // +1 skip sign "0/1"
+	return
 }
 
 func (l *LevelList) LPush(values ...[]byte) (err error) {
@@ -106,13 +77,14 @@ func (l *LevelList) LPush(values ...[]byte) (err error) {
 
 	// 左游标
 	oldstart := l.start
+	oldlen := l.len()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	for _, value := range values {
 		l.start--
 		batch.Put(l.idxKey(l.start), value)
 	}
-	if !l.inTransaction {
+	if oldlen == 0 { // 只需要第一次插入
 		batch.Put(l.infoKey(), l.infoValue())
 	}
 	err = l.redis.db.Write(l.redis.wo, batch)
@@ -129,13 +101,14 @@ func (l *LevelList) RPush(values ...[]byte) (err error) {
 
 	// 右游标
 	oldend := l.end
+	oldlen := l.len()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	for _, value := range values {
 		l.end++
 		batch.Put(l.idxKey(l.end), value)
 	}
-	if !l.inTransaction {
+	if oldlen == 0 { // 只需要第一次插入
 		batch.Put(l.infoKey(), l.infoValue())
 	}
 	err = l.redis.db.Write(l.redis.wo, batch)
@@ -176,7 +149,6 @@ func (l *LevelList) RPop() (e *Element, err error) {
 		batch.Delete(l.infoKey())
 	} else {
 		l.end--
-		batch.Put(l.infoKey(), l.infoValue())
 	}
 	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
@@ -215,7 +187,6 @@ func (l *LevelList) LPop() (e *Element, err error) {
 		batch.Delete(l.infoKey())
 	} else {
 		l.start++
-		batch.Put(l.infoKey(), l.infoValue())
 	}
 	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
@@ -272,6 +243,24 @@ func (l *LevelList) Index(i int64) (e *Element, err error) {
 	return
 }
 
+func (l *LevelList) firstIndex() (n int64) {
+	n = 0
+	l.redis.PrefixEnumerate(l.keyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
+		n = l.splitIndexKey(key)
+		*quit = true
+	})
+	return
+}
+
+func (l *LevelList) lastIndex() (n int64) {
+	n = -1
+	l.redis.PrefixEnumerate(l.keyPrefix(), IteratorBackward, func(i int, key, value []byte, quit *bool) {
+		n = l.splitIndexKey(key)
+		*quit = true
+	})
+	return
+}
+
 func (l *LevelList) len() int64 {
 	if l.end < l.start {
 		return 0
@@ -280,8 +269,6 @@ func (l *LevelList) len() int64 {
 }
 
 func (l *LevelList) Len() int64 {
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	return l.len()
 }
 

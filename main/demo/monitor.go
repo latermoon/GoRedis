@@ -35,7 +35,7 @@ func main() {
 		fmt.Println(string(line))
 	}
 
-	queue := qp.NewQueueProcess(100, writeCommand)
+	queue := qp.NewQueueProcess(200, writeCommand)
 
 	go func() {
 		ticker := time.NewTicker(time.Millisecond * 1000)
@@ -65,14 +65,18 @@ func main() {
 func writeCommand(t qp.Task) {
 	cmd := t.(*Command)
 
+	if cmd.StringAtIndex(1) == "user:update:timestamp" {
+		return
+	}
+
 	objs := make([]interface{}, 0, len(cmd.Args)-1)
 	for _, arg := range cmd.Args[1:] {
 		objs = append(objs, arg)
 	}
 
 	rd := pool.Get()
-	defer rd.Close()
 	_, err := rd.Do(cmd.Name(), objs...)
+	rd.Close()
 
 	// fmt.Println(len(cmd.Args), cmd)
 	if err == nil {

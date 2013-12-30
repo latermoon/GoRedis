@@ -3,6 +3,18 @@ package levelredis
 /*
 基于leveldb实现的redis持久化层
 
+1、key存储规则
+为了提供keys、type等基本操作，每个存入的数据都会有这样的结构 +[key]type，用于表达key以及数据类型
+比如一个set name latermoon，会在leveldb里产生 +[name]string = latermoon 的数据
+对于string以外的复杂结构，还会有另外的字段，比如 hash 会有以_h开头的key，list会有_l开头的key
+
+2、leveldb存储原则
+因为整个设计都是为了海量存储的，所以所有支持的redis指令，都必须基于leveldb实现，不能消耗内存
+必要的时候，会牺牲掉一些redis特性，比如list结构需要lindex的话，就必须放弃lrem和linsert
+
+同时会对使用场景进行一些取舍，比如zset要提供zcard的话，就需要每次操作后更新len，但增加的一次leveldb操作会降低zadd性能
+因此对于hash、set这种很少取count的数据，放弃hlen、scard的性能（但也可以提供1000以内的枚举统计）,来提高hset/sadd的性能
+
 string
 	+[name]string = "latermoon"
 	+[name]string#e1083 = "latermoon"
@@ -12,19 +24,19 @@ hash
 	_h[info]age = "27"
 	_h[info]sex = "M"
 list
-	+[list]list = "0,1"
-	_l[list]#0 = "a"
-	_l[list]#1 = "b"
-	_l[list]#2 = "c"
-	_l[list]#3 = "d"
+	+[list]list = ""
+	_l[list]#-2 = "a"
+	_l[list]#-1 = "b"
+	_l[list]#0 = "c"
+	_l[list]#1 = "d"
 zset
-	+[user_rank]zset = "2"
-	_z[user_rank]m#100422 = "1002"
-	_z[user_rank]m#100423 = "1006"
-	_z[user_rank]m#300000 = "10102"
-	_z[user_rank]s#1002#100422 = ""
-	_z[user_rank]s#1006#100423 = ""
-	_z[user_rank]s#10102#300000 = ""
+	+[user_rank]zset = ""
+	_z[user_rank]m#100422 = "-2"
+	_z[user_rank]m#100423 = "1"
+	_z[user_rank]m#300000 = "2"
+	_z[user_rank]s#-2#100422 = ""
+	_z[user_rank]s#1#100423 = ""
+	_z[user_rank]s#2#300000 = ""
 */
 
 import (
@@ -77,7 +89,7 @@ type LevelRedis struct {
 	db       *levigo.DB
 	ro       *levigo.ReadOptions
 	wo       *levigo.WriteOptions
-	lruCache *lru.LRUCache // LRU缓存层
+	lruCache *lru.LRUCache // LRU缓存层，管理string以外的key
 	mu       sync.Mutex
 	lstring  *LevelString
 }
@@ -136,14 +148,14 @@ func (l *LevelRedis) GetList(key string) (lst *LevelList) {
 
 func (l *LevelRedis) GetHash(key string) (h *LevelHash) {
 	obj := l.objFromCache(key, func() interface{} {
-		return NewLevelHash(l, key, false)
+		return NewLevelHash(l, key)
 	})
 	return obj.(*LevelHash)
 }
 
 func (l *LevelRedis) GetSet(key string) (s *LevelHash) {
 	obj := l.objFromCache(key, func() interface{} {
-		return NewLevelHash(l, key, true)
+		return NewLevelSet(l, key)
 	})
 	return obj.(*LevelHash)
 }
@@ -176,7 +188,6 @@ func (l *LevelRedis) TypeOf(key []byte) (t string) {
 }
 
 func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
-	n = 0
 	for _, keybytes := range keys {
 		key := string(keybytes)
 		t := l.TypeOf(keybytes)
@@ -184,28 +195,23 @@ func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
 		case "string":
 			n += l.Strings().Delete(keybytes)
 		case "hash":
-			ok := l.GetHash(key).Drop()
-			if ok {
+			if ok := l.GetHash(key).Drop(); ok {
 				n++
 			}
 		case "set":
-			ok := l.GetSet(key).Drop()
-			if ok {
+			if ok := l.GetSet(key).Drop(); ok {
 				n++
 			}
 		case "list":
-			ok := l.GetList(key).Drop()
-			if ok {
+			if ok := l.GetList(key).Drop(); ok {
 				n++
 			}
 		case "zset":
-			ok := l.GetSortedSet(key).Drop()
-			if ok {
+			if ok := l.GetSortedSet(key).Drop(); ok {
 				n++
 			}
 		case "doc":
-			ok := l.GetDoc(key).Drop()
-			if ok {
+			if ok := l.GetDoc(key).Drop(); ok {
 				n++
 			}
 		default:
@@ -267,38 +273,32 @@ func (l *LevelRedis) Enumerate(min, max []byte, direction IteratorDirection, fn 
 	}
 
 	i := -1
-	if found {
-		// 范围判断
-		if (direction == IteratorForward && bytes.Compare(iter.Key(), min) >= 0) ||
-			(direction == IteratorBackward && bytes.Compare(iter.Key(), max) <= 0) {
-			i++
-			quit := false
-			fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
-			if quit {
-				return
-			}
+	// 范围判断
+	if found && between(iter.Key(), min, max) {
+		i++
+		quit := false
+		fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
+		if quit {
+			return
 		}
 	}
 	for {
 		found = false
 		if direction == IteratorBackward {
 			iter.Prev()
-			found = iter.Valid()
-			if !found || bytes.Compare(iter.Key(), min) < 0 {
-				break
-			}
 		} else {
 			iter.Next()
-			found = iter.Valid()
-			if !found || bytes.Compare(iter.Key(), max) > 0 {
-				break
-			}
 		}
-		i++
-		quit := false
-		fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
-		if quit {
-			return
+		found = iter.Valid()
+		if found && between(iter.Key(), min, max) {
+			i++
+			quit := false
+			fn(i, copyBytes(iter.Key()), copyBytes(iter.Value()), &quit)
+			if quit {
+				return
+			}
+		} else {
+			break
 		}
 	}
 
