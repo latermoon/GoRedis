@@ -212,10 +212,11 @@ func (l *LevelList) TrimLeft(count uint) (n int) {
 	for i = 0; i < int64(count) && i < oldlen; i++ {
 		idx := oldstart + i
 		batch.Delete(l.idxKey(idx))
-		// fmt.Println("LTRIM", "i=", i, "idx=", idx, "oldlen:", oldlen)
+		// fmt.Println("LTRIM", l.entryKey, "len:", oldlen, "i=", i, l.start, l.end, "idx=", idx)
 		l.start++
 	}
 	shouldReset := l.len() == 0
+	// fmt.Println("shouldReset", shouldReset)
 	if shouldReset {
 		l.start = 0
 		l.end = -1
