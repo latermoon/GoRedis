@@ -15,11 +15,11 @@ import (
 
 var pool *redis.Pool
 
-var srchost = "redis-event-a001:8402"
+var srchost = "redis-event-a001:8400"
 
-var dsthost = "goredis-nearby-a001:18402"
+// var dsthost = "goredis-nearby-a001:18402"
 
-// var dsthost = "localhost:1602"
+var dsthost = "localhost:1602"
 
 func main() {
 	runtime.GOMAXPROCS(8)
@@ -71,7 +71,7 @@ func writeCommand(t qp.Task) {
 	// 	return
 	// }
 
-	if strings.HasPrefix(cmdname, "LTRIM") {
+	if strings.HasPrefix(cmdname, "11LTRIM") {
 		return
 	}
 

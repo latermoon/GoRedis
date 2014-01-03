@@ -201,14 +201,18 @@ func (l *LevelList) TrimLeft(count uint) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.len() == 0 {
+	oldlen := l.len()
+	if oldlen == 0 {
 		return
 	}
 	oldstart, oldend := l.start, l.end
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	for idx := oldstart; idx < (oldstart+int64(count)) || idx <= oldend; idx++ {
+	var i int64
+	for i = 0; i < int64(count) && i < oldlen; i++ {
+		idx := oldstart + i
 		batch.Delete(l.idxKey(idx))
+		// fmt.Println("LTRIM", "i=", i, "idx=", idx, "oldlen:", oldlen)
 		l.start++
 	}
 	shouldReset := l.len() == 0
