@@ -71,7 +71,7 @@ func writeCommand(t qp.Task) {
 	// 	return
 	// }
 
-	if strings.HasPrefix(cmdname, "LTRIM") {
+	if strings.HasPrefix(cmdname, "111L") {
 		return
 	}
 

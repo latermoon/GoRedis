@@ -147,7 +147,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 		begin := time.Now()
 		reply := server.InvokeCommandHandler(session, cmd)
 		elapsed := time.Now().Sub(begin)
-		if elapsed.Nanoseconds() > int64(1000*time.Microsecond) {
+		if elapsed.Nanoseconds() > int64(10*time.Millisecond) {
 			fmt.Printf("%0.2f ms [%s]\n", elapsed.Seconds()*1000, cmd)
 		}
 		if reply != nil {

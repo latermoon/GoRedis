@@ -24,13 +24,13 @@ hash
 	_h[info]age = "27"
 	_h[info]sex = "M"
 list
-	+[list]list = ""
+	+[list]list = "-2,1"
 	_l[list]#-2 = "a"
 	_l[list]#-1 = "b"
 	_l[list]#0 = "c"
 	_l[list]#1 = "d"
 zset
-	+[user_rank]zset = ""
+	+[user_rank]zset = "3"
 	_z[user_rank]m#100422 = "-2"
 	_z[user_rank]m#100423 = "1"
 	_z[user_rank]m#300000 = "2"
