@@ -207,7 +207,7 @@ func (l *LevelList) TrimLeft(count uint) (n int) {
 	oldstart, oldend := l.start, l.end
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	for idx := oldstart; idx < (oldstart+int64(count)) && idx <= oldend; idx++ {
+	for idx := oldstart; idx < (oldstart+int64(count)) || idx <= oldend; idx++ {
 		batch.Delete(l.idxKey(idx))
 		l.start++
 	}

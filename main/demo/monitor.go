@@ -9,14 +9,15 @@ import (
 	"github.com/latermoon/redigo/redis"
 	"net"
 	"runtime"
+	"strings"
 	"time"
 )
 
 var pool *redis.Pool
 
-var srchost = "redis-event-a001:8400"
+var srchost = "redis-event-a001:8402"
 
-var dsthost = "goredis-nearby-a001:18400"
+var dsthost = "goredis-nearby-a001:18402"
 
 // var dsthost = "localhost:1602"
 
@@ -65,6 +66,14 @@ func main() {
 
 func writeCommand(t qp.Task) {
 	cmd := t.(*Command)
+	cmdname := cmd.StringAtIndex(0)
+	// if strings.HasPrefix(cmdname, "L") {
+	// 	return
+	// }
+
+	if strings.HasPrefix(cmdname, "LTRIM") {
+		return
+	}
 
 	if cmd.StringAtIndex(1) == "user:update:timestamp" {
 		return
@@ -118,7 +127,7 @@ func printReply(reply interface{}) {
 
 func init() {
 	pool = &redis.Pool{
-		MaxIdle:     500,
+		MaxIdle:     2000,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", dsthost)
