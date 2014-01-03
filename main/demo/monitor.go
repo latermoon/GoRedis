@@ -16,8 +16,9 @@ var pool *redis.Pool
 
 var srchost = "redis-event-a001:8400"
 
-// var dsthost = "goredis-nearby-a001:18400"
-var dsthost = "localhost:1602"
+var dsthost = "goredis-nearby-a001:18400"
+
+// var dsthost = "localhost:1602"
 
 func main() {
 	runtime.GOMAXPROCS(8)
@@ -35,7 +36,7 @@ func main() {
 		fmt.Println(string(line))
 	}
 
-	queue := qp.NewQueueProcess(200, writeCommand)
+	queue := qp.NewQueueProcess(100, writeCommand)
 
 	go func() {
 		ticker := time.NewTicker(time.Millisecond * 1000)
