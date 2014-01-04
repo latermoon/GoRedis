@@ -49,17 +49,17 @@ import (
 )
 
 var (
-	stdlogger    Logger            // 默认Logger
-	caches       map[string]Logger // 缓存
-	mu           sync.Mutex
-	globalPrefix func() string // 默认前缀函数
-	globalOut    io.Writer     // 默认输出位置
+	caches        map[string]Logger // 缓存
+	mu            sync.Mutex
+	defaultLogger Logger        // 默认Logger
+	defaultPrefix func() string // 默认前缀函数
+	defaultOutput io.Writer     // 默认输出位置
 )
 
 func init() {
 	caches = make(map[string]Logger)
-	globalOut = os.Stdout // 默认输出
-	stdlogger = Log("")   // 默认日志
+	defaultOutput = os.Stdout // 默认输出os.Stdout
+	defaultLogger = Log("")
 }
 
 /**
@@ -79,29 +79,29 @@ func Log(name string) (l Logger) {
 }
 
 func SetPrefix(fn func() string) {
-	globalPrefix = fn
+	defaultPrefix = fn
 }
 
 func Prefix() func() string {
-	return globalPrefix
+	return defaultPrefix
 }
 
 func SetOutput(w io.Writer) {
-	globalOut = w
+	defaultOutput = w
 }
 
 func Output() io.Writer {
-	return globalOut
+	return defaultOutput
 }
 
 func Println(v ...interface{}) {
-	stdlogger.Println(v...)
+	defaultLogger.Println(v...)
 }
 
 func Printf(format string, v ...interface{}) {
-	stdlogger.Printf(format, v...)
+	defaultLogger.Printf(format, v...)
 }
 
 func Print(v ...interface{}) {
-	stdlogger.Print(v...)
+	defaultLogger.Print(v...)
 }
