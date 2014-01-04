@@ -15,7 +15,7 @@ import (
 
 var pool *redis.Pool
 
-var srchost = "redis-event-a001:8400"
+var srchost = "redis-event-a001:8401"
 
 // var dsthost = "goredis-nearby-a001:18402"
 
