@@ -7,6 +7,8 @@ import (
 	"bytes"
 	// "fmt"
 	"github.com/latermoon/levigo"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -30,9 +32,26 @@ func NewLevelList(redis *LevelRedis, entryKey string) (l *LevelList) {
 	l = &LevelList{}
 	l.redis = redis
 	l.entryKey = entryKey
-	l.start = l.firstIndex() // default 0
-	l.end = l.lastIndex()    // default -1
+	l.start = 0
+	l.end = -1
+	l.initCount()
 	return
+}
+
+func (l *LevelList) initCount() {
+	val, err := l.redis.db.Get(l.redis.ro, l.infoKey())
+	if err != nil || val == nil || len(val) == 0 {
+		return
+	}
+	pairs := strings.Split(string(val), ",")
+	if len(pairs) != 2 {
+		return
+	}
+	l.start, _ = strconv.ParseInt(pairs[0], 10, 64)
+	l.end, _ = strconv.ParseInt(pairs[1], 10, 64)
+	if l.end > l.start {
+		panic("bad list: " + l.entryKey)
+	}
 }
 
 func (l *LevelList) Size() int {
@@ -45,7 +64,7 @@ func (l *LevelList) infoKey() []byte {
 }
 
 func (l *LevelList) infoValue() []byte {
-	return []byte("")
+	return []byte(strconv.FormatInt(l.start, 10) + "," + strconv.FormatInt(l.end, 10))
 }
 
 func (l *LevelList) keyPrefix() []byte {
@@ -77,16 +96,13 @@ func (l *LevelList) LPush(values ...[]byte) (err error) {
 
 	// 左游标
 	oldstart := l.start
-	oldlen := l.len()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	for _, value := range values {
 		l.start--
 		batch.Put(l.idxKey(l.start), value)
 	}
-	if oldlen == 0 { // 只需要第一次插入
-		batch.Put(l.infoKey(), l.infoValue())
-	}
+	batch.Put(l.infoKey(), l.infoValue())
 	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		// 回退
@@ -101,16 +117,13 @@ func (l *LevelList) RPush(values ...[]byte) (err error) {
 
 	// 右游标
 	oldend := l.end
-	oldlen := l.len()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	for _, value := range values {
 		l.end++
 		batch.Put(l.idxKey(l.end), value)
 	}
-	if oldlen == 0 { // 只需要第一次插入
-		batch.Put(l.infoKey(), l.infoValue())
-	}
+	batch.Put(l.infoKey(), l.infoValue())
 	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		// 回退
@@ -149,6 +162,7 @@ func (l *LevelList) RPop() (e *Element, err error) {
 		batch.Delete(l.infoKey())
 	} else {
 		l.end--
+		batch.Put(l.infoKey(), l.infoValue())
 	}
 	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
@@ -187,6 +201,7 @@ func (l *LevelList) LPop() (e *Element, err error) {
 		batch.Delete(l.infoKey())
 	} else {
 		l.start++
+		batch.Put(l.infoKey(), l.infoValue())
 	}
 	err = l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
@@ -201,17 +216,22 @@ func (l *LevelList) TrimLeft(count uint) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.len() == 0 {
+	oldlen := l.len()
+	if oldlen == 0 {
 		return
 	}
 	oldstart, oldend := l.start, l.end
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	for idx := oldstart; idx < (oldstart+int64(count)) && idx <= oldend; idx++ {
+	var i int64
+	for i = 0; i < int64(count) && i < oldlen; i++ {
+		idx := oldstart + i
 		batch.Delete(l.idxKey(idx))
+		// fmt.Println("LTRIM", l.entryKey, "len:", oldlen, "i=", i, l.start, l.end, "idx=", idx)
 		l.start++
 	}
 	shouldReset := l.len() == 0
+	// fmt.Println("shouldReset", shouldReset)
 	if shouldReset {
 		l.start = 0
 		l.end = -1
@@ -219,11 +239,16 @@ func (l *LevelList) TrimLeft(count uint) (n int) {
 	} else {
 		batch.Put(l.infoKey(), l.infoValue())
 	}
+
 	err := l.redis.db.Write(l.redis.wo, batch)
 	if err != nil {
 		// 回退
 		l.start, l.end = oldstart, oldend
 	}
+	return
+}
+
+func (l *LevelList) Range(start, end int64) (e []*Element) {
 	return
 }
 
@@ -240,24 +265,6 @@ func (l *LevelList) Index(i int64) (e *Element, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return
-}
-
-func (l *LevelList) firstIndex() (n int64) {
-	n = 0
-	l.redis.PrefixEnumerate(l.keyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
-		n = l.splitIndexKey(key)
-		*quit = true
-	})
-	return
-}
-
-func (l *LevelList) lastIndex() (n int64) {
-	n = -1
-	l.redis.PrefixEnumerate(l.keyPrefix(), IteratorBackward, func(i int, key, value []byte, quit *bool) {
-		n = l.splitIndexKey(key)
-		*quit = true
-	})
 	return
 }
 
