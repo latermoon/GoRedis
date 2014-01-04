@@ -3,11 +3,13 @@ package stdlog
 import (
 	"fmt"
 	"io"
+	"sync"
 )
 
 type Logger interface {
 	SetPrefix(fn func() string)
-	GetPrefix() func() string
+	SetOutput(w io.Writer)
+	// Print
 	Println(v ...interface{})
 	Printf(format string, v ...interface{})
 	Print(v ...interface{})
@@ -15,31 +17,47 @@ type Logger interface {
 
 type SimpleLogger struct {
 	Logger
-	out    io.Writer
 	prefix func() string
-}
-
-func NewSimpleLogger(out io.Writer) (l *SimpleLogger) {
-	l = &SimpleLogger{}
-	l.out = out
-	return
+	out    io.Writer
+	mu     sync.Mutex
 }
 
 // 设置函数前缀，典型使用场景是返回当前时间字符串
 func (l *SimpleLogger) SetPrefix(fn func() string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.prefix = fn
 }
 
-func (l *SimpleLogger) GetPrefix() (fn func() string) {
-	return l.prefix
+func (l *SimpleLogger) SetOutput(w io.Writer) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.out = w
 }
 
-// 输出函数
+// 输出函数，如果没有设置Prefix和Output，则使用全局配置
 func (l *SimpleLogger) ouput(s string) {
+	// prefix函数时间不可控，先执行
+	var p string
 	if l.prefix != nil {
-		io.WriteString(l.out, l.prefix())
+		p = l.prefix()
+	} else if globalPrefix != nil {
+		p = globalPrefix()
 	}
-	io.WriteString(l.out, s)
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	w := l.out
+	if l.out == nil {
+		w = globalOut
+	}
+	// write
+	if len(p) > 0 {
+		io.WriteString(w, p+s)
+	} else {
+		io.WriteString(w, s)
+	}
 }
 
 func (l *SimpleLogger) Println(v ...interface{}) {
