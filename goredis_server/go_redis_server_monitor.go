@@ -2,6 +2,7 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"../libs/stdlog"
 	"container/list"
 	"encoding/json"
 	"fmt"
@@ -33,7 +34,7 @@ func (server *GoRedisServer) monitorOutput(session *Session, cmd *Command) {
 	}
 	if needRemove != nil {
 		for _, e := range needRemove {
-			stdlog.Info("remove monitor client %s", e.Value.(*Session).RemoteAddr())
+			stdlog.Printf("remove monitor client %s\n", e.Value.(*Session).RemoteAddr())
 			server.monitorlist.Remove(e)
 		}
 	}
