@@ -42,7 +42,7 @@ func (l *SimpleLogger) ouput(s string) {
 	if l.prefix != nil {
 		p = l.prefix()
 	} else if Prefix() != nil {
-		p = Prefix()
+		p = Prefix()()
 	}
 
 	l.mu.Lock()
