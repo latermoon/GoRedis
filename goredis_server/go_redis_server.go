@@ -2,7 +2,7 @@ package goredis_server
 
 import (
 	. "../goredis"
-	"./libs/golog"
+	stdlog "../libs/stdlog"
 	"./libs/levelredis"
 	"./libs/uuid"
 	"./monitor"
@@ -36,7 +36,6 @@ type GoRedisServer struct {
 	cmdCateCounters *monitor.Counters // 指令集统计
 	// logger
 	cmdMonitor *monitor.StatusLogger
-	stdlog     *golog.Logger
 	// 从库
 	uid              string // 实例id
 	slavelist        *list.List
@@ -72,9 +71,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 }
 
 func (server *GoRedisServer) Init() (err error) {
-	server.initLogger()
-	server.stdlog.Info("========================================")
-	server.stdlog.Info("server init ...")
+	stdlog.Println("server init ...")
 	err = server.initLevelDB()
 	if err != nil {
 		return
@@ -83,7 +80,7 @@ func (server *GoRedisServer) Init() (err error) {
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	// slave
-	server.stdlog.Info("init uid %s", server.UID())
+	stdlog.Printf("init uid %s\n", server.UID())
 	server.initSlaveSessions()
 	return
 }
@@ -105,7 +102,7 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 }
 
 func (server *GoRedisServer) Listen(host string) {
-	stdlog.Info("listen %s", host)
+	stdlog.Printf("listen %s\n", host)
 	server.RedisServer.Listen(host)
 }
 
@@ -119,17 +116,6 @@ func (server *GoRedisServer) UID() (uid string) {
 		}
 	}
 	return server.uid
-}
-
-func (server *GoRedisServer) StdLog() *golog.Logger {
-	return server.stdlog
-}
-
-func (server *GoRedisServer) initLogger() {
-	out := golog.NewConsoleAndFileWriter(server.directory + "/stdout.log")
-	server.stdlog = golog.New(out, golog.DEBUG)
-	// package内的全局变量，方便调用
-	stdlog = server.stdlog
 }
 
 // 初始化从库

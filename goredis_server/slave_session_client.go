@@ -6,6 +6,7 @@ slaveClient.Stop()
 */
 import (
 	. "../goredis"
+	"../libs/stdlog"
 	"./libs/levelredis"
 	qp "./libs/queueprocess"
 	"./monitor"
@@ -83,7 +84,7 @@ func (s *SlaveSessionClient) initMonitor() {
 
 func (s *SlaveSessionClient) Start() {
 	if s.shouldStopRunloop {
-		s.server.stdlog.Error("[%s] slaveof should run once", s.session.RemoteAddr())
+		stdlog.Printf("[%s] slaveof should run once\n", s.session.RemoteAddr())
 		return
 	}
 	// 阻塞处理，直到出错
@@ -91,7 +92,7 @@ func (s *SlaveSessionClient) Start() {
 	s.session.RdbFinished = s.rdbFinished
 	err := s.session.Sync(s.server.UID())
 	if err != nil {
-		s.server.stdlog.Error("[%s] slaveof sync error %s", s.session.RemoteAddr(), err)
+		stdlog.Printf("[%s] slaveof sync error %s\n", s.session.RemoteAddr(), err)
 	}
 	// 终止运行
 	s.shouldStopRunloop = true

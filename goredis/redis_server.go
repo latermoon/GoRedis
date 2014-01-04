@@ -9,7 +9,7 @@
 package goredis
 
 import (
-	"fmt"
+	"../libs/stdlog"
 	"net"
 	"reflect"
 	"runtime/debug"
@@ -85,10 +85,10 @@ func (server *RedisServer) Listen(host string) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("[goredis] accepted error", err)
+			stdlog.Println("accepted error", err)
 			continue
 		}
-		fmt.Println("[goredis] connection accepted from", conn.RemoteAddr())
+		stdlog.Println("connection accepted from", conn.RemoteAddr())
 		// go
 		go server.handleConnection(NewSession(conn))
 	}
@@ -128,7 +128,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 	// 异常处理
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println(fmt.Sprintf("Error %s %s", session.conn.RemoteAddr(), err))
+			stdlog.Printf("Error %s %s\n", session.conn.RemoteAddr(), err)
 			debug.PrintStack()
 			session.Close()
 		}
@@ -139,7 +139,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 		// 1) io.EOF
 		// 2) read tcp 127.0.0.1:51863: connection reset by peer
 		if e1 != nil {
-			fmt.Println(fmt.Sprintf("[goredis] end connection %s %s", session.conn.RemoteAddr(), e1))
+			stdlog.Printf("end connection %s %s\n", session.conn.RemoteAddr(), e1)
 			session.Close()
 			break
 		}
@@ -148,7 +148,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 		reply := server.InvokeCommandHandler(session, cmd)
 		elapsed := time.Now().Sub(begin)
 		if elapsed.Nanoseconds() > int64(10*time.Millisecond) {
-			fmt.Printf("%0.2f ms [%s]\n", elapsed.Seconds()*1000, cmd)
+			stdlog.Printf("exec %0.2f ms [%s]\n", elapsed.Seconds()*1000, cmd)
 		}
 		if reply != nil {
 			session.Reply(reply)
