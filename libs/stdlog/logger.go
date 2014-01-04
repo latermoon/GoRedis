@@ -41,8 +41,8 @@ func (l *SimpleLogger) ouput(s string) {
 	var p string
 	if l.prefix != nil {
 		p = l.prefix()
-	} else if globalPrefix != nil {
-		p = globalPrefix()
+	} else if Prefix() != nil {
+		p = Prefix()()
 	}
 
 	l.mu.Lock()
@@ -50,7 +50,7 @@ func (l *SimpleLogger) ouput(s string) {
 
 	w := l.out
 	if l.out == nil {
-		w = globalOut
+		w = Output()
 	}
 	// write
 	if len(p) > 0 {

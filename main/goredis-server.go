@@ -37,13 +37,12 @@ func main() {
 
 	runtime.GOMAXPROCS(*procsPtr)
 
-	// db parent directory
+	// 设置主路径
 	dbhome := "/data"
 	finfo, e1 := os.Stat(dbhome)
 	if os.IsNotExist(e1) || !finfo.IsDir() {
 		dbhome = "/tmp"
 	}
-
 	directory := fmt.Sprintf("%s/goredis_%d/", dbhome, *portPtr)
 	os.MkdirAll(directory, os.ModePerm)
 
