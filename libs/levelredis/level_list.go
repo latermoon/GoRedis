@@ -284,7 +284,7 @@ func (l *LevelList) Drop() (ok bool) {
 	defer l.mu.Unlock()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	l.redis.PrefixEnumerate(l.keyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.PrefixEnumerate(l.keyPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
 		batch.Delete(key)
 	})
 	batch.Delete(l.infoKey())

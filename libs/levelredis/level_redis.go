@@ -17,7 +17,6 @@ package levelredis
 
 string
 	+[name]string = "latermoon"
-	+[name]string#e1083 = "latermoon"
 hash
 	+[info]hash = ""
 	_h[info]name = "latermoon"
@@ -78,11 +77,11 @@ const (
 )
 
 // 枚举方向
-type IteratorDirection int
+type IterDirection int
 
 const (
-	IteratorForward IteratorDirection = iota
-	IteratorBackward
+	IterForward IterDirection = iota
+	IterBackward
 )
 
 type LevelRedis struct {
@@ -176,7 +175,7 @@ func (l *LevelRedis) GetDoc(key string) (d *LevelDocument) {
 
 func (l *LevelRedis) TypeOf(key []byte) (t string) {
 	prefix := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(key), SEP_RIGHT)
-	l.PrefixEnumerate(prefix, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.PrefixEnumerate(prefix, IterForward, func(i int, key, value []byte, quit *bool) {
 		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
 		t = string(key[right+1:])
 		*quit = true
@@ -226,7 +225,7 @@ func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
 // keys前缀扫描
 func (l *LevelRedis) Keys(prefix []byte, fn func(i int, key, keytype []byte, quit *bool)) {
 	rawprefix := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(prefix))
-	l.PrefixEnumerate(rawprefix, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.PrefixEnumerate(rawprefix, IterForward, func(i int, key, value []byte, quit *bool) {
 		left := bytes.Index(key, []byte(SEP_LEFT))
 		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
 		fn(i, key[left+1:right], key[right+1:], quit)
@@ -234,7 +233,7 @@ func (l *LevelRedis) Keys(prefix []byte, fn func(i int, key, keytype []byte, qui
 }
 
 // 前缀扫描
-func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IteratorDirection, fn func(i int, key, value []byte, quit *bool)) {
+func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
 	min := prefix
 	max := append(prefix, MAXBYTE)
 	j := -1
@@ -248,12 +247,12 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IteratorDirection,
 }
 
 // 范围扫描
-func (l *LevelRedis) Enumerate(min, max []byte, direction IteratorDirection, fn func(i int, key, value []byte, quit *bool)) {
+func (l *LevelRedis) Enumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Close()
 
 	found := false
-	if direction == IteratorBackward {
+	if direction == IterBackward {
 		if len(max) == 0 {
 			iter.SeekToLast()
 		} else {
@@ -284,7 +283,7 @@ func (l *LevelRedis) Enumerate(min, max []byte, direction IteratorDirection, fn 
 	}
 	for {
 		found = false
-		if direction == IteratorBackward {
+		if direction == IterBackward {
 			iter.Prev()
 		} else {
 			iter.Next()
