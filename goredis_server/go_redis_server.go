@@ -2,9 +2,9 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"../libs/levelredis"
 	stdlog "../libs/stdlog"
-	"./libs/levelredis"
-	"./libs/uuid"
+	"../libs/uuid"
 	"./monitor"
 	"container/list"
 	"errors"

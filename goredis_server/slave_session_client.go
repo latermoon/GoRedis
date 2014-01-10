@@ -6,8 +6,8 @@ slaveClient.Stop()
 */
 import (
 	. "../goredis"
+	"../libs/levelredis"
 	"../libs/stdlog"
-	"./libs/levelredis"
 	qp "./libs/queueprocess"
 	"./monitor"
 	"errors"

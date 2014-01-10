@@ -7,7 +7,7 @@ keynext [min] [count]
 
 import (
 	. "../goredis"
-	"./libs/levelredis"
+	"../libs/levelredis"
 )
 
 func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
