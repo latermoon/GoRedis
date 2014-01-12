@@ -55,7 +55,7 @@ func (l *LevelList) initCount() {
 }
 
 func (l *LevelList) Size() int {
-	return 0
+	return 1
 }
 
 // __key:[entry key]:list =

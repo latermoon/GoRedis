@@ -99,7 +99,7 @@ func NewLevelRedis(db *levigo.DB) (l *LevelRedis) {
 	l.ro = levigo.NewReadOptions()
 	l.wo = levigo.NewWriteOptions()
 	l.lstring = NewLevelString(l)
-	l.lruCache = lru.NewLRUCache(1000)
+	l.lruCache = lru.NewLRUCache(10000)
 	// 初始化最大的key，对于Enumerate从后面开始扫描key非常重要
 	// 使iter.Seek(key)必定Valid=true
 	maxkey := []byte{MAXBYTE}

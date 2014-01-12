@@ -41,7 +41,7 @@ func NewLevelHash(redis *LevelRedis, entryKey string) (l *LevelHash) {
 }
 
 func (l *LevelHash) Size() int {
-	return 0
+	return 1
 }
 
 func (l *LevelHash) infoKey() []byte {

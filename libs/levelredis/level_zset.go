@@ -26,7 +26,7 @@ func NewLevelZSet(redis *LevelRedis, key string) (l *LevelZSet) {
 }
 
 func (l *LevelZSet) Size() int {
-	return 0
+	return 1
 }
 
 func (l *LevelZSet) initOnce() {
