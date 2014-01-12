@@ -102,10 +102,10 @@ func (s *SlaveOf) initMonitor() {
 	s.syncMonitor.Add(monitor.NewTimeFormater("Time", 8))
 	cmds := []string{"rdbsync", "cmdsync", "proc"}
 	for _, cmd := range cmds {
-		s.syncMonitor.Add(monitor.NewCountFormater(s.syncCounters.Get(cmd), cmd, 8, "ChangedCount"))
+		s.syncMonitor.Add(monitor.NewCountFormater(s.syncCounters.Get(cmd), cmd, 16, "ChangedCount"))
 	}
 	// buffer用于显示同步过程中的taskqueue buffer长度
-	s.syncMonitor.Add(monitor.NewCountFormater(s.syncCounters.Get("buffer"), "buffer", 9, "Count"))
+	s.syncMonitor.Add(monitor.NewCountFormater(s.syncCounters.Get("buffer"), "buffer", 16, "Count"))
 	go s.syncMonitor.Start()
 }
 
@@ -127,6 +127,10 @@ func (s *SlaveOf) Start() {
 
 func (s *SlaveOf) didRecvCommand(cmd *Command, count int64, isrdb bool) {
 	if len(cmd.Args) == 1 {
+		return
+	}
+	// skip
+	if cmd.StringAtIndex(1) == "user:update:timestamp" {
 		return
 	}
 	s.syncCounters.Get("buffer").Incr(1)
