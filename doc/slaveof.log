@@ -1,0 +1,19 @@
+[root@ssd002 goredis]$ go tool pprof goredis-server prof/mem.prof 
+Adjusting heap profiles for 1-in-524288 sampling rate
+Welcome to pprof!  For help, type 'help'.
+(pprof) top20
+Total: 2632.0 MB
+  1112.0  42.2%  42.2%   1610.5  61.2% _/home/workspace/GoRedisDev/libs/lrucache.(*LRUCache).addNew
+   494.5  18.8%  61.0%    494.5  18.8% container/list.(*List).insertValue
+   387.5  14.7%  75.8%    387.5  14.7% _/home/workspace/GoRedisDev/libs/levelredis.NewLevelZSet
+   348.0  13.2%  89.0%   2016.5  76.6% _/home/workspace/GoRedisDev/goredis_server.(*GoRedisServer).OnZADD
+   137.0   5.2%  94.2%    591.0  22.5% _/home/workspace/GoRedisDev/goredis_server.(*GoRedisServer).OnRPUSH
+   125.5   4.8%  99.0%    125.5   4.8% _/home/workspace/GoRedisDev/libs/levelredis.NewLevelList
+    17.5   0.7%  99.6%     17.5   0.7% newdefer
+     4.0   0.2%  99.8%      4.0   0.2% evacuate
+     4.0   0.2%  99.9%      4.0   0.2% runtime.malg
+     1.0   0.0% 100.0%      1.5   0.1% runtime.allocm
+     0.5   0.0% 100.0%      0.5   0.0% fmt.(*fmt).padString
+     0.5   0.0% 100.0%      1.0   0.0% fmt.(*pp).doPrintf
+     0.0   0.0% 100.0%   2612.0  99.2% _/home/workspace/GoRedisDev/goredis.(*RedisServer).InvokeCommandHandler
+     0.0   0.0% 100.0%   2613.0  99.3% _/home/workspace/GoRedisDev/goredis.(*RedisServer).handleConnection
