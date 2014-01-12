@@ -73,8 +73,8 @@ func (l *LevelZSet) scoreKeyPrefix() []byte {
 func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
 	pos2 := bytes.LastIndex(scorekey, []byte(SEP))
 	pos1 := bytes.LastIndex(scorekey[:pos2], []byte(SEP))
-	if pos1+1+1 > len(scorekey) || pos1 > pos2 {
-		stdlog.Printf("bad scorekey %s, pos1:%d, pos2:%d", string(scorekey), pos1, pos2)
+	if pos1+1+1 >= len(scorekey) || pos2 >= len(scorekey) || pos1 > pos2 {
+		stdlog.Printf("bad scorekey %s, pos1:%d, pos2:%d\n", string(scorekey), pos1, pos2)
 	}
 	member = copyBytes(scorekey[pos2+1:])
 	score = copyBytes(scorekey[pos1+1+1 : pos2]) // +1 skip sign "0/1"
