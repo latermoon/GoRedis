@@ -49,7 +49,7 @@ func (l *LevelList) initCount() {
 	}
 	l.start, _ = strconv.ParseInt(pairs[0], 10, 64)
 	l.end, _ = strconv.ParseInt(pairs[1], 10, 64)
-	if l.end < l.start {
+	if !(l.end == -1 && l.start == 0) && l.end < l.start {
 		panic("bad list: " + l.entryKey)
 	}
 }

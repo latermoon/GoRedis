@@ -17,3 +17,23 @@ Total: 2632.0 MB
      0.5   0.0% 100.0%      1.0   0.0% fmt.(*pp).doPrintf
      0.0   0.0% 100.0%   2612.0  99.2% _/home/workspace/GoRedisDev/goredis.(*RedisServer).InvokeCommandHandler
      0.0   0.0% 100.0%   2613.0  99.3% _/home/workspace/GoRedisDev/goredis.(*RedisServer).handleConnection
+
+
+[2014-01-13 02:28:42] Error 10.80.102.92:15785 runtime error: slice bounds out of range
+/home/workspace/GoRedisDev/goredis/redis_server.go:132 (0x477766)
+/usr/local/go/src/pkg/runtime/panic.c:248 (0x4175f6)
+/usr/local/go/src/pkg/runtime/panic.c:482 (0x417e9d)
+/usr/local/go/src/pkg/runtime/panic.c:439 (0x417ce7)
+/home/workspace/GoRedisDev/libs/levelredis/level_zset.go:76 (0x47eebb)
+/home/workspace/GoRedisDev/libs/levelredis/level_zset.go:260 (0x483900)
+/home/workspace/GoRedisDev/libs/levelredis/level_redis.go:243 (0x483230)
+/home/workspace/GoRedisDev/libs/levelredis/level_redis.go:295 (0x47db5e)
+/home/workspace/GoRedisDev/libs/levelredis/level_redis.go:245 (0x47d485)
+/home/workspace/GoRedisDev/libs/levelredis/level_zset.go:267 (0x4806cb)
+/home/workspace/GoRedisDev/goredis_server/go_redis_server_zset.go:171 (0x436434)
+/usr/local/go/src/pkg/runtime/asm_amd64.s:339 (0x428b62)
+/usr/local/go/src/pkg/reflect/value.go:474 (0x51090b)
+/usr/local/go/src/pkg/reflect/value.go:345 (0x50f9fd)
+/home/workspace/GoRedisDev/goredis/redis_server.go:118 (0x473249)
+/home/workspace/GoRedisDev/goredis/redis_server.go:148 (0x473650)
+/usr/local/go/src/pkg/runtime/proc.c:1394 (0x41b8f0)
