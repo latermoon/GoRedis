@@ -150,9 +150,9 @@ func (l *LevelZSet) Rank(high2low bool, member []byte) (idx int) {
 	if l.score(member) == nil {
 		return -1
 	}
-	direction := IteratorForward
+	direction := IterForward
 	if high2low {
-		direction = IteratorBackward
+		direction = IterBackward
 	}
 	idx = -1
 	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), direction, func(i int, key, value []byte, quit *bool) {
@@ -176,9 +176,9 @@ func (l *LevelZSet) Rank(high2low bool, member []byte) (idx int) {
 func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [][]byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	direction := IteratorForward
+	direction := IterForward
 	if high2low {
-		direction = IteratorBackward
+		direction = IterBackward
 	}
 	scoreMembers = make([][]byte, 0, 2)
 	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), direction, func(i int, key, value []byte, quit *bool) {
@@ -199,9 +199,9 @@ func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [
 func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count int) (scoreMembers [][]byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	direction := IteratorForward
+	direction := IterForward
 	if high2low {
-		direction = IteratorBackward
+		direction = IterBackward
 	}
 	min2 := joinBytes(l.scoreKeyPrefix(), min)
 	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
@@ -253,7 +253,7 @@ func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 	defer l.mu.Unlock()
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
 		if i < start {
 			return
 		} else if i >= start && (stop == -1 || i <= stop) {
@@ -285,7 +285,7 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	l.redis.Enumerate(min2, max2, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.Enumerate(min2, max2, IterForward, func(i int, key, value []byte, quit *bool) {
 		score, member := l.splitScoreKey(key)
 		batch.Delete(l.memberKey(member))
 		batch.Delete(l.scoreKey(member, score))
@@ -321,7 +321,7 @@ func (l *LevelZSet) Drop() (ok bool) {
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	prefix := joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT)
-	l.redis.PrefixEnumerate(prefix, IteratorForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.PrefixEnumerate(prefix, IterForward, func(i int, key, value []byte, quit *bool) {
 		batch.Delete(key)
 	})
 	batch.Delete(l.zsetKey())

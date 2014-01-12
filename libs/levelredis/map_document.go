@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 var (
@@ -22,6 +23,7 @@ const (
 // 提供面向document操作的map
 type MapDocument struct {
 	data map[string]interface{}
+	mu   sync.Mutex
 }
 
 func NewMapDocument(data map[string]interface{}) (m *MapDocument) {
@@ -34,6 +36,8 @@ func NewMapDocument(data map[string]interface{}) (m *MapDocument) {
 
 // doc_set(key, {"name":"latermoon", "$rpush":["photos", "c.jpg", "d.jpg"], "$incr":["version", 1]})
 func (m *MapDocument) RichSet(input map[string]interface{}) (err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for k, v := range input {
 		if !strings.HasPrefix(k, "$") {
 			parent, key, _, _ := m.findElement(k, true)
@@ -76,6 +80,8 @@ func (m *MapDocument) RichSet(input map[string]interface{}) (err error) {
 
 // doc_get(key, ["name", "setting.mute", "photos.$1"])
 func (m *MapDocument) RichGet(fields ...string) (result map[string]interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	result = make(map[string]interface{})
 	if len(fields) == 0 {
 		for k, v := range m.data {

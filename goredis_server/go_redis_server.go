@@ -2,9 +2,9 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"../libs/levelredis"
 	stdlog "../libs/stdlog"
-	"./libs/levelredis"
-	"./libs/uuid"
+	"../libs/uuid"
 	"./monitor"
 	"container/list"
 	"errors"
@@ -14,7 +14,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.10"
+const VERSION = "1.0.11"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")

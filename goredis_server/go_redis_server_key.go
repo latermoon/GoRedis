@@ -7,7 +7,7 @@ keynext [min] [count]
 
 import (
 	. "../goredis"
-	"./libs/levelredis"
+	"../libs/levelredis"
 )
 
 func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
@@ -76,7 +76,7 @@ func (server *GoRedisServer) OnRAW_KEYSEARCH(cmd *Command) (reply *Reply) {
 	bulks := make([]interface{}, 0, 10)
 	min := seekkey
 	max := append(seekkey, 254)
-	server.levelRedis.Enumerate(min, max, levelredis.IteratorForward, func(i int, key, value []byte, quit *bool) {
+	server.levelRedis.Enumerate(min, max, levelredis.IterForward, func(i int, key, value []byte, quit *bool) {
 		bulks = append(bulks, key)
 		if i >= count-1 {
 			*quit = true
