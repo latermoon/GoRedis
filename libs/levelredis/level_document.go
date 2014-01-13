@@ -26,7 +26,7 @@ func NewLevelDocument(redis *LevelRedis, key string) (l *LevelDocument) {
 }
 
 func (l *LevelDocument) Size() int {
-	return 0
+	return 1
 }
 
 // 初始化一次

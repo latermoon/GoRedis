@@ -6,8 +6,9 @@ package slaveof
 import (
 	. "../../../goredis"
 	. "../../../goredis_server/"
-	"../../../goredis_server/libs/levelredis"
 	"../../../goredis_server/monitor"
+	"../../../libs/levelredis"
+	"../../../libs/safelist"
 	"errors"
 	"fmt"
 	"github.com/latermoon/levigo"
@@ -24,7 +25,7 @@ type SlaveOf struct {
 	shouldStopRunloop bool // 跳出runloop指令
 	aofRedis          *levelredis.LevelRedis
 	queueCount        int // 队列数
-	queueLists        []*levelredis.LevelList
+	queueLists        []*safelist.SafeList
 	msgpack_handle    codec.MsgpackHandle
 	// 监控
 	syncCounters *monitor.Counters
@@ -87,11 +88,11 @@ func (s *SlaveOf) initSlaveDb() (err error) {
 	}
 	s.aofRedis = levelredis.NewLevelRedis(db)
 	// init lists
-	s.queueLists = make([]*levelredis.LevelList, s.queueCount)
+	s.queueLists = make([]*safelist.SafeList, s.queueCount)
 	for i := 0; i < s.queueCount; i++ {
-		aofkey := fmt.Sprintf("queue_%d", i)
-		s.queueLists[i] = s.aofRedis.GetList(aofkey)
-		s.queueLists[i].BeginTransaction()
+		// aofkey := fmt.Sprintf("queue_%d", i)
+		// s.queueLists[i] = s.aofRedis.GetList(aofkey)
+		s.queueLists[i] = safelist.NewSafeList()
 	}
 	return
 }
@@ -102,10 +103,10 @@ func (s *SlaveOf) initMonitor() {
 	s.syncMonitor.Add(monitor.NewTimeFormater("Time", 8))
 	cmds := []string{"rdbsync", "cmdsync", "proc"}
 	for _, cmd := range cmds {
-		s.syncMonitor.Add(monitor.NewCountFormater(s.syncCounters.Get(cmd), cmd, 8, "ChangedCount"))
+		s.syncMonitor.Add(monitor.NewCountFormater(s.syncCounters.Get(cmd), cmd, 16, "ChangedCount"))
 	}
 	// buffer用于显示同步过程中的taskqueue buffer长度
-	s.syncMonitor.Add(monitor.NewCountFormater(s.syncCounters.Get("buffer"), "buffer", 9, "Count"))
+	s.syncMonitor.Add(monitor.NewCountFormater(s.syncCounters.Get("buffer"), "buffer", 16, "Count"))
 	go s.syncMonitor.Start()
 }
 
@@ -129,6 +130,10 @@ func (s *SlaveOf) didRecvCommand(cmd *Command, count int64, isrdb bool) {
 	if len(cmd.Args) == 1 {
 		return
 	}
+	// skip
+	if cmd.StringAtIndex(1) == "user:update:timestamp" {
+		return
+	}
 	s.syncCounters.Get("buffer").Incr(1)
 	if isrdb {
 		s.syncCounters.Get("rdbsync").Incr(1)
@@ -137,18 +142,21 @@ func (s *SlaveOf) didRecvCommand(cmd *Command, count int64, isrdb bool) {
 	}
 	key, _ := cmd.ArgAtIndex(1)
 	lst := s.queueLists[SumOfBytesChars(key)%s.queueCount]
-	out, err := s.encodeCommand(cmd)
-	if err == nil {
-		lst.RPush(out)
-	} else {
-		fmt.Println("err,", err)
+	// out, err := s.encodeCommand(cmd)
+	// if err == nil {
+	// 	lst.RPush(out)
+	// } else {
+	// 	fmt.Println("err,", err)
+	// }
+	lst.RPush(cmd)
+	if count%1000 == 0 {
+		time.Sleep(time.Millisecond * 2)
 	}
 }
 
 // 当rdb同步结束后，开始启动消费队列
 func (s *SlaveOf) rdbFinished(count int64) {
 	for i := 0; i < s.queueCount; i++ {
-		s.queueLists[i].Commit()
 		go s.queueProcess(i)
 	}
 }
@@ -162,23 +170,25 @@ func (s *SlaveOf) queueProcess(i int) {
 		if lst.Len() == 0 {
 			time.Sleep(time.Millisecond * time.Duration(100))
 		}
-		elem, e1 := lst.LPop()
-		if e1 != nil {
-			fmt.Println("lpop err", i, e1)
-			time.Sleep(time.Millisecond * time.Duration(100))
-			continue
-		}
+		// elem, e1 := lst.LPop()
+		elem := lst.LPop()
+		// if e1 != nil {
+		// 	fmt.Println("lpop err", i, e1)
+		// 	time.Sleep(time.Millisecond * time.Duration(100))
+		// 	continue
+		// }
 		if elem == nil {
 			continue
 		}
 		s.syncCounters.Get("buffer").Incr(-1)
 		s.syncCounters.Get("proc").Incr(1)
-		cmd, e2 := s.decodeCommand(elem.Value.([]byte))
-		if e2 != nil {
-			fmt.Println("decode err", i, e1)
-			time.Sleep(time.Millisecond * time.Duration(100))
-			continue
-		}
+		// cmd, e2 := s.decodeCommand(elem.([]byte))
+		// if e2 != nil {
+		// 	fmt.Println("decode err", i, e2)
+		// 	time.Sleep(time.Millisecond * time.Duration(100))
+		// 	continue
+		// }
+		cmd := elem.(*Command)
 		conn := s.pool.Get()
 		argCount := len(cmd.Args) - 1
 		objs := make([]interface{}, 0, argCount)
@@ -187,8 +197,6 @@ func (s *SlaveOf) queueProcess(i int) {
 		}
 		conn.Do(cmd.Name(), objs...)
 		conn.Close()
-		// fmt.Println(aofkey, lst.Len(), "->pop", cmd)
-		// cmd := NewCommand(obj.([]byte)...)
 	}
 }
 
