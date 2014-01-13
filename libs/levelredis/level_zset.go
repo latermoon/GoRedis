@@ -5,6 +5,7 @@ package levelredis
 import (
 	"../stdlog"
 	"bytes"
+	"fmt"
 	"github.com/latermoon/levigo"
 	"strconv"
 	"sync"
@@ -31,6 +32,8 @@ func (l *LevelZSet) Size() int {
 }
 
 func (l *LevelZSet) initOnce() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if l.totalCount == -1 {
 		data, _ := l.redis.db.Get(l.redis.ro, l.zsetKey())
 		if data != nil {
@@ -74,6 +77,7 @@ func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
 	pos2 := bytes.LastIndex(scorekey, []byte(SEP))
 	pos1 := bytes.LastIndex(scorekey[:pos2], []byte(SEP))
 	if pos1+1+1 >= len(scorekey) || pos2 >= len(scorekey) || pos1 > pos2 || pos1 == -1 || pos2 == -1 {
+		fmt.Printf("bad scorekey %s, pos1:%d, pos2:%d\n", string(scorekey), pos1, pos2)
 		stdlog.Printf("bad scorekey %s, pos1:%d, pos2:%d\n", string(scorekey), pos1, pos2)
 	}
 	member = copyBytes(scorekey[pos2+1:])
@@ -112,6 +116,8 @@ func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 }
 
 func (l *LevelZSet) Score(member []byte) (score []byte) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	return l.score(member)
 }
 
