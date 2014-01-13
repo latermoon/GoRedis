@@ -32,8 +32,6 @@ func (l *LevelZSet) Size() int {
 }
 
 func (l *LevelZSet) initOnce() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	if l.totalCount == -1 {
 		data, _ := l.redis.db.Get(l.redis.ro, l.zsetKey())
 		if data != nil {

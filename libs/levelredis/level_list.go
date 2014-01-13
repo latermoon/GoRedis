@@ -282,6 +282,7 @@ func (l *LevelList) Len() int64 {
 func (l *LevelList) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
 	l.redis.PrefixEnumerate(l.keyPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {

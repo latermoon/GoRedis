@@ -14,7 +14,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.13"
+const VERSION = "1.0.14"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -30,7 +30,7 @@ type GoRedisServer struct {
 	// 数据源
 	directory  string
 	levelRedis *levelredis.LevelRedis
-	config     *levelredis.LevelConfig
+	config     *Config
 	// counters
 	cmdCounters     *monitor.Counters
 	cmdCateCounters *monitor.Counters // 指令集统计
@@ -76,13 +76,21 @@ func (server *GoRedisServer) Init() (err error) {
 	if err != nil {
 		return
 	}
-	server.config = levelredis.NewLevelConfig(server.levelRedis, goredisPrefix+"config:")
+	// __goredis:config:xxx
+	server.config = NewConfig(server.levelRedis, goredisPrefix+"config:")
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
-	// slave
 	stdlog.Printf("init uid %s\n", server.UID())
+	server.initConfig()
+	// slave
 	server.initSlaveSessions()
 	return
+}
+
+func (server *GoRedisServer) initConfig() {
+	// slowlog-log-slower-than
+	slst := server.config.IntForKey("slowlog-log-slower-than", 100*1000)
+	stdlog.Println("config: slowlog-log-slower-than", slst)
 }
 
 func (server *GoRedisServer) initLevelDB() (err error) {
@@ -109,10 +117,10 @@ func (server *GoRedisServer) Listen(host string) {
 func (server *GoRedisServer) UID() (uid string) {
 	if len(server.uid) == 0 {
 		uidkey := "uid"
-		server.uid = server.config.GetString(uidkey)
+		server.uid = server.config.StringForKey(uidkey)
 		if len(server.uid) == 0 {
 			server.uid = uuid.UUID(8)
-			server.config.SetString(uidkey, server.uid)
+			server.config.Set(uidkey, []byte(server.uid))
 		}
 	}
 	return server.uid

@@ -84,12 +84,17 @@ const (
 	IterBackward
 )
 
+var (
+	lruCacheSize         = uint64(10000) // cache size
+	objCacheCreateThread = 100           // obj create threads
+)
+
 type LevelRedis struct {
 	db       *levigo.DB
 	ro       *levigo.ReadOptions
 	wo       *levigo.WriteOptions
-	lruCache *lru.LRUCache // LRU缓存层，管理string以外的key
-	mu       sync.Mutex
+	lruCache *lru.LRUCache // LRU缓存，管理string以外的key
+	mus      []sync.Mutex  // Key Hash线程池
 	lstring  *LevelString
 }
 
@@ -99,7 +104,8 @@ func NewLevelRedis(db *levigo.DB) (l *LevelRedis) {
 	l.ro = levigo.NewReadOptions()
 	l.wo = levigo.NewWriteOptions()
 	l.lstring = NewLevelString(l)
-	l.lruCache = lru.NewLRUCache(10000)
+	l.lruCache = lru.NewLRUCache(lruCacheSize)
+	l.mus = make([]sync.Mutex, objCacheCreateThread)
 	// 初始化最大的key，对于Enumerate从后面开始扫描key非常重要
 	// 使iter.Seek(key)必定Valid=true
 	maxkey := []byte{MAXBYTE}
@@ -127,8 +133,11 @@ func (l *LevelRedis) RawSet(key []byte, value []byte) {
 
 // 使用LRUCache管理string以外的数据结构实例
 func (l *LevelRedis) objFromCache(key string, fn func() interface{}) (obj interface{}) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	// 因为level对象构造需要时间，这里使用多个mutex来多线程处理，同一个key只会hash到同一个mutex里
+	mu := l.mus[SumOfStringChars(key)%objCacheCreateThread]
+	mu.Lock()
+	defer mu.Unlock()
+
 	var ok bool
 	obj, ok = l.lruCache.Get(key)
 	if !ok {

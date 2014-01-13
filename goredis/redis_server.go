@@ -128,8 +128,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 	// 异常处理
 	defer func() {
 		if err := recover(); err != nil {
-			stdlog.Printf("Error %s %s\n", session.conn.RemoteAddr(), err)
-			debug.PrintStack()
+			stdlog.Printf("Error %s %s\n%s", session.conn.RemoteAddr(), err, string(debug.Stack()))
 			session.Close()
 		}
 	}()
