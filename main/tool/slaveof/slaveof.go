@@ -149,8 +149,8 @@ func (s *SlaveOf) didRecvCommand(cmd *Command, count int64, isrdb bool) {
 	// 	fmt.Println("err,", err)
 	// }
 	lst.RPush(cmd)
-	if count%100 == 0 {
-		time.Sleep(time.Millisecond * 1)
+	if count%1000 == 0 {
+		time.Sleep(time.Millisecond * 2)
 	}
 }
 
