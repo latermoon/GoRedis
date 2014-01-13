@@ -14,7 +14,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.14"
+const VERSION = "1.0.15"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -89,8 +89,7 @@ func (server *GoRedisServer) Init() (err error) {
 
 func (server *GoRedisServer) initConfig() {
 	// slowlog-log-slower-than
-	slst := server.config.IntForKey("slowlog-log-slower-than", 100*1000)
-	stdlog.Println("config: slowlog-log-slower-than", slst)
+	// slst := server.config.IntForKey("slowlog-log-slower-than", 100*1000)
 }
 
 func (server *GoRedisServer) initLevelDB() (err error) {
