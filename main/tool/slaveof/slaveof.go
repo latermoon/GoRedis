@@ -8,6 +8,7 @@ import (
 	. "../../../goredis_server/"
 	"../../../goredis_server/monitor"
 	"../../../libs/levelredis"
+	"../../../libs/safelist"
 	"errors"
 	"fmt"
 	"github.com/latermoon/levigo"
@@ -24,7 +25,7 @@ type SlaveOf struct {
 	shouldStopRunloop bool // 跳出runloop指令
 	aofRedis          *levelredis.LevelRedis
 	queueCount        int // 队列数
-	queueLists        []*levelredis.LevelList
+	queueLists        []*safelist.SafeList
 	msgpack_handle    codec.MsgpackHandle
 	// 监控
 	syncCounters *monitor.Counters
@@ -87,10 +88,11 @@ func (s *SlaveOf) initSlaveDb() (err error) {
 	}
 	s.aofRedis = levelredis.NewLevelRedis(db)
 	// init lists
-	s.queueLists = make([]*levelredis.LevelList, s.queueCount)
+	s.queueLists = make([]*safelist.SafeList, s.queueCount)
 	for i := 0; i < s.queueCount; i++ {
-		aofkey := fmt.Sprintf("queue_%d", i)
-		s.queueLists[i] = s.aofRedis.GetList(aofkey)
+		// aofkey := fmt.Sprintf("queue_%d", i)
+		// s.queueLists[i] = s.aofRedis.GetList(aofkey)
+		s.queueLists[i] = safelist.NewSafeList()
 	}
 	return
 }
@@ -164,20 +166,21 @@ func (s *SlaveOf) queueProcess(i int) {
 		if lst.Len() == 0 {
 			time.Sleep(time.Millisecond * time.Duration(100))
 		}
-		elem, e1 := lst.LPop()
-		if e1 != nil {
-			fmt.Println("lpop err", i, e1)
-			time.Sleep(time.Millisecond * time.Duration(100))
-			continue
-		}
+		// elem, e1 := lst.LPop()
+		elem := lst.LPop()
+		// if e1 != nil {
+		// 	fmt.Println("lpop err", i, e1)
+		// 	time.Sleep(time.Millisecond * time.Duration(100))
+		// 	continue
+		// }
 		if elem == nil {
 			continue
 		}
 		s.syncCounters.Get("buffer").Incr(-1)
 		s.syncCounters.Get("proc").Incr(1)
-		cmd, e2 := s.decodeCommand(elem.Value.([]byte))
+		cmd, e2 := s.decodeCommand(elem.([]byte))
 		if e2 != nil {
-			fmt.Println("decode err", i, e1)
+			fmt.Println("decode err", i, e2)
 			time.Sleep(time.Millisecond * time.Duration(100))
 			continue
 		}
@@ -189,8 +192,6 @@ func (s *SlaveOf) queueProcess(i int) {
 		}
 		conn.Do(cmd.Name(), objs...)
 		conn.Close()
-		// fmt.Println(aofkey, lst.Len(), "->pop", cmd)
-		// cmd := NewCommand(obj.([]byte)...)
 	}
 }
 
