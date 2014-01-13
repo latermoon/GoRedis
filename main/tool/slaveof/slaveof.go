@@ -142,11 +142,15 @@ func (s *SlaveOf) didRecvCommand(cmd *Command, count int64, isrdb bool) {
 	}
 	key, _ := cmd.ArgAtIndex(1)
 	lst := s.queueLists[SumOfBytesChars(key)%s.queueCount]
-	out, err := s.encodeCommand(cmd)
-	if err == nil {
-		lst.RPush(out)
-	} else {
-		fmt.Println("err,", err)
+	// out, err := s.encodeCommand(cmd)
+	// if err == nil {
+	// 	lst.RPush(out)
+	// } else {
+	// 	fmt.Println("err,", err)
+	// }
+	lst.RPush(cmd)
+	if count%100 == 0 {
+		time.Sleep(time.Millisecond * 1)
 	}
 }
 
@@ -178,12 +182,13 @@ func (s *SlaveOf) queueProcess(i int) {
 		}
 		s.syncCounters.Get("buffer").Incr(-1)
 		s.syncCounters.Get("proc").Incr(1)
-		cmd, e2 := s.decodeCommand(elem.([]byte))
-		if e2 != nil {
-			fmt.Println("decode err", i, e2)
-			time.Sleep(time.Millisecond * time.Duration(100))
-			continue
-		}
+		// cmd, e2 := s.decodeCommand(elem.([]byte))
+		// if e2 != nil {
+		// 	fmt.Println("decode err", i, e2)
+		// 	time.Sleep(time.Millisecond * time.Duration(100))
+		// 	continue
+		// }
+		cmd := elem.(*Command)
 		conn := s.pool.Get()
 		argCount := len(cmd.Args) - 1
 		objs := make([]interface{}, 0, argCount)
