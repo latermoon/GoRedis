@@ -6,8 +6,8 @@ import (
 
 // 计数器
 type Counter struct {
-	count     int
-	prevCount int
+	count     int64
+	prevCount int64
 	mutex     sync.Mutex
 }
 
@@ -18,23 +18,23 @@ func NewCounter() (c *Counter) {
 	return
 }
 
-func (c *Counter) SetCount(i int) {
+func (c *Counter) SetCount(i int64) {
 	c.mutex.Lock()
 	c.prevCount, c.count = c.count, i
 	c.mutex.Unlock()
 }
 
-func (c *Counter) Count() int {
+func (c *Counter) Count() int64 {
 	return c.count
 }
 
-func (c *Counter) Incr(i int) {
+func (c *Counter) Incr(i int64) {
 	c.mutex.Lock()
 	c.count += i
 	c.mutex.Unlock()
 }
 
-func (c *Counter) Decr(i int) {
+func (c *Counter) Decr(i int64) {
 	c.mutex.Lock()
 	c.count -= i
 	c.mutex.Unlock()
@@ -47,7 +47,7 @@ func (c *Counter) Clear() {
 	c.mutex.Unlock()
 }
 
-func (c *Counter) ChangedCount() (chg int) {
+func (c *Counter) ChangedCount() (chg int64) {
 	c.mutex.Lock()
 	chg, c.prevCount = c.count-c.prevCount, c.count
 	c.mutex.Unlock()

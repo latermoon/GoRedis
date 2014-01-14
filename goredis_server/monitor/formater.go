@@ -44,10 +44,10 @@ func NewCountFormater(counter *Counter, title string, padding int, mode string) 
 func (f *CountFormater) Text() string {
 	if f.mode == "ChangedCount" {
 		chg := f.counter.ChangedCount()
-		return strconv.Itoa(chg)
+		return strconv.FormatInt(chg, 10)
 	} else {
 		// default: "Count"
-		return strconv.Itoa(f.counter.Count())
+		return strconv.FormatInt(f.counter.Count(), 10)
 	}
 }
 

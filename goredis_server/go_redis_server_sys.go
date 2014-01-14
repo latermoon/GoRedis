@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"strconv"
+	"strings"
 )
 
 func (server *GoRedisServer) formatFloat(f float64) string {
@@ -40,9 +41,19 @@ func (server *GoRedisServer) OnPPROF(cmd *Command) (reply *Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnPPROF_START(cmd *Command) (reply *Reply) {
-
-	reply = StatusReply("OK")
+// leveldb_prop "leveldb.stats"
+func (server *GoRedisServer) OnLEVELDB_PROP(cmd *Command) (reply *Reply) {
+	prop := cmd.StringAtIndex(1)
+	v := server.levelRedis.DB().PropertyValue(prop)
+	lines := strings.Split(v, "\n")
+	bulks := make([]interface{}, 0, len(lines))
+	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+		bulks = append(bulks, line)
+	}
+	reply = MultiBulksReply(bulks)
 	return
 }
 
