@@ -39,8 +39,8 @@ func NewLevelList(redis *LevelRedis, entryKey string) (l *LevelList) {
 }
 
 func (l *LevelList) initCount() {
-	val, err := l.redis.db.Get(l.redis.ro, l.infoKey())
-	if err != nil || val == nil || len(val) == 0 {
+	val := l.redis.RawGet(l.infoKey())
+	if val == nil || len(val) == 0 {
 		return
 	}
 	pairs := strings.Split(string(val), ",")
@@ -103,7 +103,7 @@ func (l *LevelList) LPush(values ...[]byte) (err error) {
 		batch.Put(l.idxKey(l.start), value)
 	}
 	batch.Put(l.infoKey(), l.infoValue())
-	err = l.redis.db.Write(l.redis.wo, batch)
+	err = l.redis.WriteBatch(batch)
 	if err != nil {
 		// 回退
 		l.start = oldstart
@@ -124,7 +124,7 @@ func (l *LevelList) RPush(values ...[]byte) (err error) {
 		batch.Put(l.idxKey(l.end), value)
 	}
 	batch.Put(l.infoKey(), l.infoValue())
-	err = l.redis.db.Write(l.redis.wo, batch)
+	err = l.redis.WriteBatch(batch)
 	if err != nil {
 		// 回退
 		l.end = oldend
@@ -145,9 +145,9 @@ func (l *LevelList) RPop() (e *Element, err error) {
 	// get
 	idx := l.end
 	e = &Element{}
-	e.Value, err = l.redis.db.Get(l.redis.ro, l.idxKey(idx))
-	if err != nil {
-		return nil, err
+	e.Value = l.redis.RawGet(l.idxKey(idx))
+	if e.Value == nil {
+		return
 	}
 
 	// 只剩下一个元素时，删除infoKey(0)
@@ -164,7 +164,7 @@ func (l *LevelList) RPop() (e *Element, err error) {
 		l.end--
 		batch.Put(l.infoKey(), l.infoValue())
 	}
-	err = l.redis.db.Write(l.redis.wo, batch)
+	err = l.redis.WriteBatch(batch)
 	if err != nil {
 		// 回退
 		l.start, l.end = oldstart, oldend
@@ -185,9 +185,9 @@ func (l *LevelList) LPop() (e *Element, err error) {
 	// get
 	idx := l.start
 	e = &Element{}
-	e.Value, err = l.redis.db.Get(l.redis.ro, l.idxKey(idx))
-	if err != nil {
-		return nil, err
+	e.Value = l.redis.RawGet(l.idxKey(idx))
+	if e.Value == nil {
+		return
 	}
 	// 只剩下一个元素时，删除infoKey(0)
 	shouldReset := l.len() == 1
@@ -203,7 +203,7 @@ func (l *LevelList) LPop() (e *Element, err error) {
 		l.start++
 		batch.Put(l.infoKey(), l.infoValue())
 	}
-	err = l.redis.db.Write(l.redis.wo, batch)
+	err = l.redis.WriteBatch(batch)
 	if err != nil {
 		// 回退
 		l.start, l.end = oldstart, oldend
@@ -240,7 +240,7 @@ func (l *LevelList) TrimLeft(count uint) (n int) {
 		batch.Put(l.infoKey(), l.infoValue())
 	}
 
-	err := l.redis.db.Write(l.redis.wo, batch)
+	err := l.redis.WriteBatch(batch)
 	if err != nil {
 		// 回退
 		l.start, l.end = oldstart, oldend
@@ -261,9 +261,9 @@ func (l *LevelList) Index(i int64) (e *Element, err error) {
 	}
 	idx := l.start + i
 	e = &Element{}
-	e.Value, err = l.redis.db.Get(l.redis.ro, l.idxKey(idx))
-	if err != nil {
-		return nil, err
+	e.Value = l.redis.RawGet(l.idxKey(idx))
+	if e.Value == nil {
+		return
 	}
 	return
 }
@@ -289,7 +289,7 @@ func (l *LevelList) Drop() (ok bool) {
 		batch.Delete(key)
 	})
 	batch.Delete(l.infoKey())
-	l.redis.db.Write(l.redis.wo, batch)
+	l.redis.WriteBatch(batch)
 	ok = true
 	l.start = 0
 	l.end = -1

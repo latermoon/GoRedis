@@ -75,12 +75,11 @@ func (l *LevelHash) fieldInKey(fieldkey []byte) (field []byte) {
 }
 
 func (l *LevelHash) Get(field []byte) (val []byte) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
 	fieldkey := l.fieldKey(field)
-	var err error
-	val, err = l.redis.db.Get(l.redis.ro, fieldkey)
-	if err != nil {
-		val = nil
-	}
+	val = l.redis.RawGet(fieldkey)
 	return
 }
 
@@ -98,11 +97,14 @@ func (l *LevelHash) Set(fieldVals ...[]byte) (n int) {
 		n++
 	}
 	batch.Put(l.infoKey(), l.infoValue())
-	l.redis.db.Write(l.redis.wo, batch)
+	l.redis.WriteBatch(batch)
 	return
 }
 
 func (l *LevelHash) GetAll(limit int) (elems []*HashElem) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
 	elems = make([]*HashElem, 0, 10)
 	l.redis.PrefixEnumerate(l.fieldPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
 		if limit != -1 && i >= limit {
@@ -130,7 +132,7 @@ func (l *LevelHash) Remove(fields ...[]byte) (n int) {
 	n = 0
 	for _, field := range fields {
 		if l.Get(field) != nil {
-			l.redis.db.Delete(l.redis.wo, l.fieldKey(field))
+			l.redis.RawDel(l.fieldKey(field))
 			n++
 		}
 	}
@@ -141,7 +143,7 @@ func (l *LevelHash) Remove(fields ...[]byte) (n int) {
 		*quit = true
 	})
 	if !hasElem {
-		l.redis.db.Delete(l.redis.wo, l.infoKey())
+		l.redis.RawDel(l.infoKey())
 	}
 	return
 }
@@ -170,7 +172,7 @@ func (l *LevelHash) Drop() (ok bool) {
 		batch.Delete(key)
 	})
 	batch.Delete(l.infoKey())
-	l.redis.db.Write(l.redis.wo, batch)
+	l.redis.WriteBatch(batch)
 	ok = true
 	return
 }

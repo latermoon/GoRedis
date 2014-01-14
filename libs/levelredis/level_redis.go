@@ -41,7 +41,7 @@ zset
 import (
 	lru "../lrucache"
 	"bytes"
-	// "fmt"
+	// "../stdlog"
 	"github.com/latermoon/levigo"
 	"math"
 	"sync"
@@ -96,10 +96,14 @@ type LevelRedis struct {
 	lruCache *lru.LRUCache // LRU缓存，管理string以外的key
 	mus      []sync.Mutex  // Key Hash线程池
 	lstring  *LevelString
+	// stats
+	muCount  sync.Mutex
+	counters map[string]int64
 }
 
 func NewLevelRedis(db *levigo.DB) (l *LevelRedis) {
 	l = &LevelRedis{}
+	l.counters = map[string]int64{"get": 0, "set": 0, "batch": 0, "del": 0, "enum": 0, "lru_hit": 0, "lru_miss": 0}
 	l.db = db
 	l.ro = levigo.NewReadOptions()
 	l.wo = levigo.NewWriteOptions()
@@ -117,18 +121,40 @@ func (l *LevelRedis) DB() (db *levigo.DB) {
 	return l.db
 }
 
+func (l *LevelRedis) incrCounter(name string) {
+	l.muCount.Lock()
+	l.counters[name]++
+	l.muCount.Unlock()
+}
+
+func (l *LevelRedis) Counter(name string) int64 {
+	return l.counters[name]
+}
+
 func (l *LevelRedis) Strings() (s *LevelString) {
 	return l.lstring
 }
 
 // 获取原始key的内容
 func (l *LevelRedis) RawGet(key []byte) (value []byte) {
+	l.incrCounter("get")
 	value, _ = l.db.Get(l.ro, key)
 	return
 }
 
-func (l *LevelRedis) RawSet(key []byte, value []byte) {
-	l.db.Put(l.wo, key, value)
+func (l *LevelRedis) RawSet(key []byte, value []byte) error {
+	l.incrCounter("set")
+	return l.db.Put(l.wo, key, value)
+}
+
+func (l *LevelRedis) RawDel(key []byte) error {
+	l.incrCounter("del")
+	return l.db.Delete(l.wo, key)
+}
+
+func (l *LevelRedis) WriteBatch(w *levigo.WriteBatch) error {
+	l.incrCounter("batch")
+	return l.db.Write(l.wo, w)
 }
 
 // 使用LRUCache管理string以外的数据结构实例
@@ -143,6 +169,9 @@ func (l *LevelRedis) objFromCache(key string, fn func() interface{}) (obj interf
 	if !ok {
 		obj = fn()
 		l.lruCache.Set(key, obj.(lru.Value))
+		l.incrCounter("lru_miss")
+	} else {
+		l.incrCounter("lru_hit")
 	}
 	return
 }
@@ -199,32 +228,38 @@ func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
 	for _, keybytes := range keys {
 		key := string(keybytes)
 		t := l.TypeOf(keybytes)
-		switch t {
-		case "string":
+
+		if t == "string" {
 			n += l.Strings().Delete(keybytes)
-		case "hash":
-			if ok := l.GetHash(key).Drop(); ok {
-				n++
+		} else {
+			// 使用相同的lock来处理对象的创建和删除
+			mu := l.mus[SumOfStringChars(key)%objCacheCreateThread]
+			mu.Lock()
+			defer mu.Unlock()
+
+			switch t {
+			case "hash":
+				if ok := l.GetHash(key).Drop(); ok {
+					n++
+				}
+			case "set":
+				if ok := l.GetSet(key).Drop(); ok {
+					n++
+				}
+			case "list":
+				if ok := l.GetList(key).Drop(); ok {
+					n++
+				}
+			case "zset":
+				if ok := l.GetSortedSet(key).Drop(); ok {
+					n++
+				}
+			case "doc":
+				if ok := l.GetDoc(key).Drop(); ok {
+					n++
+				}
+			default:
 			}
-		case "set":
-			if ok := l.GetSet(key).Drop(); ok {
-				n++
-			}
-		case "list":
-			if ok := l.GetList(key).Drop(); ok {
-				n++
-			}
-		case "zset":
-			if ok := l.GetSortedSet(key).Drop(); ok {
-				n++
-			}
-		case "doc":
-			if ok := l.GetDoc(key).Drop(); ok {
-				n++
-			}
-		default:
-		}
-		if t != "string" {
 			l.lruCache.Delete(key)
 		}
 	}
@@ -257,6 +292,7 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IterDirection, fn 
 
 // 范围扫描
 func (l *LevelRedis) Enumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
+	l.incrCounter("enum")
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Close()
 

@@ -3,12 +3,14 @@ package goredis_server
 import (
 	. "../goredis"
 	"../libs/levelredis"
+	statlog "../libs/statlog"
 	stdlog "../libs/stdlog"
 	"../libs/uuid"
 	"./monitor"
 	"container/list"
 	"errors"
 	"github.com/latermoon/levigo"
+	"os"
 	"strings"
 	"sync"
 )
@@ -32,10 +34,12 @@ type GoRedisServer struct {
 	levelRedis *levelredis.LevelRedis
 	config     *Config
 	// counters
+	counters        *monitor.Counters
 	cmdCounters     *monitor.Counters
 	cmdCateCounters *monitor.Counters // 指令集统计
 	// logger
-	cmdMonitor *monitor.StatusLogger
+	cmdMonitor    *monitor.StatusLogger
+	leveldbStatus *statlog.StatLogger
 	// 从库
 	uid              string // 实例id
 	slavelist        *list.List
@@ -65,6 +69,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
 	}
 	// counter
+	server.counters = monitor.NewCounters()
 	server.cmdCounters = monitor.NewCounters()
 	server.cmdCateCounters = monitor.NewCounters()
 	return
@@ -80,6 +85,7 @@ func (server *GoRedisServer) Init() (err error) {
 	server.config = NewConfig(server.levelRedis, goredisPrefix+"config:")
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
+	server.initLevelDBStatusLog(server.directory + "/leveldb.log")
 	stdlog.Printf("init uid %s\n", server.UID())
 	server.initConfig()
 	// slave
@@ -154,6 +160,30 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 	go server.cmdMonitor.Start()
 }
 
+func (server *GoRedisServer) initLevelDBStatusLog(path string) {
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	server.leveldbStatus = statlog.NewStatLogger(file)
+	server.leveldbStatus.Add(statlog.TimeItem("time"))
+	// leveldb io 操作数
+	ldbkeys := []string{"get", "set", "enum", "del", "lru_hit", "lru_miss"}
+	opt := &statlog.Opt{Padding: 10}
+	for _, k := range ldbkeys {
+		// pass local var to inner func()
+		func(name string) {
+			server.leveldbStatus.Add(statlog.Item(name, func() interface{} {
+				c := server.counters.Get("leveldb_io_" + name)
+				c.SetCount(server.levelRedis.Counter(name))
+				return c.ChangedCount()
+			}, opt))
+		}(k)
+	}
+
+	go server.leveldbStatus.Start()
+}
+
 // for CommandHandler
 func (server *GoRedisServer) On(session *Session, cmd *Command) {
 	go func() {
@@ -173,7 +203,9 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) {
 	}()
 
 	// monitor
-	go server.monitorOutput(session, cmd)
+	if server.monitorlist.Len() > 0 {
+		go server.monitorOutput(session, cmd)
+	}
 }
 
 func (server *GoRedisServer) OnUndefined(session *Session, cmd *Command) (reply *Reply) {

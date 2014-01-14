@@ -19,11 +19,7 @@ func (l *LevelString) stringKey(key []byte) []byte {
 }
 
 func (l *LevelString) Get(key []byte) (value []byte) {
-	var err error
-	value, err = l.redis.db.Get(l.redis.ro, l.stringKey(key))
-	if err != nil {
-		value = nil
-	}
+	value = l.redis.RawGet(l.stringKey(key))
 	return
 }
 
@@ -32,14 +28,13 @@ func (l *LevelString) Delete(keys ...[]byte) (n int) {
 	for _, key := range keys {
 		val := l.Get(key)
 		if val != nil {
-			l.redis.db.Delete(l.redis.wo, l.stringKey(key))
+			l.redis.RawDel(l.stringKey(key))
 			n++
 		}
 	}
 	return
 }
 
-func (l *LevelString) Set(key []byte, value []byte) (err error) {
-	err = l.redis.db.Put(l.redis.wo, l.stringKey(key), value)
-	return
+func (l *LevelString) Set(key []byte, value []byte) error {
+	return l.redis.RawSet(l.stringKey(key), value)
 }
