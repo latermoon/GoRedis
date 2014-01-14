@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// 配置读写
 type Config struct {
 	redis  *levelredis.LevelRedis
 	prefix string
