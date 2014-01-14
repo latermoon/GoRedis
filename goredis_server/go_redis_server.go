@@ -9,8 +9,6 @@ import (
 	"./monitor"
 	"container/list"
 	"errors"
-	"github.com/latermoon/levigo"
-	"os"
 	"strings"
 	"sync"
 )
@@ -75,45 +73,6 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	return
 }
 
-func (server *GoRedisServer) Init() (err error) {
-	stdlog.Println("server init ...")
-	err = server.initLevelDB()
-	if err != nil {
-		return
-	}
-	// __goredis:config:xxx
-	server.config = NewConfig(server.levelRedis, goredisPrefix+"config:")
-	// monitor
-	server.initCommandMonitor(server.directory + "/cmd.log")
-	server.initLevelDBStatusLog(server.directory + "/leveldb.log")
-	stdlog.Printf("init uid %s\n", server.UID())
-	server.initConfig()
-	// slave
-	server.initSlaveSessions()
-	return
-}
-
-func (server *GoRedisServer) initConfig() {
-	// slowlog-log-slower-than
-	// slst := server.config.IntForKey("slowlog-log-slower-than", 100*1000)
-}
-
-func (server *GoRedisServer) initLevelDB() (err error) {
-	opts := levigo.NewOptions()
-	opts.SetCache(levigo.NewLRUCache(128 * 1024 * 1024))
-	opts.SetCompression(levigo.SnappyCompression)
-	opts.SetBlockSize(32 * 1024)
-	opts.SetWriteBufferSize(128 * 1024 * 1024)
-	opts.SetMaxOpenFiles(100000)
-	opts.SetCreateIfMissing(true)
-	db, e1 := levigo.Open(server.directory+"/db0", opts)
-	if e1 != nil {
-		return e1
-	}
-	server.levelRedis = levelredis.NewLevelRedis(db)
-	return
-}
-
 func (server *GoRedisServer) Listen(host string) {
 	stdlog.Printf("listen %s\n", host)
 	server.RedisServer.Listen(host)
@@ -142,48 +101,6 @@ func (server *GoRedisServer) initSlaveSessions() {
 	// }
 }
 
-// 命令执行监控
-func (server *GoRedisServer) initCommandMonitor(path string) {
-	// monitor
-	server.cmdMonitor = monitor.NewStatusLogger(path)
-	server.cmdMonitor.Add(monitor.NewTimeFormater("time", 8))
-	server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCounters.Get("total"), "total", 7, "ChangedCount"))
-	// key, string, hash, list, ...
-	for _, cate := range CommandCategoryList {
-		cateName := string(cate)
-		padding := len(cateName) + 1
-		if padding < 7 {
-			padding = 7
-		}
-		server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCateCounters.Get(cateName), cateName, padding, "ChangedCount"))
-	}
-	go server.cmdMonitor.Start()
-}
-
-func (server *GoRedisServer) initLevelDBStatusLog(path string) {
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
-	if err != nil {
-		panic(err)
-	}
-	server.leveldbStatus = statlog.NewStatLogger(file)
-	server.leveldbStatus.Add(statlog.TimeItem("time"))
-	// leveldb io 操作数
-	ldbkeys := []string{"get", "set", "enum", "del", "lru_hit", "lru_miss"}
-	opt := &statlog.Opt{Padding: 10}
-	for _, k := range ldbkeys {
-		// pass local var to inner func()
-		func(name string) {
-			server.leveldbStatus.Add(statlog.Item(name, func() interface{} {
-				c := server.counters.Get("leveldb_io_" + name)
-				c.SetCount(server.levelRedis.Counter(name))
-				return c.ChangedCount()
-			}, opt))
-		}(k)
-	}
-
-	go server.leveldbStatus.Start()
-}
-
 // for CommandHandler
 func (server *GoRedisServer) On(session *Session, cmd *Command) {
 	go func() {
@@ -191,7 +108,7 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) {
 		server.cmdCounters.Get(cmdName).Incr(1)
 		cate := GetCommandCategory(cmdName)
 		server.cmdCateCounters.Get(string(cate)).Incr(1)
-		server.cmdCounters.Get("total").Incr(1)
+		server.cmdCateCounters.Get("total").Incr(1)
 
 		// 同步到从库
 		if _, ok := server.needSyncCmdTable[cmdName]; ok {
