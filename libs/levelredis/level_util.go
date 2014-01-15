@@ -29,6 +29,23 @@ func between(v, min, max []byte) bool {
 	return bytes.Compare(v, min) >= 0 && bytes.Compare(v, max) <= 0
 }
 
+// 获取字符串的char总值
+func SumOfStringChars(s string) (n int) {
+	count := len(s)
+	for i := 0; i < count; i++ {
+		n += count
+	}
+	return
+}
+
+func SumOfBytesChars(bs []byte) (n int) {
+	count := len(bs)
+	for i := 0; i < count; i++ {
+		n += int(bs[i])
+	}
+	return
+}
+
 // 使用二进制存储整形
 func Int64ToBytes(i int64) []byte {
 	var buf = make([]byte, 8)

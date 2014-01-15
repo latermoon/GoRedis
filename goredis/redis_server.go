@@ -128,8 +128,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 	// 异常处理
 	defer func() {
 		if err := recover(); err != nil {
-			stdlog.Printf("Error %s %s\n", session.conn.RemoteAddr(), err)
-			debug.PrintStack()
+			stdlog.Printf("Error %s %s\n%s", session.conn.RemoteAddr(), err, string(debug.Stack()))
 			session.Close()
 		}
 	}()
@@ -147,7 +146,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 		begin := time.Now()
 		reply := server.InvokeCommandHandler(session, cmd)
 		elapsed := time.Now().Sub(begin)
-		if elapsed.Nanoseconds() > int64(100*time.Millisecond) {
+		if elapsed.Nanoseconds() > int64(50*time.Millisecond) {
 			stdlog.Printf("exec %0.2f ms [%s]\n", elapsed.Seconds()*1000, cmd)
 		}
 		if reply != nil {

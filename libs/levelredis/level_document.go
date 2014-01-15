@@ -37,7 +37,7 @@ func (l *LevelDocument) initOnce() {
 		return
 	}
 
-	in, _ := l.redis.db.Get(l.redis.ro, l.docKey())
+	in := l.redis.RawGet(l.docKey())
 	if in != nil {
 		dec := codec.NewDecoderBytes(in, &l.mh)
 		m := make(map[string]interface{})
@@ -70,7 +70,7 @@ func (l *LevelDocument) Set(m map[string]interface{}) (err error) {
 
 	err = l.doc.RichSet(m)
 	if err == nil {
-		err = l.redis.db.Put(l.redis.wo, l.docKey(), l.docValue())
+		err = l.redis.RawSet(l.docKey(), l.docValue())
 	}
 	return
 }
@@ -84,9 +84,9 @@ func (l *LevelDocument) Get(fields ...string) (result map[string]interface{}) {
 func (l *LevelDocument) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	in, _ := l.redis.db.Get(l.redis.ro, l.docKey())
+	in := l.redis.RawGet(l.docKey())
 	if in != nil {
-		l.redis.db.Delete(l.redis.wo, l.docKey())
+		l.redis.RawDel(l.docKey())
 	}
 	l.doc = nil
 	ok = true

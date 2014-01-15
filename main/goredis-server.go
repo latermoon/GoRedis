@@ -46,13 +46,8 @@ func main() {
 	directory := fmt.Sprintf("%s/goredis_%d/", dbhome, *portPtr)
 	os.MkdirAll(directory, os.ModePerm)
 
-	// 设置全局输出路径
-	out, err := os.OpenFile(directory+"stdout.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
-	if err != nil {
-		panic(err)
-	}
-	// 同时输出到屏幕和文件
-	stdlog.SetOutput(stdlog.NewMultiWriter(os.Stdout, out))
+	// 重定向日志输出位置
+	redirectLogOutput(directory)
 
 	host := fmt.Sprintf("%s:%d", *hostPtr, *portPtr)
 
@@ -61,4 +56,20 @@ func main() {
 	server := goredis_server.NewGoRedisServer(directory)
 	server.Init()
 	server.Listen(host)
+}
+
+// 将Stdout, Stderr重定向到指定文件
+func redirectLogOutput(directory string) {
+	oldout := os.Stdout
+	var err error
+	os.Stdout, err = os.OpenFile(directory+"stdout.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	os.Stderr, err = os.OpenFile(directory+"stderr.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	// 同时输出到屏幕和文件
+	stdlog.SetOutput(stdlog.NewMultiWriter(oldout, os.Stdout))
 }

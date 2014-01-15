@@ -15,14 +15,42 @@ func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
 	switch section {
 	case "memory":
 		reply = BulkReply(server.memoryInfo())
+	case "server":
+		reply = BulkReply(server.serverInfo())
+	case "command":
+		reply = BulkReply(server.commandInfo())
 	default:
-		reply = BulkReply(fmt.Sprintf("goredis_version:%s", VERSION))
+		reply = BulkReply(server.serverInfo())
 	}
 	return
 }
 
+func (server *GoRedisServer) serverInfo() string {
+	buf := bytes.Buffer{}
+	buf.WriteString("# Server\n")
+	buf.WriteString(fmt.Sprintf("goredis_version:%s\n", VERSION))
+	return buf.String()
+}
+
+func (server *GoRedisServer) commandInfo() string {
+	buf := bytes.Buffer{}
+	buf.WriteString("# Command\n")
+	names := server.cmdCounters.CounterNames()
+	sort.Strings(names)
+	for _, name := range names {
+		counter := server.cmdCounters.Get(name)
+		buf.WriteString("cmd_")
+		buf.WriteString(name)
+		buf.WriteString(":")
+		buf.WriteString(strconv.FormatInt(counter.Count(), 10))
+		buf.WriteString("\n")
+	}
+	return buf.String()
+}
+
 func (server *GoRedisServer) memoryInfo() string {
 	buf := bytes.Buffer{}
+	buf.WriteString("# Memory\n")
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	// General statistics.
@@ -59,22 +87,7 @@ func (server *GoRedisServer) cmdCateCounterInfo() string {
 		buf.WriteString("cc_")
 		buf.WriteString(name)
 		buf.WriteString(":")
-		buf.WriteString(strconv.Itoa(counter.Count()))
-		buf.WriteString("\n")
-	}
-	return buf.String()
-}
-
-func (server *GoRedisServer) cmdCounterInfo() string {
-	buf := bytes.Buffer{}
-	names := server.cmdCounters.CounterNames()
-	sort.Strings(names)
-	for _, name := range names {
-		counter := server.cmdCounters.Get(name)
-		buf.WriteString("cmd_")
-		buf.WriteString(name)
-		buf.WriteString(":")
-		buf.WriteString(strconv.Itoa(counter.Count()))
+		buf.WriteString(strconv.FormatInt(counter.Count(), 10))
 		buf.WriteString("\n")
 	}
 	return buf.String()

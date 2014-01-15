@@ -3,18 +3,18 @@ package goredis_server
 import (
 	. "../goredis"
 	"../libs/levelredis"
+	statlog "../libs/statlog"
 	stdlog "../libs/stdlog"
 	"../libs/uuid"
 	"./monitor"
 	"container/list"
 	"errors"
-	"github.com/latermoon/levigo"
 	"strings"
 	"sync"
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.13"
+const VERSION = "1.0.15"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -30,12 +30,14 @@ type GoRedisServer struct {
 	// 数据源
 	directory  string
 	levelRedis *levelredis.LevelRedis
-	config     *levelredis.LevelConfig
+	config     *Config
 	// counters
+	counters        *monitor.Counters
 	cmdCounters     *monitor.Counters
 	cmdCateCounters *monitor.Counters // 指令集统计
 	// logger
-	cmdMonitor *monitor.StatusLogger
+	cmdMonitor    *monitor.StatusLogger
+	leveldbStatus *statlog.StatLogger
 	// 从库
 	uid              string // 实例id
 	slavelist        *list.List
@@ -65,39 +67,9 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
 	}
 	// counter
+	server.counters = monitor.NewCounters()
 	server.cmdCounters = monitor.NewCounters()
 	server.cmdCateCounters = monitor.NewCounters()
-	return
-}
-
-func (server *GoRedisServer) Init() (err error) {
-	stdlog.Println("server init ...")
-	err = server.initLevelDB()
-	if err != nil {
-		return
-	}
-	server.config = levelredis.NewLevelConfig(server.levelRedis, goredisPrefix+"config:")
-	// monitor
-	server.initCommandMonitor(server.directory + "/cmd.log")
-	// slave
-	stdlog.Printf("init uid %s\n", server.UID())
-	server.initSlaveSessions()
-	return
-}
-
-func (server *GoRedisServer) initLevelDB() (err error) {
-	opts := levigo.NewOptions()
-	opts.SetCache(levigo.NewLRUCache(128 * 1024 * 1024))
-	opts.SetCompression(levigo.SnappyCompression)
-	opts.SetBlockSize(32 * 1024)
-	opts.SetWriteBufferSize(128 * 1024 * 1024)
-	opts.SetMaxOpenFiles(100000)
-	opts.SetCreateIfMissing(true)
-	db, e1 := levigo.Open(server.directory+"/db0", opts)
-	if e1 != nil {
-		return e1
-	}
-	server.levelRedis = levelredis.NewLevelRedis(db)
 	return
 }
 
@@ -109,42 +81,13 @@ func (server *GoRedisServer) Listen(host string) {
 func (server *GoRedisServer) UID() (uid string) {
 	if len(server.uid) == 0 {
 		uidkey := "uid"
-		server.uid = server.config.GetString(uidkey)
+		server.uid = server.config.StringForKey(uidkey)
 		if len(server.uid) == 0 {
 			server.uid = uuid.UUID(8)
-			server.config.SetString(uidkey, server.uid)
+			server.config.Set(uidkey, []byte(server.uid))
 		}
 	}
 	return server.uid
-}
-
-// 初始化从库
-func (server *GoRedisServer) initSlaveSessions() {
-	// m := server.slaveIdMap()
-	// server.stdlog.Info("init slaves: %s", m)
-	// for uid, _ := range m {
-	// 	slaveSession := NewSlaveSession(server, nil, uid)
-	// 	server.slavelist.PushBack(slaveSession)
-	// 	slaveSession.ContinueAof()
-	// }
-}
-
-// 命令执行监控
-func (server *GoRedisServer) initCommandMonitor(path string) {
-	// monitor
-	server.cmdMonitor = monitor.NewStatusLogger(path)
-	server.cmdMonitor.Add(monitor.NewTimeFormater("time", 8))
-	server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCounters.Get("total"), "total", 7, "ChangedCount"))
-	// key, string, hash, list, ...
-	for _, cate := range CommandCategoryList {
-		cateName := string(cate)
-		padding := len(cateName) + 1
-		if padding < 7 {
-			padding = 7
-		}
-		server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCateCounters.Get(cateName), cateName, padding, "ChangedCount"))
-	}
-	go server.cmdMonitor.Start()
 }
 
 // for CommandHandler
@@ -154,7 +97,7 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) {
 		server.cmdCounters.Get(cmdName).Incr(1)
 		cate := GetCommandCategory(cmdName)
 		server.cmdCateCounters.Get(string(cate)).Incr(1)
-		server.cmdCounters.Get("total").Incr(1)
+		server.cmdCateCounters.Get("total").Incr(1)
 
 		// 同步到从库
 		if _, ok := server.needSyncCmdTable[cmdName]; ok {
@@ -166,7 +109,9 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) {
 	}()
 
 	// monitor
-	go server.monitorOutput(session, cmd)
+	if server.monitorlist.Len() > 0 {
+		go server.monitorOutput(session, cmd)
+	}
 }
 
 func (server *GoRedisServer) OnUndefined(session *Session, cmd *Command) (reply *Reply) {

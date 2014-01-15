@@ -37,7 +37,6 @@ const (
 	CCateList        CCate = "list"
 	CCateSet         CCate = "set"
 	CCateSortedSet   CCate = "zset"
-	CCateAof         CCate = "aof"
 	CCatePubSub      CCate = "pubsub"
 	CCateTransaction CCate = "trans"
 	CCateScript      CCate = "script"
@@ -46,7 +45,7 @@ const (
 	CCateUnknown     CCate = "unknown"
 )
 
-var CommandCategoryList = []CCate{CCateKey, CCateString, CCateHash, CCateList, CCateSet, CCateSortedSet, CCateAof, CCatePubSub, CCateTransaction, CCateScript, CCateConnection, CCateServer, CCateUnknown}
+var CommandCategoryList = []CCate{CCateKey, CCateString, CCateHash, CCateList, CCateSet, CCateSortedSet, CCatePubSub, CCateTransaction, CCateScript, CCateConnection, CCateServer, CCateUnknown}
 
 // 指令所属类别
 var ccatemap map[string]CCate
@@ -59,7 +58,6 @@ var ccatemaplist = map[CCate][]string{
 	CCateList:        []string{"BLPOP", "BRPOP", "BRPOPLPUSH", "LINDEX", "LINSERT", "LLEN", "LPOP", "LPUSH", "LPUSHX", "LRANGE", "LREM", "LSET", "LTRIM", "RPOP", "RPOPLRUSH", "RPUSH", "RPUSHX"},
 	CCateSet:         []string{"SADD", "SCARD", "SDIFF", "SDIFFSTORE", "SINTER", "SINTERSTORE", "SISMEMBER", "SMEMBERS", "SMOVE", "SPOP", "SRANDMEMBER", "SREM", "SUNION", "SUNIONSTORE"},
 	CCateSortedSet:   []string{"ZADD", "ZCARD", "ZCOUNT", "ZINCRBY", "ZINTERSTORE", "ZRANGE", "ZRANGEBYSCORE", "ZRANK", "ZREM", "ZREMRANGEBYRANK", "ZREMRANGEBYSCORE", "ZREVRANGE", "ZREVRANGEBYSCORE", "ZREVRANK", "ZSCORE", "ZUNIONSTORE"},
-	CCateAof:         []string{"AOF_PUSH", "AOF_PUSH_ASYNC", "AOF_POP", "AOF_INDEX", "AOF_RANGE", "AOF_LEN"},
 	CCatePubSub:      []string{"PSUBSCRIBE", "PUBSUB", "PUBLISH", "PUNSUBSCRIBE", "SUBSCRIBE", "UNSUBSCRIBE"},
 	CCateTransaction: []string{"DISCARD", "EXEC", "MULTI", "UNWATCH", "WATCH"},
 	CCateScript:      []string{"EVAL", "EVALSHA", "SCRIPT"},
