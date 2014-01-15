@@ -90,17 +90,6 @@ func (server *GoRedisServer) UID() (uid string) {
 	return server.uid
 }
 
-// 初始化从库
-func (server *GoRedisServer) initSlaveSessions() {
-	// m := server.slaveIdMap()
-	// server.stdlog.Info("init slaves: %s", m)
-	// for uid, _ := range m {
-	// 	slaveSession := NewSlaveSession(server, nil, uid)
-	// 	server.slavelist.PushBack(slaveSession)
-	// 	slaveSession.ContinueAof()
-	// }
-}
-
 // for CommandHandler
 func (server *GoRedisServer) On(session *Session, cmd *Command) {
 	go func() {

@@ -141,3 +141,14 @@ func (server *GoRedisServer) initCommandCounterLog(cate string, cmds []string) {
 	}
 	go slog.Start()
 }
+
+// 初始化从库
+func (server *GoRedisServer) initSlaveSessions() {
+	// m := server.slaveIdMap()
+	// server.stdlog.Info("init slaves: %s", m)
+	// for uid, _ := range m {
+	// 	slaveSession := NewSlaveSession(server, nil, uid)
+	// 	server.slavelist.PushBack(slaveSession)
+	// 	slaveSession.ContinueAof()
+	// }
+}
