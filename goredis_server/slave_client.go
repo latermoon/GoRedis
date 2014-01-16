@@ -14,6 +14,13 @@ import (
 
 type SlaveStatus int
 
+type SlaveClientCallback interface {
+	RdbSizeCallback(size int64)
+	RdbRecvCallback(r *bufio.Reader)
+	IdleCallback()
+	CommandRecvCallback(cmd *Command)
+}
+
 /**
 
 client := NewSlaveClient(...)
@@ -22,17 +29,18 @@ client.Cancel()
 
 */
 type SlaveClient struct {
-	session             *Session
-	RdbSizeCallback     func(size int64)      // 可选
-	RdbRecvCallback     func(r *bufio.Reader) // 必选
-	CommandRecvCallback func(cmd *Command)    // 必选
+	session  *Session
+	callback SlaveClientCallback
 }
 
 func NewSlaveClient(session *Session) (s *SlaveClient) {
 	s = &SlaveClient{}
 	s.session = session
-	s.RdbSizeCallback = func(size int64) {}
 	return
+}
+
+func (s *SlaveClient) SetCallback(callback SlaveClientCallback) {
+	s.callback = callback
 }
 
 // 开始同步
@@ -64,13 +72,16 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 				break
 			}
 			rdbsaved = true
+		} else if c == '\n' {
+			s.session.ReadByte()
+			s.callback.IdleCallback()
 		} else {
 			var cmd *Command
 			cmd, err = s.session.ReadCommand()
 			if err != nil {
 				break
 			}
-			s.CommandRecvCallback(cmd)
+			s.callback.CommandRecvCallback(cmd)
 		}
 	}
 	return
@@ -94,7 +105,7 @@ func (s *SlaveClient) recvRdb() (err error) {
 	if err != nil {
 		return
 	}
-	s.RdbSizeCallback(size)
+	s.callback.RdbSizeCallback(size)
 
 	// read
 	w := bufio.NewWriter(f)
@@ -105,7 +116,7 @@ func (s *SlaveClient) recvRdb() (err error) {
 	w.Flush()
 
 	// callback
-	s.RdbRecvCallback(bufio.NewReader(f))
+	s.callback.RdbRecvCallback(bufio.NewReader(f))
 	return
 }
 
