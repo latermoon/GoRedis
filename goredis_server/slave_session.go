@@ -84,11 +84,13 @@ func (s *SlaveSession) Sync(uid string) (err error) {
 		} else if !readRdbFinish && c == '$' {
 			fmt.Printf("[%s] sync rdb \n", s.session.RemoteAddr())
 			s.session.ReadByte()
-			var rdbsize int
-			rdbsize, err = s.session.ReadLineInteger()
+			var count int64
+			count, err = s.session.ReadLineInteger()
 			if err != nil {
 				break
 			}
+			rdbsize := int(count)
+
 			fmt.Printf("[%s] rdb size %d bytes\n", s.session.RemoteAddr(), rdbsize)
 			// read
 			dec := newDecoder(s)
