@@ -109,7 +109,7 @@ func (s *SlaveClient) recvRdb() (err error) {
 
 	// read
 	w := bufio.NewWriter(f)
-	_, err = iotool.RateLimitCopy(w, s.session, size, 200*1024*1024, func(written int64, rate int) {
+	_, err = iotool.RateLimitCopy(w, s.session, size, 40*1024*1024, func(written int64, rate int) {
 		stdlog.Println("copy:", written, "rate:", rate)
 	})
 	// _, err = io.CopyN(w, s.session, size)
