@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -109,9 +110,11 @@ func (s *SlaveClient) recvRdb() (err error) {
 
 	// read
 	w := bufio.NewWriter(f)
-	_, err = iotool.RateLimitCopy(w, s.session, size, 40*1024*1024, func(written int64, rate int) {
+	var written int64
+	written, err = iotool.RateLimitCopy(w, io.LimitReader(s.session, size), 40*1024*1024, func(written int64, rate int) {
 		stdlog.Println("copy:", written, "rate:", rate)
 	})
+	stdlog.Println("finish:", written)
 	// _, err = io.CopyN(w, s.session, size)
 	if err != nil {
 		return
