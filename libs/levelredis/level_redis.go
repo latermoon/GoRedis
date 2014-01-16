@@ -121,6 +121,7 @@ func (l *LevelRedis) DB() (db *levigo.DB) {
 	return l.db
 }
 
+// leveldb操作数，计数器
 func (l *LevelRedis) incrCounter(name string) {
 	l.muCount.Lock()
 	l.counters[name]++

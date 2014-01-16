@@ -74,6 +74,7 @@ func (server *GoRedisServer) OnMONITOR(session *Session, cmd *Command) (reply *R
 	return
 }
 
+// echo 'monitor keys' | redis-cli -p 1602
 func (server *GoRedisServer) monitorKeys(session *Session, cmd *Command) {
 	prefix, _ := cmd.ArgAtIndex(2)
 	server.levelRedis.Keys(prefix, func(i int, key, keytype []byte, quit *bool) {
