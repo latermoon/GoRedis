@@ -2,6 +2,7 @@ package goredis_server
 
 import (
 	. "../goredis"
+	"../libs/iotool"
 	"../libs/stdlog"
 	"bufio"
 	"errors"
@@ -109,7 +110,10 @@ func (s *SlaveClient) recvRdb() (err error) {
 
 	// read
 	w := bufio.NewWriter(f)
-	_, err = io.CopyN(w, s.session, size)
+	_, err = iotool.RateLimitCopy(w, io.LimitReader(s.session, size), 200*1024*1024, func(written int64, rate int) {
+		stdlog.Println("copy:", written, "rate:", rate)
+	})
+	// _, err = io.CopyN(w, s.session, size)
 	if err != nil {
 		return
 	}
