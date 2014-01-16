@@ -101,23 +101,24 @@ func (s *Session) ReadReply() (reply *Reply, err error) {
 		reply.Value, err = s.readLineInteger()
 	case '$':
 		reply.Type = ReplyTypeBulk
-		var bufsize int
+		var bufsize int64
 		bufsize, err = s.readLineInteger()
 		if err != nil {
 			break
 		}
-		reply.Value, err = s.BlockReadBytes(bufsize)
+		reply.Value, err = s.BlockReadBytes(int(bufsize))
 		if err != nil {
 			break
 		}
 		s.skipSpecificBytes([]byte{CR, LF})
 	case '*':
 		reply.Type = ReplyTypeMultiBulks
-		var argCount int
-		argCount, err = s.readLineInteger()
+		var count int64
+		count, err = s.readLineInteger()
 		if err != nil {
 			break
 		}
+		argCount := int(count)
 		if argCount == -1 {
 			reply.Value = nil // *-1
 		} else {
@@ -128,11 +129,12 @@ func (s *Session) ReadReply() (reply *Reply, err error) {
 				if err != nil {
 					break
 				}
-				var argSize int
-				argSize, err = s.readLineInteger()
+				var count int64
+				count, err = s.readLineInteger()
 				if err != nil {
 					return
 				}
+				argSize := int(count)
 				if argSize == -1 {
 					args[i] = nil
 				} else {
@@ -170,11 +172,11 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 		return
 	}
 	// number of arguments
-	var argCount int
-	if argCount, err = s.readLineInteger(); err != nil {
+	var count int64
+	if count, err = s.readLineInteger(); err != nil {
 		return
 	}
-
+	argCount := int(count)
 	cmd.Args = make([][]byte, argCount)
 	for i := 0; i < argCount; i++ {
 		// Read ( $<number of bytes of argument 1> CR LF )
@@ -183,11 +185,12 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 			return
 		}
 
-		var argSize int
-		argSize, err = s.readLineInteger()
+		var count int64
+		count, err = s.readLineInteger()
 		if err != nil {
 			return
 		}
+		argSize := int(count)
 
 		// Read ( <argument data> CR LF )
 		cmd.Args[i], err = s.BlockReadBytes(argSize)
@@ -365,17 +368,17 @@ func (s *Session) ReadLineString() (str string, err error) {
 }
 
 // 读取整形，遇到CRLF换行为止
-func (s *Session) readLineInteger() (i int, err error) {
+func (s *Session) readLineInteger() (i int64, err error) {
 	var line string
 	line, err = s.readLineString()
 	if err != nil {
 		return
 	}
-	i, err = strconv.Atoi(line)
+	i, err = strconv.ParseInt(line, 10, 64)
 	return
 }
 
-func (s *Session) ReadLineInteger() (i int, err error) {
+func (s *Session) ReadLineInteger() (i int64, err error) {
 	return s.readLineInteger()
 }
 
@@ -460,24 +463,27 @@ func (s *Session) lightReadBytes(delim byte) (line []byte, err error) {
 	return
 }
 
-func (s *Session) ReadRDB() (err error) {
+func (s *Session) ReadRDB(w io.Writer) (err error) {
 	// Read ( $<number of bytes of RDB> CR LF )
 	err = s.skipSpecificByte('$')
 	if err != nil {
 		return
 	}
 
-	var rdbSize int
-	rdbSize, err = s.readLineInteger()
+	var count int64
+	count, err = s.readLineInteger()
 	if err != nil {
 		return
 	}
+	rdbSize := int(count)
 
+	var c byte
 	for i := 0; i < rdbSize; i++ {
-		_, err = s.rw.ReadByte()
+		c, err = s.rw.ReadByte()
 		if err != nil {
 			return
 		}
+		w.Write([]byte{c})
 	}
 	return
 }
