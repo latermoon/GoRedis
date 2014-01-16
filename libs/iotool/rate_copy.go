@@ -12,7 +12,7 @@ type RateChangedCallback func(written int64, rate int)
 
 // 限速复制
 // 一般用于内网传输时，防止网卡满载，导致其它应用访问超时
-func RateLimitCopy(dst io.Writer, src io.Reader, bytesInSecond int, callback RateChangedCallback) (written int64, err error) {
+func RateLimitCopy(dst io.Writer, src io.Reader, size int64, bytesInSecond int, callback RateChangedCallback) (written int64, err error) {
 	if bytesInSecond < 5*1024*1024 {
 		err = errors.New("bytesInSecond must larger than 5Mb")
 		return
@@ -20,6 +20,7 @@ func RateLimitCopy(dst io.Writer, src io.Reader, bytesInSecond int, callback Rat
 	obj := &rateLimitCopy{
 		dst:           dst,
 		src:           src,
+		size:          size,
 		bytesInSecond: bytesInSecond,
 		callback:      callback,
 	}
@@ -31,6 +32,7 @@ type rateLimitCopy struct {
 	dst           io.Writer
 	src           io.Reader
 	callback      RateChangedCallback
+	size          int64      // 总共要copy的字节数
 	bytesInSecond int        // 传输速率，1秒
 	written       int64      // 已拷贝字节数
 	queue         *list.List // 存放最近1秒的传输字节
@@ -42,16 +44,28 @@ type rateLimitCopy struct {
 
 func (r *rateLimitCopy) StartCopy() (int64, error) {
 	// init
-	r.blocksize = 500 * 1024 // 1Mb
+	defaultBlock := int64(500 * 1024) // 1Mb
+	r.blocksize = defaultBlock
 	r.queue = list.New()
 	blockcount := r.bytesInSecond / int(r.blocksize)
 	r.sleepms = 1000 / blockcount
 
 	// rate calc
 	go r.rateRecordThread()
+	defer func() {
+		r.shouldStop = true
+	}()
 	for {
+		if r.size-r.written > defaultBlock {
+			r.blocksize = defaultBlock
+		} else {
+			r.blocksize = r.size - r.written
+		}
 		n, err := io.CopyN(r.dst, r.src, r.blocksize)
 		r.written += n
+		if r.written >= r.size {
+			break
+		}
 		if err == io.EOF {
 			break
 		}
@@ -62,7 +76,6 @@ func (r *rateLimitCopy) StartCopy() (int64, error) {
 			time.Sleep(time.Millisecond * time.Duration(r.sleepms))
 		}
 	}
-	r.shouldStop = true
 	return r.written, nil
 }
 
