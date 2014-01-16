@@ -23,7 +23,7 @@ func RateLimitCopy(dst io.Writer, src io.Reader, bytesInSecond int, callback Rat
 		bytesInSecond: bytesInSecond,
 		callback:      callback,
 	}
-	written, err = obj.Start()
+	written, err = obj.StartCopy()
 	return
 }
 
@@ -37,9 +37,10 @@ type rateLimitCopy struct {
 	sleepms       int        // 读取一个block休息的时间
 	currentRate   int        //当前速率
 	blocksize     int64      // 单次读取一个block的大小
+	shouldStop    bool       // 停止计算器
 }
 
-func (r *rateLimitCopy) Start() (int64, error) {
+func (r *rateLimitCopy) StartCopy() (int64, error) {
 	// init
 	r.blocksize = 500 * 1024 // 1Mb
 	r.queue = list.New()
@@ -61,6 +62,7 @@ func (r *rateLimitCopy) Start() (int64, error) {
 			time.Sleep(time.Millisecond * time.Duration(r.sleepms))
 		}
 	}
+	r.shouldStop = true
 	return r.written, nil
 }
 
@@ -69,6 +71,9 @@ func (r *rateLimitCopy) rateRecordThread() {
 	ticker := time.NewTicker(time.Millisecond * 100)
 	i := 0
 	for _ = range ticker.C {
+		if r.shouldStop {
+			break
+		}
 		// 保持10个元素
 		if r.queue.Len() >= 4 {
 			r.queue.Remove(r.queue.Front())
