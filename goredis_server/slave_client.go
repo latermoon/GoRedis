@@ -264,7 +264,7 @@ func (s *slaveCallback) RdbRecvFinishCallback(client *SlaveClient, r *bufio.Read
 
 func (s *SlaveClient) rdbDecodeCommand(client *SlaveClient, cmd *Command) {
 	slavelog.Printf("[M %s] rdb decode %s\n", client.RemoteAddr(), cmd)
-	s.server.InvokeCommandHandler(client.session, cmd)
+	s.server.On(client.session, cmd)
 }
 
 func (s *SlaveClient) rdbDecodeFinish(client *SlaveClient, n int64) {

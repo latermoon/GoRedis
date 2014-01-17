@@ -10,11 +10,10 @@ package goredis
 
 import (
 	"GoRedis/libs/stdlog"
+	"errors"
+	"fmt"
 	"net"
-	"reflect"
 	"runtime/debug"
-	"strings"
-	"time"
 )
 
 const (
@@ -23,25 +22,13 @@ const (
 	CRLF = "\r\n"
 )
 
-// 命令处理接口
-type CommandHandler interface {
-	// 首先搜索"On+大写NAME"格式的函数，存在则调用，不存在则调用On
-	// OnGET(cmd *Command) (reply *Reply)
-	// OnGET(session *Session, cmd *Command) (reply *Reply)
-	OnUndefined(session *Session, cmd *Command) (reply *Reply)
-	On(session *Session, cmd *Command)
-}
+var log = stdlog.Log("goredis")
 
-// 一个空的默认命令处理对象
-type emptyCommandHandler struct {
-	CommandHandler
-}
-
-func (s *emptyCommandHandler) On(session *Session, cmd *Command) {
-}
-
-func (s *emptyCommandHandler) OnUndefined(session *Session, cmd *Command) (reply *Reply) {
-	return ErrorReply("Not Supported: " + cmd.String())
+// 处理接收到的连接和数据
+type ServerHandler interface {
+	SessionOpened(session *Session)
+	SessionClosed(session *Session, err error)
+	On(session *Session, cmd *Command) (reply *Reply)
 }
 
 // ==============================
@@ -50,18 +37,16 @@ func (s *emptyCommandHandler) OnUndefined(session *Session, cmd *Command) (reply
 // ==============================
 type RedisServer struct {
 	// 指定的处理程序
-	handler CommandHandler
-	// 缓存处理函数，减少relect次数
-	methodCache map[string]reflect.Value
+	handler ServerHandler
 }
 
-func NewRedisServer(handler CommandHandler) (server *RedisServer) {
+func NewRedisServer(handler ServerHandler) (server *RedisServer) {
 	server = &RedisServer{}
 	server.SetHandler(handler)
 	return
 }
 
-func (server *RedisServer) SetHandler(handler CommandHandler) {
+func (server *RedisServer) SetHandler(handler ServerHandler) {
 	server.handler = handler
 }
 
@@ -76,51 +61,22 @@ func (server *RedisServer) Listen(host string) {
 	}
 
 	// init
-	server.methodCache = make(map[string]reflect.Value)
 	if server.handler == nil {
-		server.SetHandler(&emptyCommandHandler{})
+		panic("must call SetHandler(...) before Listen")
 	}
 
 	// run loop
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			stdlog.Println("accepted error", err)
+			log.Println("accepted error", err)
 			continue
 		}
-		stdlog.Println("connection accepted from", conn.RemoteAddr())
+		session := NewSession(conn)
+		server.handler.SessionOpened(session)
 		// go
-		go server.handleConnection(NewSession(conn))
+		go server.handleConnection(session)
 	}
-}
-
-func (server *RedisServer) InvokeCommandHandler(session *Session, cmd *Command) (reply *Reply) {
-	cmdName := strings.ToUpper(cmd.Name())
-	// 从Cache取出处理函数
-	method, exists := server.methodCache[cmdName]
-	if !exists {
-		method = reflect.ValueOf(server.handler).MethodByName("On" + cmdName)
-		server.methodCache[cmdName] = method
-	}
-
-	// 通用调用
-	server.handler.On(session, cmd)
-	if method.IsValid() {
-		// 可以调用两种接口
-		// method = OnXXX(cmd *Command) (reply *Reply)
-		// method = OnXXX(session *Session, cmd *Command) (reply *Reply)
-		var in []reflect.Value
-		if method.Type().NumIn() == 1 {
-			in = []reflect.Value{reflect.ValueOf(cmd)}
-		} else {
-			in = []reflect.Value{reflect.ValueOf(session), reflect.ValueOf(cmd)}
-		}
-		callResult := method.Call(in)
-		reply = callResult[0].Interface().(*Reply)
-	} else {
-		reply = server.handler.OnUndefined(session, cmd)
-	}
-	return
 }
 
 // 处理一个客户端连接
@@ -128,29 +84,33 @@ func (server *RedisServer) handleConnection(session *Session) {
 	// 异常处理
 	defer func() {
 		if err := recover(); err != nil {
-			stdlog.Printf("Error %s %s\n%s", session.conn.RemoteAddr(), err, string(debug.Stack()))
+			log.Printf("Error %s %s\n%s", session.RemoteAddr(), err, string(debug.Stack()))
 			session.Close()
+			switch err.(type) {
+			case error:
+				server.handler.SessionClosed(session, err.(error))
+			default:
+				server.handler.SessionClosed(session, errors.New(fmt.Sprint(err)))
+			}
 		}
 	}()
+
+	var lastErr error
 	for {
-		cmd, e1 := session.ReadCommand()
+		var cmd *Command
+		cmd, lastErr = session.ReadCommand()
 		// 常见的error是:
 		// 1) io.EOF
 		// 2) read tcp 127.0.0.1:51863: connection reset by peer
-		if e1 != nil {
-			stdlog.Printf("end connection %s %s\n", session.conn.RemoteAddr(), e1)
+		if lastErr != nil {
 			session.Close()
 			break
 		}
 		// 处理
-		begin := time.Now()
-		reply := server.InvokeCommandHandler(session, cmd)
-		elapsed := time.Now().Sub(begin)
-		if elapsed.Nanoseconds() > int64(50*time.Millisecond) {
-			stdlog.Printf("exec %0.2f ms [%s]\n", elapsed.Seconds()*1000, cmd)
-		}
+		reply := server.handler.On(session, cmd)
 		if reply != nil {
-			session.Reply(reply)
+			lastErr = session.Reply(reply)
 		}
 	}
+	server.handler.SessionClosed(session, lastErr)
 }
