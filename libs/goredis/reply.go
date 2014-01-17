@@ -21,54 +21,20 @@ type ReplyType int
 
 // 响应的种类
 const (
-	ReplyTypeStatus = iota
+	ReplyTypeStatus ReplyType = iota
 	ReplyTypeError
 	ReplyTypeInteger
 	ReplyTypeBulk
 	ReplyTypeMultiBulks
 )
 
+var replyTypeDesc = map[ReplyType]string{ReplyTypeStatus: "StatusReply", ReplyTypeError: "ErrorReply", ReplyTypeInteger: "IntegerReply", ReplyTypeBulk: "BulkReply", ReplyTypeMultiBulks: "MultiBulksReply"}
+
 func (r *Reply) String() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("<")
-	switch r.Type {
-	case ReplyTypeStatus:
-		buf.WriteString("StatusReply:")
-		switch r.Value.(type) {
-		case string:
-			buf.WriteString(r.Value.(string))
-		case []byte:
-			buf.Write(r.Value.([]byte))
-		default:
-			buf.WriteString(fmt.Sprintf("Size(%d)", len(r.Value.([]byte))))
-		}
-	case ReplyTypeError:
-		buf.WriteString("ErrorReply:")
-		switch r.Value.(type) {
-		case string:
-			buf.WriteString(r.Value.(string))
-		case []byte:
-			buf.Write(r.Value.([]byte))
-		default:
-			buf.WriteString(fmt.Sprintf("Size(%d)", len(r.Value.([]byte))))
-		}
-	case ReplyTypeInteger:
-		buf.WriteString("IntegerReply:")
-		buf.WriteString(fmt.Sprintf("%d", r.Value))
-	case ReplyTypeBulk:
-		buf.WriteString("BulkReply:")
-		switch r.Value.(type) {
-		case string:
-			buf.WriteString(r.Value.(string))
-		case []byte:
-			buf.Write(r.Value.([]byte))
-		default:
-			buf.WriteString(fmt.Sprintf("Size(%d)", len(r.Value.([]byte))))
-		}
-	case ReplyTypeMultiBulks:
-		buf.WriteString("MultiBulksReply:")
-	}
-	buf.WriteString(">")
+	buf.WriteString(replyTypeDesc[r.Type])
+	buf.WriteString(":>")
 	return buf.String()
 }
 
