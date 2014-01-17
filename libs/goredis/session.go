@@ -339,20 +339,26 @@ func (s *Session) skipSpecificBytes(bs []byte) (err error) {
 	return
 }
 
-// 读取到Redis通用换行符为止
-func (s *Session) readBytesToCRLF() (bs []byte, err error) {
-	bs, err = s.ReadBytes(CR)
+// 读取一行
+func (s *Session) readLine() (line []byte, err error) {
+	line, err = s.rw.ReadSlice(LF)
+	if err == bufio.ErrBufferFull {
+		return nil, errors.New("line too long")
+	}
 	if err != nil {
 		return
 	}
-	err = s.skipSpecificByte(LF)
-	return
+	i := len(line) - 2
+	if i < 0 || line[i] != CR {
+		err = errors.New("bad line terminator:" + string(line))
+	}
+	return line[:i], nil
 }
 
 // 读取字符串，遇到CRLF换行为止
 func (s *Session) readLineString() (str string, err error) {
 	var line []byte
-	line, err = s.readBytesToCRLF()
+	line, err = s.readLine()
 	if err != nil {
 		return
 	}
