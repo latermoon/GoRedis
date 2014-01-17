@@ -1,0 +1,65 @@
+[30244] 17 Jan 14:22:37.925 # Warning: no config file specified, using the default config. In order to specify a config file use redis-server /path/to/redis.conf
+[30244] 17 Jan 14:22:37.926 * Max number of open files set to 10032
+                _._                                                  
+           _.-``__ ''-._                                             
+      _.-``    `.  `_.  ''-._           Redis 2.6.14 (00000000/0) 64 bit
+  .-`` .-```.  ```\/    _.,_ ''-._                                   
+ (    '      ,       .-`  | `,    )     Running in stand alone mode
+ |`-._`-...-` __...-.``-._|'` _.-'|     Port: 6379
+ |    `-._   `._    /     _.-'    |     PID: 30244
+  `-._    `-._  `-./  _.-'    _.-'                                   
+ |`-._`-._    `-.__.-'    _.-'_.-'|                                  
+ |    `-._`-._        _.-'_.-'    |           http://redis.io        
+  `-._    `-._`-.__.-'_.-'    _.-'                                   
+ |`-._`-._    `-.__.-'    _.-'_.-'|                                  
+ |    `-._`-._        _.-'_.-'    |                                  
+  `-._    `-._`-.__.-'_.-'    _.-'                                   
+      `-._    `-.__.-'    _.-'                                       
+          `-._        _.-'                                           
+              `-.__.-'                                               
+
+[30244] 17 Jan 14:22:37.928 # Server started, Redis version 2.6.14
+[30244] 17 Jan 14:22:37.928 * DB loaded from disk: 0.000 seconds
+[30244] 17 Jan 14:22:37.928 * The server is now ready to accept connections on port 6379
+[30244] 17 Jan 18:00:50.938 * Slave ask for synchronization
+[30244] 17 Jan 18:00:50.938 * Starting BGSAVE for SYNC
+[30244] 17 Jan 18:00:50.939 * Background saving started by pid 31741
+[31741] 17 Jan 18:00:50.941 * DB saved on disk
+[30244] 17 Jan 18:00:51.026 * Background saving terminated with success
+[30244] 17 Jan 18:00:51.026 * Synchronization with slave succeeded
+[30244] 17 Jan 18:07:21.806 * Slave ask for synchronization
+[30244] 17 Jan 18:07:21.806 * Starting BGSAVE for SYNC
+[30244] 17 Jan 18:07:21.806 * Background saving started by pid 31817
+[31817] 17 Jan 18:07:21.807 * DB saved on disk
+[30244] 17 Jan 18:07:21.905 * Background saving terminated with success
+[30244] 17 Jan 18:07:21.906 * Synchronization with slave succeeded
+[30244] 17 Jan 18:08:33.049 * Slave ask for synchronization
+[30244] 17 Jan 18:08:33.049 * Starting BGSAVE for SYNC
+[30244] 17 Jan 18:08:33.049 * Background saving started by pid 31865
+[31865] 17 Jan 18:08:33.050 * DB saved on disk
+[30244] 17 Jan 18:08:33.145 * Background saving terminated with success
+[30244] 17 Jan 18:08:33.145 * Synchronization with slave succeeded
+[30244] 17 Jan 18:12:37.648 * Slave ask for synchronization
+[30244] 17 Jan 18:12:37.648 * Starting BGSAVE for SYNC
+[30244] 17 Jan 18:12:37.649 * Background saving started by pid 31972
+[31972] 17 Jan 18:12:37.649 * DB saved on disk
+[30244] 17 Jan 18:12:37.678 * Background saving terminated with success
+[30244] 17 Jan 18:12:37.679 * Synchronization with slave succeeded
+[30244] 17 Jan 18:15:45.786 * Slave ask for synchronization
+[30244] 17 Jan 18:15:45.786 * Starting BGSAVE for SYNC
+[30244] 17 Jan 18:15:45.787 * Background saving started by pid 32066
+[32066] 17 Jan 18:15:45.788 * DB saved on disk
+[30244] 17 Jan 18:15:45.868 * Background saving terminated with success
+[30244] 17 Jan 18:15:45.868 * Synchronization with slave succeeded
+[30244] 17 Jan 18:16:27.138 * Slave ask for synchronization
+[30244] 17 Jan 18:16:27.138 * Starting BGSAVE for SYNC
+[30244] 17 Jan 18:16:27.139 * Background saving started by pid 32099
+[32099] 17 Jan 18:16:27.140 * DB saved on disk
+[30244] 17 Jan 18:16:27.203 * Background saving terminated with success
+[30244] 17 Jan 18:16:27.203 * Synchronization with slave succeeded
+[30244] 17 Jan 18:16:43.440 * Slave ask for synchronization
+[30244] 17 Jan 18:16:43.440 * Starting BGSAVE for SYNC
+[30244] 17 Jan 18:16:43.441 * Background saving started by pid 32123
+[32123] 17 Jan 18:16:43.441 * DB saved on disk
+[30244] 17 Jan 18:16:43.493 * Background saving terminated with success
+[30244] 17 Jan 18:16:43.493 * Synchronization with slave succeeded

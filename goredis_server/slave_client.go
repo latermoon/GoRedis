@@ -3,24 +3,31 @@ package goredis_server
 import (
 	. "GoRedis/libs/goredis"
 	"GoRedis/libs/iotool"
+	"GoRedis/libs/levelredis"
+	"GoRedis/libs/rdb"
 	"GoRedis/libs/stdlog"
 	"bufio"
 	"errors"
 	"fmt"
+	// "github.com/latermoon/levigo"
 	"io"
-	"io/ioutil"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
 type SlaveStatus int
 
 type SlaveClientCallback interface {
-	RdbSizeCallback(size int64)
-	RdbRecvCallback(r *bufio.Reader)
-	IdleCallback()
-	CommandRecvCallback(cmd *Command)
+	RdbSizeCallback(client *SlaveClient, totalsize int64)
+	RdbRecvFinishCallback(client *SlaveClient, r *bufio.Reader)
+	RdbRecvProcessCallback(client *SlaveClient, size int64, rate int)
+	IdleCallback(client *SlaveClient)
+	CommandRecvCallback(client *SlaveClient, cmd *Command)
 }
+
+var slavelog = stdlog.Log("slaveof")
 
 /**
 
@@ -30,18 +37,37 @@ client.Cancel()
 
 */
 type SlaveClient struct {
-	session  *Session
-	callback SlaveClientCallback
+	session    *Session
+	server     *GoRedisServer
+	callback   SlaveClientCallback
+	levelredis *levelredis.LevelRedis
 }
 
-func NewSlaveClient(session *Session) (s *SlaveClient) {
+func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient) {
 	s = &SlaveClient{}
+	s.server = server
 	s.session = session
 	return
 }
 
+func (s *SlaveClient) init() {
+
+}
+
 func (s *SlaveClient) SetCallback(callback SlaveClientCallback) {
 	s.callback = callback
+}
+
+func (s *SlaveClient) RemoteAddr() net.Addr {
+	return s.session.RemoteAddr()
+}
+
+func (s *SlaveClient) directory() string {
+	return s.server.directory + "slaveof_" + fmt.Sprint(s.session.RemoteAddr()) + "/"
+}
+
+func (s *SlaveClient) rdbfilename() string {
+	return s.directory() + "dump.rdb"
 }
 
 // 开始同步
@@ -51,9 +77,9 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 		return e1
 	}
 	if isgoredis {
-		stdlog.Println("slaveof GoRedis:", version)
+		slavelog.Printf("[M %s] slaveof %s GoRedis:%s\n", s.RemoteAddr(), s.RemoteAddr(), version)
 	} else {
-		stdlog.Println("slaveof Redis:", version)
+		slavelog.Printf("[M %s] slaveof %s Redis:%s\n", s.RemoteAddr(), s.RemoteAddr(), version)
 	}
 
 	args := [][]byte{[]byte("SYNC")}
@@ -69,20 +95,20 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 		if !rdbsaved && c == '$' {
 			err = s.recvRdb()
 			if err != nil {
-				stdlog.Println("recv rdb error:", err)
+				slavelog.Printf("[M %s] recv rdb error:%s\n", s.RemoteAddr(), err)
 				break
 			}
 			rdbsaved = true
 		} else if c == '\n' {
 			s.session.ReadByte()
-			s.callback.IdleCallback()
+			s.callback.IdleCallback(s)
 		} else {
 			var cmd *Command
 			cmd, err = s.session.ReadCommand()
 			if err != nil {
 				break
 			}
-			s.callback.CommandRecvCallback(cmd)
+			s.callback.CommandRecvCallback(s, cmd)
 		}
 	}
 	return
@@ -90,10 +116,12 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 
 func (s *SlaveClient) recvRdb() (err error) {
 	var f *os.File
-	f, err = ioutil.TempFile("/tmp/", "tmp_goredis_")
+	os.Mkdir(s.directory(), os.ModePerm)
+	f, err = os.OpenFile(s.rdbfilename(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		return
 	}
+	slavelog.Printf("[M %s] create rdb:%s\n", s.RemoteAddr(), s.rdbfilename())
 	defer func() {
 		filename := f.Name()
 		f.Close()
@@ -106,23 +134,22 @@ func (s *SlaveClient) recvRdb() (err error) {
 	if err != nil {
 		return
 	}
-	s.callback.RdbSizeCallback(size)
+	s.callback.RdbSizeCallback(s, size)
 
 	// read
 	w := bufio.NewWriter(f)
-	var written int64
-	written, err = iotool.RateLimitCopy(w, io.LimitReader(s.session, size), 40*1024*1024, func(written int64, rate int) {
-		stdlog.Println("copy:", written, "rate:", rate)
+	// var written int64
+	_, err = iotool.RateLimitCopy(w, io.LimitReader(s.session, size), 40*1024*1024, func(written int64, rate int) {
+		s.callback.RdbRecvProcessCallback(s, written, rate)
 	})
-	stdlog.Println("finish:", written)
 	// _, err = io.CopyN(w, s.session, size)
 	if err != nil {
 		return
 	}
 	w.Flush()
-
+	f.Seek(0, 0)
 	// callback
-	s.callback.RdbRecvCallback(bufio.NewReader(f))
+	s.callback.RdbRecvFinishCallback(s, bufio.NewReader(f))
 	return
 }
 
@@ -186,4 +213,223 @@ func (s *SlaveClient) masterInfo() (isgoredis bool, version string, err error) {
 	}
 
 	return
+}
+
+// ==============================
+// 处理获得的数据
+// ==============================
+type slaveCallback struct {
+	SlaveClientCallback
+	server *GoRedisServer
+}
+
+func newSlaveCallback(server *GoRedisServer) (s *slaveCallback) {
+	s = &slaveCallback{}
+	s.server = server
+	return
+}
+
+func (s *slaveCallback) RdbSizeCallback(client *SlaveClient, totalsize int64) {
+	slavelog.Printf("[M %s] rdb size: %d\n", client.RemoteAddr(), totalsize)
+	// create leveldb
+}
+
+func (s *slaveCallback) RdbRecvFinishCallback(client *SlaveClient, r *bufio.Reader) {
+	slavelog.Printf("[M %s] rdb recv finish \n", client.RemoteAddr())
+	dec := newRdbDecoder(client)
+	err := rdb.Decode(r, dec)
+	if err != nil {
+		// must cancel
+		slavelog.Printf("[M %s] decode error %s\n", client.RemoteAddr(), err)
+	}
+	return
+}
+
+func (s *SlaveClient) rdbDecodeCommand(client *SlaveClient, cmd *Command) {
+	slavelog.Printf("[M %s] rdb decode %s\n", client.RemoteAddr(), cmd)
+}
+
+func (s *SlaveClient) rdbDecodeFinish(client *SlaveClient, n int64) {
+	slavelog.Printf("[M %s] rdb decode finish, items: %d\n", client.RemoteAddr(), n)
+}
+
+func (s *slaveCallback) RdbRecvProcessCallback(client *SlaveClient, size int64, rate int) {
+	slavelog.Printf("[M %s] rdb recv: %d, rate:%d\n", client.RemoteAddr(), size, rate)
+}
+
+func (s *slaveCallback) IdleCallback(client *SlaveClient) {
+	slavelog.Printf("[M %s] slaveof waiting\n", client.RemoteAddr())
+}
+
+func (s *slaveCallback) CommandRecvCallback(client *SlaveClient, cmd *Command) {
+	slavelog.Printf("[M %s] recv: %s\n", client.RemoteAddr(), cmd)
+}
+
+// =============================================
+// 第三方rdb解释函数
+// =============================================
+type rdbDecoder struct {
+	rdb.NopDecoder
+	db       int
+	i        int
+	keyCount int64
+	bufsize  int
+	client   *SlaveClient
+	// 数据缓冲
+	hashEntry [][]byte
+	setEntry  [][]byte
+	listEntry [][]byte
+	zsetEntry [][]byte
+}
+
+func newRdbDecoder(s *SlaveClient) (dec *rdbDecoder) {
+	dec = &rdbDecoder{}
+	dec.client = s
+	dec.keyCount = 0
+	dec.bufsize = 200
+	return
+}
+
+func (p *rdbDecoder) StartDatabase(n int) {
+	p.db = n
+}
+
+func (p *rdbDecoder) EndDatabase(n int) {
+}
+
+func (p *rdbDecoder) EndRDB() {
+	p.client.rdbDecodeFinish(p.client, p.keyCount)
+}
+
+// Set
+func (p *rdbDecoder) Set(key, value []byte, expiry int64) {
+	cmd := NewCommand([]byte("SET"), key, value)
+	p.client.rdbDecodeCommand(p.client, cmd)
+	p.keyCount++
+}
+
+func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
+	if int(length) < p.bufsize {
+		p.hashEntry = make([][]byte, 0, length+2)
+	} else {
+		p.hashEntry = make([][]byte, 0, p.bufsize)
+	}
+	p.hashEntry = append(p.hashEntry, []byte("HSET"))
+	p.hashEntry = append(p.hashEntry, key)
+	p.keyCount++
+}
+
+func (p *rdbDecoder) Hset(key, field, value []byte) {
+	p.hashEntry = append(p.hashEntry, field)
+	p.hashEntry = append(p.hashEntry, value)
+	if len(p.hashEntry) >= p.bufsize {
+		cmd := NewCommand(p.hashEntry...)
+		p.client.rdbDecodeCommand(p.client, cmd)
+		p.hashEntry = make([][]byte, 0, p.bufsize)
+		p.hashEntry = append(p.hashEntry, []byte("HSET"))
+		p.hashEntry = append(p.hashEntry, key)
+	}
+}
+
+// Hash
+func (p *rdbDecoder) EndHash(key []byte) {
+	if len(p.hashEntry) > 2 {
+		cmd := NewCommand(p.hashEntry...)
+		p.client.rdbDecodeCommand(p.client, cmd)
+	}
+}
+
+func (p *rdbDecoder) StartSet(key []byte, cardinality, expiry int64) {
+	if int(cardinality) < p.bufsize {
+		p.setEntry = make([][]byte, 0, cardinality+2)
+	} else {
+		p.setEntry = make([][]byte, 0, p.bufsize)
+	}
+	p.setEntry = append(p.setEntry, []byte("SADD"))
+	p.setEntry = append(p.setEntry, key)
+	p.keyCount++
+}
+
+func (p *rdbDecoder) Sadd(key, member []byte) {
+	p.setEntry = append(p.setEntry)
+	if len(p.setEntry) >= p.bufsize {
+		cmd := NewCommand(p.setEntry...)
+		p.client.rdbDecodeCommand(p.client, cmd)
+		p.setEntry = make([][]byte, 0, p.bufsize)
+		p.setEntry = append(p.setEntry, []byte("SADD"))
+		p.setEntry = append(p.setEntry, key)
+	}
+}
+
+// Set
+func (p *rdbDecoder) EndSet(key []byte) {
+	if len(p.setEntry) > 2 {
+		cmd := NewCommand(p.setEntry...)
+		p.client.rdbDecodeCommand(p.client, cmd)
+	}
+}
+
+func (p *rdbDecoder) StartList(key []byte, length, expiry int64) {
+	if int(length) < p.bufsize {
+		p.listEntry = make([][]byte, 0, length+2)
+	} else {
+		p.listEntry = make([][]byte, 0, p.bufsize)
+	}
+	p.listEntry = append(p.listEntry, []byte("RPUSH"))
+	p.listEntry = append(p.listEntry, key)
+	p.keyCount++
+	p.i = 0
+}
+
+func (p *rdbDecoder) Rpush(key, value []byte) {
+	p.listEntry = append(p.listEntry, value)
+	if len(p.listEntry) >= p.bufsize {
+		cmd := NewCommand(p.listEntry...)
+		p.client.rdbDecodeCommand(p.client, cmd)
+		p.listEntry = make([][]byte, 0, p.bufsize)
+		p.listEntry = append(p.listEntry, []byte("RPUSH"))
+		p.listEntry = append(p.listEntry, key)
+	}
+	p.i++
+}
+
+// List
+func (p *rdbDecoder) EndList(key []byte) {
+	if len(p.listEntry) > 2 {
+		cmd := NewCommand(p.listEntry...)
+		p.client.rdbDecodeCommand(p.client, cmd)
+	}
+}
+
+func (p *rdbDecoder) StartZSet(key []byte, cardinality, expiry int64) {
+	if int(cardinality) > p.bufsize {
+		p.zsetEntry = make([][]byte, 0, cardinality)
+	} else {
+		p.zsetEntry = make([][]byte, 0, p.bufsize)
+	}
+	p.zsetEntry = append(p.zsetEntry, []byte("ZADD"))
+	p.zsetEntry = append(p.zsetEntry, key)
+	p.keyCount++
+	p.i = 0
+}
+
+func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
+	p.zsetEntry = append(p.zsetEntry, []byte(strconv.FormatInt(int64(score), 10)))
+	p.zsetEntry = append(p.zsetEntry, member)
+	if len(p.zsetEntry) >= p.bufsize {
+		cmd := NewCommand(p.zsetEntry...)
+		p.client.rdbDecodeCommand(p.client, cmd)
+		p.zsetEntry = make([][]byte, 0, p.bufsize)
+		p.zsetEntry = append(p.zsetEntry, []byte("ZADD"))
+		p.zsetEntry = append(p.zsetEntry, key)
+	}
+	p.i++
+}
+
+// ZSet
+func (p *rdbDecoder) EndZSet(key []byte) {
+	if len(p.zsetEntry) > 2 {
+		cmd := NewCommand(p.zsetEntry...)
+		p.client.rdbDecodeCommand(p.client, cmd)
+	}
 }
