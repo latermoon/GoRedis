@@ -35,7 +35,7 @@ doc_get(key, "name,sex,photos,setting.mute,version")
 */
 
 import (
-	. "../goredis"
+	. "GoRedis/libs/goredis"
 	"encoding/json"
 )
 

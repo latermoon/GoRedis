@@ -1,9 +1,9 @@
 package goredis_server
 
 import (
-	. "../goredis"
-	"../libs/iotool"
-	"../libs/stdlog"
+	. "GoRedis/libs/goredis"
+	"GoRedis/libs/iotool"
+	"GoRedis/libs/stdlog"
 	"bufio"
 	"errors"
 	"fmt"

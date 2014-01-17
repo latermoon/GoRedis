@@ -5,11 +5,11 @@ slaveClient.Start()
 slaveClient.Stop()
 */
 import (
-	. "../goredis"
-	"../libs/levelredis"
-	"../libs/stdlog"
-	qp "./libs/queueprocess"
 	"./monitor"
+	. "GoRedis/libs/goredis"
+	"GoRedis/libs/levelredis"
+	qp "GoRedis/libs/queueprocess"
+	"GoRedis/libs/stdlog"
 	"errors"
 	"fmt"
 	"github.com/latermoon/levigo"

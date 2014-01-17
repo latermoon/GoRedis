@@ -12,9 +12,10 @@ type RateChangedCallback func(written int64, rate int)
 
 // 限速复制
 // 一般用于内网传输时，防止网卡满载，导致其它应用访问超时
+// 对于千兆网卡，极速一般100MB，所以这里最大不应该超过100MB
 func RateLimitCopy(dst io.Writer, src io.Reader, bytesInSecond int, callback RateChangedCallback) (written int64, err error) {
 	if bytesInSecond < 5*1024*1024 {
-		err = errors.New("bytesInSecond must larger than 5Mb")
+		err = errors.New("bytesInSecond must larger than 5MB")
 		return
 	}
 	obj := &rateLimitCopy{

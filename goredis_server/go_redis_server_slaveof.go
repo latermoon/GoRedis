@@ -1,7 +1,7 @@
 package goredis_server
 
 import (
-	. "../goredis"
+	. "GoRedis/libs/goredis"
 	"net"
 )
 
@@ -23,5 +23,6 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 	slaveSession := NewSlaveSession(NewSession(conn), hostPort)
 	slaveClient := NewSlaveSessionClient(server, slaveSession)
 	go slaveClient.Start()
+
 	return
 }

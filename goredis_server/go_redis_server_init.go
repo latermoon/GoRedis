@@ -1,10 +1,10 @@
 package goredis_server
 
 import (
-	"../libs/levelredis"
-	statlog "../libs/statlog"
-	stdlog "../libs/stdlog"
 	"./monitor"
+	"GoRedis/libs/levelredis"
+	"GoRedis/libs/statlog"
+	"GoRedis/libs/stdlog"
 	"fmt"
 	"github.com/latermoon/levigo"
 	"os"

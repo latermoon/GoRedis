@@ -1,12 +1,12 @@
 package goredis_server
 
 import (
-	. "../goredis"
-	"../libs/levelredis"
-	statlog "../libs/statlog"
-	stdlog "../libs/stdlog"
-	"../libs/uuid"
 	"./monitor"
+	. "GoRedis/libs/goredis"
+	"GoRedis/libs/levelredis"
+	"GoRedis/libs/statlog"
+	"GoRedis/libs/stdlog"
+	"GoRedis/libs/uuid"
 	"container/list"
 	"errors"
 	"strings"

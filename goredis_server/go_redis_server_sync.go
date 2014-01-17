@@ -1,7 +1,7 @@
 package goredis_server
 
 import (
-	. "../goredis"
+	. "GoRedis/libs/goredis"
 	// "strings"
 )
 

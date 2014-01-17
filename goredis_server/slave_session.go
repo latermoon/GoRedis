@@ -1,8 +1,8 @@
 package goredis_server
 
 import (
-	. "../goredis"
-	"./libs/rdb"
+	. "GoRedis/libs/goredis"
+	"GoRedis/libs/rdb"
 	"fmt"
 	"net"
 	"strconv"

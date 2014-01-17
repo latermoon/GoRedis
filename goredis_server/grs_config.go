@@ -1,7 +1,7 @@
 package goredis_server
 
 import (
-	"../libs/levelredis"
+	"GoRedis/libs/levelredis"
 	// "../libs/stdlog"
 	"strconv"
 	"strings"

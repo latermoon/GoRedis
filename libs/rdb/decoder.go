@@ -10,7 +10,7 @@ import (
 	"math"
 	"strconv"
 
-	"./crc64"
+	"GoRedis/libs/rdb/crc64"
 )
 
 // A Decoder must be implemented to parse a RDB file.

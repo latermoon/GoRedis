@@ -4,8 +4,8 @@ package goredis_server
 // http://redis.io/commands#sorted_set
 
 import (
-	. "../goredis"
 	"./util"
+	. "GoRedis/libs/goredis"
 	// "fmt"
 	"strconv"
 	"strings"
