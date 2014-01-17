@@ -83,12 +83,12 @@ In a Multi Bulk Reply the first byte of the reply s "*"
 */
 func (s *Session) ReadReply() (reply *Reply, err error) {
 	reader := s.rw
-	reply = &Reply{}
 	var c byte
 	if c, err = reader.ReadByte(); err != nil {
 		return
 	}
 
+	reply = &Reply{}
 	switch c {
 	case '+':
 		reply.Type = ReplyTypeStatus
@@ -106,10 +106,12 @@ func (s *Session) ReadReply() (reply *Reply, err error) {
 		if err != nil {
 			break
 		}
-		reply.Value, err = s.BlockReadBytes(int(bufsize))
+		buf := make([]byte, int(bufsize))
+		_, err = io.ReadFull(s, buf)
 		if err != nil {
 			break
 		}
+		reply.Value = buf
 		s.skipSpecificBytes([]byte{CR, LF})
 	case '*':
 		reply.Type = ReplyTypeMultiBulks
@@ -138,7 +140,8 @@ func (s *Session) ReadReply() (reply *Reply, err error) {
 				if argSize == -1 {
 					args[i] = nil
 				} else {
-					args[i], err = s.BlockReadBytes(argSize)
+					args[i] = make([]byte, argSize)
+					_, err = io.ReadFull(s, args[i])
 					if err != nil {
 						break
 					}
@@ -193,7 +196,8 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 		argSize := int(count)
 
 		// Read ( <argument data> CR LF )
-		cmd.Args[i], err = s.BlockReadBytes(argSize)
+		cmd.Args[i] = make([]byte, argSize)
+		_, err = io.ReadFull(s, cmd.Args[i])
 		if err != nil {
 			return
 		}
@@ -337,18 +341,11 @@ func (s *Session) skipSpecificBytes(bs []byte) (err error) {
 
 // 读取到Redis通用换行符为止
 func (s *Session) readBytesToCRLF() (bs []byte, err error) {
-	bs, err = s.lightReadBytes(CR)
+	bs, err = s.ReadBytes(CR)
 	if err != nil {
 		return
 	}
-
-	var c byte
-	if c, err = s.rw.ReadByte(); err != nil {
-		return
-	} else if c != LF {
-		err = errors.New(fmt.Sprintf("Illegal LF / %d", c))
-	}
-
+	err = s.skipSpecificByte(LF)
 	return
 }
 
@@ -382,15 +379,6 @@ func (s *Session) ReadLineInteger() (i int64, err error) {
 	return s.readLineInteger()
 }
 
-// Close conn
-func (s *Session) Close() error {
-	return s.conn.Close()
-}
-
-func (s *Session) String() string {
-	return fmt.Sprintf("<Session:%s>", s.conn.RemoteAddr().String())
-}
-
 func (s *Session) Read(p []byte) (n int, err error) {
 	return s.rw.Read(p)
 }
@@ -401,6 +389,11 @@ func (s *Session) Write(p []byte) (n int, err error) {
 		s.rw.Flush()
 	}
 	return
+}
+
+// Close conn
+func (s *Session) Close() error {
+	return s.conn.Close()
 }
 
 func (s *Session) ReadByte() (c byte, err error) {
@@ -416,49 +409,6 @@ func (s *Session) PeekByte() (c byte, err error) {
 	c, err = s.rw.ReadByte()
 	if err == nil {
 		err = s.rw.UnreadByte()
-	}
-	return
-}
-
-// 阻塞读取
-func (s *Session) BlockReadBytes(bufsize int) (bs []byte, err error) {
-	bs = make([]byte, bufsize)
-	var n int
-	n, err = s.rw.Read(bs)
-	if err == io.EOF {
-		return
-	}
-	// 如果网络较慢，会出现一次读不完，剩下的逐个读取
-	if n < bufsize {
-		//fmt.Printf("%d < bufsize %d\n", n, bufsize)
-		var c byte
-		for j := n; j < bufsize; j++ {
-			c, err = s.rw.ReadByte()
-			if err != nil {
-				return
-			}
-			bs[j] = c
-		}
-	}
-	return
-}
-
-// 简化的ReadBytes(delim)方法
-// reader.ReadBytes(delim)创建对象过多，使用下面方法让GoRedis多处理2k/s
-func (s *Session) lightReadBytes(delim byte) (line []byte, err error) {
-	var c byte
-	// cap=4，是因为大部分场景下，redis里的数据长度不大于9999
-	line = make([]byte, 0, 4)
-	for {
-		c, err = s.rw.ReadByte()
-		if err != nil {
-			return
-		}
-		// 遇到结束符
-		if c == delim {
-			break
-		}
-		line = append(line, c)
 	}
 	return
 }
@@ -486,4 +436,8 @@ func (s *Session) ReadRDB(w io.Writer) (err error) {
 		w.Write([]byte{c})
 	}
 	return
+}
+
+func (s *Session) String() string {
+	return fmt.Sprintf("<Session:%s>", s.RemoteAddr())
 }

@@ -54,15 +54,14 @@ func (server *RedisServer) SetHandler(handler ServerHandler) {
  * 开始监听主机端口
  * @param host "localhost:6379"
  */
-func (server *RedisServer) Listen(host string) {
-	listener, e1 := net.Listen("tcp", host)
-	if e1 != nil {
-		panic(e1)
+func (server *RedisServer) Listen(host string) error {
+	listener, err := net.Listen("tcp", host)
+	if err != nil {
+		return err
 	}
 
-	// init
 	if server.handler == nil {
-		panic("must call SetHandler(...) before Listen")
+		return errors.New("must call SetHandler(...) before Listen")
 	}
 
 	// run loop
@@ -77,6 +76,7 @@ func (server *RedisServer) Listen(host string) {
 		// go
 		go server.handleConnection(session)
 	}
+	return nil
 }
 
 // 处理一个客户端连接

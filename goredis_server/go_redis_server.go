@@ -83,9 +83,9 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	return
 }
 
-func (server *GoRedisServer) Listen(host string) {
+func (server *GoRedisServer) Listen(host string) error {
 	stdlog.Printf("listen %s\n", host)
-	server.RedisServer.Listen(host)
+	return server.RedisServer.Listen(host)
 }
 
 func (server *GoRedisServer) UID() (uid string) {

@@ -55,7 +55,10 @@ func main() {
 	// start ...
 	server := goredis_server.NewGoRedisServer(directory)
 	server.Init()
-	server.Listen(host)
+	err := server.Listen(host)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // 将Stdout, Stderr重定向到指定文件
