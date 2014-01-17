@@ -1,8 +1,8 @@
 package goredis_server
 
 import (
-	. "../goredis"
-	"../libs/stdlog"
+	. "GoRedis/libs/goredis"
+	"GoRedis/libs/stdlog"
 	"container/list"
 	"encoding/json"
 	"fmt"

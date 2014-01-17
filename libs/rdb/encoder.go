@@ -8,7 +8,7 @@ import (
 	"math"
 	"strconv"
 
-	"./crc64"
+	"GoRedis/libs/rdb/crc64"
 )
 
 const Version = 6

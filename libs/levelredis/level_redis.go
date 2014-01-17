@@ -39,7 +39,7 @@ zset
 */
 
 import (
-	lru "../lrucache"
+	lru "GoRedis/libs/lrucache"
 	"bytes"
 	// "../stdlog"
 	"github.com/latermoon/levigo"

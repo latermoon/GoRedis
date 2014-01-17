@@ -1,4 +1,5 @@
 
-goredis/.DS_Store
 
 .DS_Store
+
+main/goredis-server

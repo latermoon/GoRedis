@@ -3,7 +3,7 @@ package levelredis
 // 基于leveldb实现的zset，用于海量存储，节约内存
 
 import (
-	"../stdlog"
+	"GoRedis/libs/stdlog"
 	"bytes"
 	"github.com/latermoon/levigo"
 	"runtime/debug"
@@ -80,9 +80,11 @@ func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
 	}()
 	pos2 := bytes.LastIndex(scorekey, []byte(SEP))
 	sepr := bytes.Index(scorekey, []byte(SEP_RIGHT))
-	pos1 := bytes.Index(scorekey[sepr:], []byte(SEP))
+	pos1 := bytes.Index(scorekey[sepr:], []byte(SEP)) + sepr
 	member = copyBytes(scorekey[pos2+1:])
 	score = copyBytes(scorekey[pos1+1+1 : pos2]) // +1 skip sign "0/1"
+	// stdlog.Println("pos2", pos2, "sepr", sepr, "pos1", pos1)
+	// stdlog.Println("scorekey", string(scorekey), string(member), string(score))
 	return
 }
 

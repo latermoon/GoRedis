@@ -9,7 +9,7 @@
 package goredis
 
 import (
-	"../libs/stdlog"
+	"GoRedis/libs/stdlog"
 	"net"
 	"reflect"
 	"runtime/debug"

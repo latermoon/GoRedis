@@ -1,7 +1,8 @@
 package goredis_server
 
 import (
-	. "../goredis"
+	. "GoRedis/libs/goredis"
+	"GoRedis/libs/stdlog"
 	"net"
 )
 
@@ -13,15 +14,20 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 	port := cmd.StringAtIndex(2)
 	hostPort := host + ":" + port
 
+	stdlog.Println("SLAVEOF:", hostPort)
+
 	conn, err := net.Dial("tcp", hostPort)
 	if err != nil {
 		reply = ErrorReply(err)
+		stdlog.Println(err)
 		return
 	}
 	reply = StatusReply("OK")
 	// 异步处理
-	slaveSession := NewSlaveSession(NewSession(conn), hostPort)
-	slaveClient := NewSlaveSessionClient(server, slaveSession)
-	go slaveClient.Start()
+	slaveClient := NewSlaveClient(server, NewSession(conn))
+	slaveClient.SetCallback(newSlaveCallback(server))
+
+	go slaveClient.Sync(server.UID())
+
 	return
 }

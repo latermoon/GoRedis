@@ -5,7 +5,7 @@ package main
 
 import (
 	"../goredis_server"
-	stdlog "../libs/stdlog"
+	"GoRedis/libs/stdlog"
 	"flag"
 	"fmt"
 	"os"
