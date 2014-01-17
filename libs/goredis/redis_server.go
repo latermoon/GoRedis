@@ -83,15 +83,18 @@ func (server *RedisServer) Listen(host string) error {
 func (server *RedisServer) handleConnection(session *Session) {
 	// 异常处理
 	defer func() {
-		if err := recover(); err != nil {
-			log.Printf("Error %s %s\n%s", session.RemoteAddr(), err, string(debug.Stack()))
+		if v := recover(); v != nil {
+			log.Printf("Error %s %s\n%s", session.RemoteAddr(), v, string(debug.Stack()))
 			session.Close()
-			switch err.(type) {
+			// callback
+			var err error
+			switch v.(type) {
 			case error:
-				server.handler.SessionClosed(session, err.(error))
+				err = err.(error)
 			default:
-				server.handler.SessionClosed(session, errors.New(fmt.Sprint(err)))
+				err = errors.New(fmt.Sprint(err))
 			}
+			server.handler.SessionClosed(session, err)
 		}
 	}()
 
