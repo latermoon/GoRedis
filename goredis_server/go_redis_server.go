@@ -10,6 +10,7 @@ import (
 	"container/list"
 	"errors"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -108,6 +109,9 @@ func (server *GoRedisServer) SessionOpened(session *Session) {
 // ServerHandler.SessionClosed()
 func (server *GoRedisServer) SessionClosed(session *Session, err error) {
 	stdlog.Println("end connection", session.RemoteAddr(), err)
+	if err != io.EOF {
+		// 非io原因关闭
+	}
 }
 
 // ServerHandler.On()

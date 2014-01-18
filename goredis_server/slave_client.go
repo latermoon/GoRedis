@@ -143,7 +143,7 @@ func (s *SlaveClient) recvRdb() (err error) {
 
 	s.session.ReadByte()
 	var size int64
-	size, err = s.session.ReadLineInteger()
+	size, err = s.session.ReadInt64()
 	if err != nil {
 		return
 	}

@@ -9,10 +9,10 @@
 package goredis
 
 import (
-	"GoRedis/libs/stdlog"
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"runtime/debug"
 )
 
@@ -21,8 +21,6 @@ const (
 	LF   = '\n'
 	CRLF = "\r\n"
 )
-
-var log = stdlog.Log("goredis")
 
 // 处理接收到的连接和数据
 type ServerHandler interface {
@@ -40,7 +38,7 @@ type RedisServer struct {
 	handler ServerHandler
 }
 
-func NewRedisServer(handler ServerHandler) (server *RedisServer) {
+func NewServer(handler ServerHandler) (server *RedisServer) {
 	server = &RedisServer{}
 	server.SetHandler(handler)
 	return
@@ -61,20 +59,18 @@ func (server *RedisServer) Listen(host string) error {
 	}
 
 	if server.handler == nil {
-		return errors.New("must call SetHandler(...) before Listen")
+		return errors.New("[goredis] must call SetHandler(...) before Listen")
 	}
 
 	// run loop
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println("accepted error", err)
+			os.Stderr.WriteString(fmt.Sprint("[goredis] accepted error", err, "\n"))
 			continue
 		}
-		session := NewSession(conn)
-		server.handler.SessionOpened(session)
 		// go
-		go server.handleConnection(session)
+		go server.handleConnection(NewSession(conn))
 	}
 	return nil
 }
@@ -84,19 +80,18 @@ func (server *RedisServer) handleConnection(session *Session) {
 	// 异常处理
 	defer func() {
 		if v := recover(); v != nil {
-			log.Printf("Error %s %s\n%s", session.RemoteAddr(), v, string(debug.Stack()))
+			os.Stderr.WriteString(fmt.Sprintf("[goredis] fatal %s %s\n%s\n", session.RemoteAddr(), v, string(debug.Stack())))
 			session.Close()
 			// callback
-			var err error
-			switch v.(type) {
-			case error:
-				err = err.(error)
-			default:
-				err = errors.New(fmt.Sprint(err))
+			err, ok := v.(error)
+			if !ok {
+				err = errors.New(fmt.Sprint(v))
 			}
 			server.handler.SessionClosed(session, err)
 		}
 	}()
+
+	server.handler.SessionOpened(session)
 
 	var lastErr error
 	for {
@@ -115,5 +110,6 @@ func (server *RedisServer) handleConnection(session *Session) {
 			lastErr = session.Reply(reply)
 		}
 	}
+
 	server.handler.SessionClosed(session, lastErr)
 }

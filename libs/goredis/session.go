@@ -92,51 +92,49 @@ func (s *Session) ReadReply() (reply *Reply, err error) {
 	switch c {
 	case '+':
 		reply.Type = ReplyTypeStatus
-		reply.Value, err = s.readLineString()
+		reply.Value, err = s.readString()
 	case '-':
 		reply.Type = ReplyTypeError
-		reply.Value, err = s.readLineString()
+		reply.Value, err = s.readString()
 	case ':':
 		reply.Type = ReplyTypeInteger
-		reply.Value, err = s.readLineInteger()
+		reply.Value, err = s.readInt()
 	case '$':
 		reply.Type = ReplyTypeBulk
-		var bufsize int64
-		bufsize, err = s.readLineInteger()
+		var bufsize int
+		bufsize, err = s.readInt()
 		if err != nil {
 			break
 		}
-		buf := make([]byte, int(bufsize))
+		buf := make([]byte, bufsize)
 		_, err = io.ReadFull(s, buf)
 		if err != nil {
 			break
 		}
 		reply.Value = buf
-		s.skipSpecificBytes([]byte{CR, LF})
+		s.skipBytes([]byte{CR, LF})
 	case '*':
 		reply.Type = ReplyTypeMultiBulks
-		var count int64
-		count, err = s.readLineInteger()
+		var argCount int
+		argCount, err = s.readInt()
 		if err != nil {
 			break
 		}
-		argCount := int(count)
 		if argCount == -1 {
 			reply.Value = nil // *-1
 		} else {
 			args := make([][]byte, argCount)
 			for i := 0; i < argCount; i++ {
 				// TODO multi bulk 的类型 $和:
-				err = s.skipSpecificByte('$')
+				err = s.skipByte('$')
 				if err != nil {
 					break
 				}
-				var count int64
-				count, err = s.readLineInteger()
+				var argSize int
+				argSize, err = s.readInt()
 				if err != nil {
 					return
 				}
-				argSize := int(count)
 				if argSize == -1 {
 					args[i] = nil
 				} else {
@@ -146,7 +144,7 @@ func (s *Session) ReadReply() (reply *Reply, err error) {
 						break
 					}
 				}
-				s.skipSpecificBytes([]byte{CR, LF})
+				s.skipBytes([]byte{CR, LF})
 			}
 			reply.Value = args
 		}
@@ -170,30 +168,28 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 	cmd = &Command{}
 
 	// Read ( *<number of arguments> CR LF )
-	err = s.skipSpecificByte('*')
+	err = s.skipByte('*')
 	if err != nil { // io.EOF
 		return
 	}
 	// number of arguments
-	var count int64
-	if count, err = s.readLineInteger(); err != nil {
+	var argCount int
+	if argCount, err = s.readInt(); err != nil {
 		return
 	}
-	argCount := int(count)
 	cmd.Args = make([][]byte, argCount)
 	for i := 0; i < argCount; i++ {
 		// Read ( $<number of bytes of argument 1> CR LF )
-		err = s.skipSpecificByte('$')
+		err = s.skipByte('$')
 		if err != nil {
 			return
 		}
 
-		var count int64
-		count, err = s.readLineInteger()
+		var argSize int
+		argSize, err = s.readInt()
 		if err != nil {
 			return
 		}
-		argSize := int(count)
 
 		// Read ( <argument data> CR LF )
 		cmd.Args[i] = make([]byte, argSize)
@@ -202,7 +198,7 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 			return
 		}
 
-		err = s.skipSpecificBytes([]byte{CR, LF})
+		err = s.skipBytes([]byte{CR, LF})
 		if err != nil {
 			return
 		}
@@ -316,8 +312,12 @@ func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 	return
 }
 
+// ====================================
+// io
+// ====================================
+
 // 验证并跳过指定的字节，用于开始符和结束符的判断
-func (s *Session) skipSpecificByte(c byte) (err error) {
+func (s *Session) skipByte(c byte) (err error) {
 	var tmp byte
 	tmp, err = s.rw.ReadByte()
 	if err != nil {
@@ -329,9 +329,9 @@ func (s *Session) skipSpecificByte(c byte) (err error) {
 	return
 }
 
-func (s *Session) skipSpecificBytes(bs []byte) (err error) {
+func (s *Session) skipBytes(bs []byte) (err error) {
 	for _, c := range bs {
-		err = s.skipSpecificByte(c)
+		err = s.skipByte(c)
 		if err != nil {
 			break
 		}
@@ -356,33 +356,35 @@ func (s *Session) readLine() (line []byte, err error) {
 }
 
 // 读取字符串，遇到CRLF换行为止
-func (s *Session) readLineString() (str string, err error) {
+func (s *Session) readString() (str string, err error) {
 	var line []byte
-	line, err = s.readLine()
-	if err != nil {
+	if line, err = s.readLine(); err != nil {
 		return
 	}
 	str = string(line)
 	return
 }
 
-func (s *Session) ReadLineString() (str string, err error) {
-	return s.readLineString()
+func (s *Session) readInt() (i int, err error) {
+	var line string
+	if line, err = s.readString(); err != nil {
+		return
+	}
+	i, err = strconv.Atoi(line)
+	return
 }
 
-// 读取整形，遇到CRLF换行为止
-func (s *Session) readLineInteger() (i int64, err error) {
+func (s *Session) readInt64() (i int64, err error) {
 	var line string
-	line, err = s.readLineString()
-	if err != nil {
+	if line, err = s.readString(); err != nil {
 		return
 	}
 	i, err = strconv.ParseInt(line, 10, 64)
 	return
 }
 
-func (s *Session) ReadLineInteger() (i int64, err error) {
-	return s.readLineInteger()
+func (s *Session) ReadInt64() (i int64, err error) {
+	return s.readInt64()
 }
 
 func (s *Session) Read(p []byte) (n int, err error) {
@@ -421,20 +423,17 @@ func (s *Session) PeekByte() (c byte, err error) {
 
 func (s *Session) ReadRDB(w io.Writer) (err error) {
 	// Read ( $<number of bytes of RDB> CR LF )
-	err = s.skipSpecificByte('$')
-	if err != nil {
+	if err = s.skipByte('$'); err != nil {
 		return
 	}
 
-	var count int64
-	count, err = s.readLineInteger()
-	if err != nil {
+	var rdbSize int64
+	if rdbSize, err = s.readInt64(); err != nil {
 		return
 	}
-	rdbSize := int(count)
 
 	var c byte
-	for i := 0; i < rdbSize; i++ {
+	for i := int64(0); i < rdbSize; i++ {
 		c, err = s.rw.ReadByte()
 		if err != nil {
 			return
