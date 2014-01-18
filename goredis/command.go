@@ -87,6 +87,10 @@ func (cmd *Command) StringArgs() (strs []string) {
 	return
 }
 
+func (cmd *Command) Len() int {
+	return len(cmd.Args)
+}
+
 // Redis协议的Command数据
 /*
 *<number of arguments> CR LF

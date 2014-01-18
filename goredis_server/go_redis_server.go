@@ -2,19 +2,21 @@ package goredis_server
 
 import (
 	"./monitor"
-	. "GoRedis/libs/goredis"
+	. "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
 	"GoRedis/libs/uuid"
 	"container/list"
 	"errors"
+	"reflect"
 	"strings"
 	"sync"
+	"time"
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.15"
+const VERSION = "1.0.16"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -23,9 +25,14 @@ var (
 
 var goredisPrefix string = "__goredis:"
 
+var (
+	slowexec = 30 // ms
+	slowlog  = stdlog.Log("slow")
+)
+
 // GoRedisServer
 type GoRedisServer struct {
-	CommandHandler
+	ServerHandler
 	RedisServer
 	// 数据源
 	directory  string
@@ -39,14 +46,13 @@ type GoRedisServer struct {
 	cmdMonitor    *monitor.StatusLogger
 	leveldbStatus *statlog.StatLogger
 	// 从库
-	uid              string // 实例id
-	slavelist        *list.List
-	needSyncCmdTable map[string]bool // 需要同步的指令
-	// locks
-	stringMutex sync.Mutex
+	uid       string // 实例id
+	slavelist *list.List
 	// monitor
 	monitorlist  *list.List
 	monitorMutex sync.Mutex
+	// 缓存处理函数，减少relect次数
+	methodCache map[string]reflect.Value
 }
 
 /*
@@ -58,14 +64,11 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server = &GoRedisServer{}
 	// set as itself
 	server.SetHandler(server)
+	server.methodCache = make(map[string]reflect.Value)
 	// default datasource
 	server.directory = directory
-	server.needSyncCmdTable = make(map[string]bool)
 	server.slavelist = list.New()
 	server.monitorlist = list.New()
-	for _, cmd := range needSyncCmds {
-		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
-	}
 	// counter
 	server.counters = monitor.NewCounters()
 	server.cmdCounters = monitor.NewCounters()
@@ -73,9 +76,9 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	return
 }
 
-func (server *GoRedisServer) Listen(host string) {
+func (server *GoRedisServer) Listen(host string) error {
 	stdlog.Printf("listen %s\n", host)
-	server.RedisServer.Listen(host)
+	return server.RedisServer.Listen(host)
 }
 
 func (server *GoRedisServer) UID() (uid string) {
@@ -90,17 +93,45 @@ func (server *GoRedisServer) UID() (uid string) {
 	return server.uid
 }
 
-// for CommandHandler
-func (server *GoRedisServer) On(session *Session, cmd *Command) {
+// ServerHandler.SessionOpened()
+func (server *GoRedisServer) SessionOpened(session *Session) {
+	stdlog.Println("connection accepted from", session.RemoteAddr())
+}
+
+// ServerHandler.SessionClosed()
+func (server *GoRedisServer) SessionClosed(session *Session, err error) {
+	stdlog.Println("end connection", session.RemoteAddr(), err)
+}
+
+// ServerHandler.On()
+// 由GoRedis协议层触发，通过反射调用OnGET/OnSET等方法
+func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
+	if err := verifyCommand(cmd); err != nil {
+		return ErrorReply(err)
+	}
+	// slowlog
+	begin := time.Now()
+	// invoke
+	reply = server.invokeCommandHandler(session, cmd)
+	elapsed := time.Now().Sub(begin)
+	if elapsed.Nanoseconds() > int64(time.Millisecond*time.Duration(slowexec)) {
+		slowlog.Printf("[%s] exec %0.2f ms [%s]\n", session.RemoteAddr(), elapsed.Seconds()*1000, cmd)
+	}
+
+	// monitor
+	if server.monitorlist.Len() > 0 {
+		go server.monitorOutput(session, cmd)
+	}
+
 	go func() {
 		cmdName := strings.ToUpper(cmd.Name())
 		server.cmdCounters.Get(cmdName).Incr(1)
-		cate := GetCommandCategory(cmdName)
+		cate := commandCategory(cmdName)
 		server.cmdCateCounters.Get(string(cate)).Incr(1)
 		server.cmdCateCounters.Get("total").Incr(1)
 
 		// 同步到从库
-		if _, ok := server.needSyncCmdTable[cmdName]; ok {
+		if needSync(cmdName) {
 			for e := server.slavelist.Front(); e != nil; e = e.Next() {
 				// TODO
 				// e.Value.(*SlaveSession).AsyncSendCommand(cmd)
@@ -108,12 +139,40 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) {
 		}
 	}()
 
-	// monitor
-	if server.monitorlist.Len() > 0 {
-		go server.monitorOutput(session, cmd)
+	return
+}
+
+// 首先搜索"On+大写NAME"格式的函数，存在则调用，不存在则调用On
+// OnGET(cmd *Command) (reply *Reply)
+// OnGET(session *Session, cmd *Command) (reply *Reply)
+func (server *GoRedisServer) invokeCommandHandler(session *Session, cmd *Command) (reply *Reply) {
+	cmdName := strings.ToUpper(cmd.Name())
+	// 从Cache取出处理函数
+	method, exists := server.methodCache[cmdName]
+	if !exists {
+		method = reflect.ValueOf(server).MethodByName("On" + cmdName)
+		server.methodCache[cmdName] = method
 	}
+
+	if method.IsValid() {
+		// 可以调用两种接口
+		// method = OnXXX(cmd *Command) (reply *Reply)
+		// method = OnXXX(session *Session, cmd *Command) (reply *Reply)
+		var in []reflect.Value
+		if method.Type().NumIn() == 1 {
+			in = []reflect.Value{reflect.ValueOf(cmd)}
+		} else {
+			in = []reflect.Value{reflect.ValueOf(session), reflect.ValueOf(cmd)}
+		}
+		callResult := method.Call(in)
+		reply = callResult[0].Interface().(*Reply)
+	} else {
+		reply = server.OnUndefined(session, cmd)
+	}
+
+	return
 }
 
 func (server *GoRedisServer) OnUndefined(session *Session, cmd *Command) (reply *Reply) {
-	return ErrorReply("NotSupported: " + strings.ToUpper(cmd.Name()))
+	return ErrorReply("NotSupported: " + cmd.String())
 }

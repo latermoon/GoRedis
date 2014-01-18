@@ -1,7 +1,7 @@
 package redis_tool
 
 import (
-	. "GoRedis/libs/goredis"
+	. "GoRedis/goredis"
 	"bufio"
 	"bytes"
 	"net"

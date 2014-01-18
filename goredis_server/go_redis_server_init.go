@@ -28,6 +28,7 @@ func (server *GoRedisServer) Init() (err error) {
 	server.initCommandCounterLog("zset", []string{"ZADD", "ZCARD", "ZSCORE", "ZINCRBY", "ZRANGE", "ZRANGEBYSCORE", "ZRANK", "ZREM", "ZREMRANGEBYRANK", "ZREMRANGEBYSCORE", "ZREVRANGE", "ZREVRANGEBYSCORE", "ZREVRANK"})
 	server.initLeveldbIOLog(server.directory + "/leveldb.io.log")
 	server.initLeveldbStatsLog(server.directory + "/leveldb.stats.log")
+	server.initSlowlog(server.directory + "/slow.log")
 	stdlog.Printf("init uid %s\n", server.UID())
 	server.initConfig()
 	// slave
@@ -72,6 +73,14 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 		server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCateCounters.Get(cateName), cateName, padding, "ChangedCount"))
 	}
 	go server.cmdMonitor.Start()
+}
+
+func (server *GoRedisServer) initSlowlog(path string) {
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	slowlog.SetOutput(file)
 }
 
 func (server *GoRedisServer) initLeveldbIOLog(path string) {

@@ -1,7 +1,7 @@
 package goredis_server
 
 import (
-	. "GoRedis/libs/goredis"
+	. "GoRedis/goredis"
 	"GoRedis/libs/iotool"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/rdb"
@@ -148,7 +148,7 @@ func (s *SlaveClient) recvRdb() (err error) {
 
 	s.session.ReadByte()
 	var size int64
-	size, err = s.session.ReadLineInteger()
+	size, err = s.session.ReadInt64()
 	if err != nil {
 		return
 	}
@@ -276,7 +276,7 @@ func (s *slaveCallback) RdbRecvFinishCallback(client *SlaveClient, r *bufio.Read
 
 func (s *SlaveClient) rdbDecodeCommand(client *SlaveClient, cmd *Command) {
 	slavelog.Printf("[M %s] rdb decode %s\n", client.RemoteAddr(), cmd)
-	s.server.InvokeCommandHandler(client.session, cmd)
+	s.server.On(client.session, cmd)
 }
 
 func (s *SlaveClient) rdbDecodeFinish(client *SlaveClient, n int64) {

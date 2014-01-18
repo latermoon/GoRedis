@@ -1,17 +1,13 @@
 package goredis_server
 
 import (
-	. "GoRedis/libs/goredis"
+	. "GoRedis/goredis"
 	"os"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 )
-
-func (server *GoRedisServer) formatFloat(f float64) string {
-	return strconv.FormatFloat(f, 'g', 12, 64)
-}
 
 func (server *GoRedisServer) OnGC(cmd *Command) (reply *Reply) {
 	runtime.GC()

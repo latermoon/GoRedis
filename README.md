@@ -29,5 +29,8 @@ GoRedis
 
 	./goredis-server -procs 8 -p 1602
 
+#### 本地二次开发
+
+	将代码clone到本地$GOPATH/src下，然后运行 sh install.sh 编译依赖包
 
 
