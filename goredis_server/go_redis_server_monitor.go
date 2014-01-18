@@ -42,19 +42,17 @@ func (server *GoRedisServer) monitorOutput(session *Session, cmd *Command) {
 
 // +1386347668.732167 [0 10.80.101.169:8400] "ZADD" "user:update:timestamp" "1.386347668E9" "40530990"
 func (server *GoRedisServer) formatMonitorCommand(session *Session, cmd *Command) (s string) {
-	t := time.Now()
 	// 对于cmd，用json编码，然后去掉前后的"[]"以及中间的逗号","
 	// ["SET", "name", "latermoon"] => "SET" "name" "lateroon"
 	b, err := json.Marshal(cmd.StringArgs())
 	cmdstr := string(b)
 	if err != nil {
 		cmdstr = cmd.String()
-	} else {
-		cmdstr = strings.TrimPrefix(cmdstr, "[")
+	} else if len(cmdstr) >= 2 {
+		cmdstr = cmdstr[1 : len(cmdstr)-1] // trim "[" & "]"
 		cmdstr = strings.Replace(cmdstr, "\",\"", "\" \"", -1)
-		cmdstr = strings.TrimSuffix(cmdstr, "]")
 	}
-	s = fmt.Sprintf("+%f [0 %s] %s", float64(t.UnixNano())/1e9, session.RemoteAddr(), cmdstr)
+	s = fmt.Sprintf("+%f [0 %s] %s", float64(time.Now().UnixNano())/1e9, session.RemoteAddr(), cmdstr)
 	return
 }
 

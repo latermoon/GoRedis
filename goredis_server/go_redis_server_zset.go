@@ -16,6 +16,7 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 	if count%2 != 0 {
 		return ErrorReply("Bad argument count")
 	}
+	args := make([][]byte, count)
 	// format score
 	for i := 0; i < count; i += 2 {
 		scorefloat, err := strconv.ParseFloat(string(scoreMembers[i]), 64)
@@ -24,11 +25,11 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 		}
 		// replace score
 		scoreInt := int64(scorefloat)
-		scoreMembers[i] = util.Int64ToBytes(scoreInt)
+		args[i] = util.Int64ToBytes(scoreInt)
 	}
 	// add
 	zset := server.levelRedis.GetSortedSet(key)
-	n := zset.Add(scoreMembers...)
+	n := zset.Add(args...)
 	reply = IntegerReply(n)
 	return
 }
