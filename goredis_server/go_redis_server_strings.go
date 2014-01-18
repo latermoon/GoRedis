@@ -10,18 +10,12 @@ import (
 var maxCmdLock = 100
 
 func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
-	if cmd.Len() < 2 {
-		return ErrorReply(ErrBadArgumentCount)
-	}
 	key := cmd.Args[1]
 	value := server.levelRedis.Strings().Get(key)
 	return BulkReply(value)
 }
 
 func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
-	if cmd.Len() < 3 {
-		return ErrorReply(ErrBadArgumentCount)
-	}
 	key, _ := cmd.ArgAtIndex(1)
 	val, _ := cmd.ArgAtIndex(2)
 	server.levelRedis.Strings().Set(key, val)
@@ -29,9 +23,6 @@ func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
-	if cmd.Len() < 2 {
-		return ErrorReply(ErrBadArgumentCount)
-	}
 	keys := cmd.Args[1:]
 	vals := make([]interface{}, len(keys))
 	for i, key := range keys {
@@ -42,10 +33,10 @@ func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
-	if cmd.Len() < 3 || cmd.Len()%2 != 0 {
-		return ErrorReply(ErrBadArgumentCount)
-	}
 	keyvals := cmd.Args[1:]
+	if len(keyvals)%2 != 0 {
+		return ErrorReply(WrongArgumentCount)
+	}
 	for i, count := 0, cmd.Len(); i < count; i += 2 {
 		key := keyvals[i]
 		val := keyvals[i+1]

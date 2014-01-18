@@ -19,9 +19,8 @@ import (
 const VERSION = "1.0.16"
 
 var (
-	WrongKindError      = errors.New("Wrong kind opration")
-	WrongKindReply      = ErrorReply(WrongKindError)
-	ErrBadArgumentCount = errors.New("bad argument count")
+	WrongKindError = errors.New("Wrong kind opration")
+	WrongKindReply = ErrorReply(WrongKindError)
 )
 
 var goredisPrefix string = "__goredis:"
@@ -112,6 +111,9 @@ func (server *GoRedisServer) SessionClosed(session *Session, err error) {
 // ServerHandler.On()
 // 由GoRedis协议层触发，通过反射调用OnGET/OnSET等方法
 func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
+	if err := verifyCommand(cmd); err != nil {
+		return ErrorReply(err)
+	}
 	// slowlog
 	begin := time.Now()
 	// invoke
