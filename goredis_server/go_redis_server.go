@@ -46,9 +46,8 @@ type GoRedisServer struct {
 	cmdMonitor    *monitor.StatusLogger
 	leveldbStatus *statlog.StatLogger
 	// 从库
-	uid              string // 实例id
-	slavelist        *list.List
-	needSyncCmdTable map[string]bool // 需要同步的指令
+	uid       string // 实例id
+	slavelist *list.List
 	// monitor
 	monitorlist  *list.List
 	monitorMutex sync.Mutex
@@ -68,12 +67,8 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.methodCache = make(map[string]reflect.Value)
 	// default datasource
 	server.directory = directory
-	server.needSyncCmdTable = make(map[string]bool)
 	server.slavelist = list.New()
 	server.monitorlist = list.New()
-	for _, cmd := range needSyncCmds {
-		server.needSyncCmdTable[strings.ToUpper(cmd)] = true
-	}
 	// counter
 	server.counters = monitor.NewCounters()
 	server.cmdCounters = monitor.NewCounters()
@@ -131,12 +126,12 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 	go func() {
 		cmdName := strings.ToUpper(cmd.Name())
 		server.cmdCounters.Get(cmdName).Incr(1)
-		cate := GetCommandCategory(cmdName)
+		cate := commandCategory(cmdName)
 		server.cmdCateCounters.Get(string(cate)).Incr(1)
 		server.cmdCateCounters.Get("total").Incr(1)
 
 		// 同步到从库
-		if _, ok := server.needSyncCmdTable[cmdName]; ok {
+		if needSync(cmdName) {
 			for e := server.slavelist.Front(); e != nil; e = e.Next() {
 				// TODO
 				// e.Value.(*SlaveSession).AsyncSendCommand(cmd)
