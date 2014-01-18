@@ -1,8 +1,8 @@
 package main
 
 import (
-	. "../../goredis"
-	"../../libs/redis_tool"
+	. "GoRedis/goredis"
+	"GoRedis/libs/redis_tool"
 	"flag"
 	"fmt"
 	"github.com/latermoon/GoRedis/libs/stdlog"
