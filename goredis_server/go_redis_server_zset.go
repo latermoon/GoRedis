@@ -1,12 +1,8 @@
 package goredis_server
 
-// 本类编写仓促，重复代码较多，准备重构
-// http://redis.io/commands#sorted_set
-
 import (
 	"./util"
 	. "GoRedis/goredis"
-	// "GoRedis/libs/stdlog"
 	"strconv"
 	"strings"
 )

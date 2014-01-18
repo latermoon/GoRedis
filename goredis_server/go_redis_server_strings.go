@@ -16,8 +16,7 @@ func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	val, _ := cmd.ArgAtIndex(2)
+	key, val := cmd.Args[1], cmd.Args[2]
 	server.levelRedis.Strings().Set(key, val)
 	return StatusReply("OK")
 }
@@ -50,7 +49,7 @@ func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
  * TODO 性能需要改进
  * @param chg 增减量，正负数均可
  */
-func (server *GoRedisServer) incrStringEntry(key []byte, chg int) (newvalue int, err error) {
+func (server *GoRedisServer) incrStringKey(key []byte, chg int) (newvalue int, err error) {
 	// 对操作的key进行hash后，有序并发处理
 	hash := inthash(key, maxCmdLock)
 	mu := mutexof("cmd_lock_" + strconv.Itoa(hash))
@@ -75,7 +74,7 @@ func (server *GoRedisServer) incrStringEntry(key []byte, chg int) (newvalue int,
 
 func (server *GoRedisServer) OnINCR(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
-	newvalue, err := server.incrStringEntry(key, 1)
+	newvalue, err := server.incrStringKey(key, 1)
 	if err != nil {
 		reply = ErrorReply(err)
 	} else {
@@ -85,13 +84,13 @@ func (server *GoRedisServer) OnINCR(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnINCRBY(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
+	key := cmd.Args[1]
 	chg, e1 := strconv.Atoi(cmd.StringAtIndex(2))
 	if e1 != nil {
 		reply = ErrorReply(e1)
 		return
 	}
-	newvalue, err := server.incrStringEntry(key, chg)
+	newvalue, err := server.incrStringKey(key, chg)
 	if err != nil {
 		reply = ErrorReply(err)
 	} else {
@@ -101,8 +100,8 @@ func (server *GoRedisServer) OnINCRBY(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnDECR(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	newvalue, err := server.incrStringEntry(key, -1)
+	key := cmd.Args[1]
+	newvalue, err := server.incrStringKey(key, -1)
 	if err != nil {
 		reply = ErrorReply(err)
 	} else {
@@ -112,13 +111,13 @@ func (server *GoRedisServer) OnDECR(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnDECRBY(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
+	key := cmd.Args[1]
 	chg, e1 := strconv.Atoi(cmd.StringAtIndex(2))
 	if e1 != nil {
 		reply = ErrorReply(e1)
 		return
 	}
-	newvalue, err := server.incrStringEntry(key, chg*-1)
+	newvalue, err := server.incrStringKey(key, chg*-1)
 	if err != nil {
 		reply = ErrorReply(err)
 	} else {
