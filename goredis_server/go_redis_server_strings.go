@@ -3,57 +3,55 @@ package goredis_server
 // TODO 严谨的情况下应该校验参数数量，这里大部分都不校验是为了简化代码，panic后会断开client connection
 
 import (
-	. "GoRedis/libs/goredis"
+	. "GoRedis/goredis"
 	"strconv"
 )
 
+var maxCmdLock = 100
+
 func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
-	key, _ := cmd.ArgAtIndex(1)
-	value := server.levelRedis.Strings().Get(key)
-	if value == nil {
-		reply = BulkReply(nil)
-	} else {
-		reply = BulkReply(value)
+	if cmd.Len() < 2 {
+		return ErrorReply(ErrBadArgumentCount)
 	}
-	return
+	key := cmd.Args[1]
+	value := server.levelRedis.Strings().Get(key)
+	return BulkReply(value)
 }
 
 func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
+	if cmd.Len() < 3 {
+		return ErrorReply(ErrBadArgumentCount)
+	}
 	key, _ := cmd.ArgAtIndex(1)
 	val, _ := cmd.ArgAtIndex(2)
-	err := server.levelRedis.Strings().Set(key, val)
-	reply = ReplySwitch(err, StatusReply("OK"))
-	return
+	server.levelRedis.Strings().Set(key, val)
+	return StatusReply("OK")
 }
 
 func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
+	if cmd.Len() < 2 {
+		return ErrorReply(ErrBadArgumentCount)
+	}
 	keys := cmd.Args[1:]
 	vals := make([]interface{}, len(keys))
 	for i, key := range keys {
-		value := server.levelRedis.Strings().Get(key)
-		if value == nil {
-			vals[i] = nil
-		} else {
-			vals[i] = value
-		}
+		vals[i] = server.levelRedis.Strings().Get(key)
 	}
 	reply = MultiBulksReply(vals)
 	return
 }
 
 func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
-	keyvals := cmd.Args[1:]
-	count := len(keyvals)
-	if count%2 != 0 {
-		return ErrorReply("Bad Argument Count")
+	if cmd.Len() < 3 || cmd.Len()%2 != 0 {
+		return ErrorReply(ErrBadArgumentCount)
 	}
-	for i := 0; i < count; i += 2 {
+	keyvals := cmd.Args[1:]
+	for i, count := 0, cmd.Len(); i < count; i += 2 {
 		key := keyvals[i]
 		val := keyvals[i+1]
 		server.levelRedis.Strings().Set(key, val)
 	}
-	reply = StatusReply("OK")
-	return
+	return StatusReply("OK")
 }
 
 /**
@@ -62,6 +60,12 @@ func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
  * @param chg 增减量，正负数均可
  */
 func (server *GoRedisServer) incrStringEntry(key []byte, chg int) (newvalue int, err error) {
+	// 对操作的key进行hash后，有序并发处理
+	hash := inthash(key, maxCmdLock)
+	mu := mutexof("cmd_lock_" + strconv.Itoa(hash))
+	mu.Lock()
+	defer mu.Unlock()
+
 	value := server.levelRedis.Strings().Get(key)
 	var oldvalue int
 	if value == nil {
@@ -79,19 +83,17 @@ func (server *GoRedisServer) incrStringEntry(key []byte, chg int) (newvalue int,
 }
 
 func (server *GoRedisServer) OnINCR(cmd *Command) (reply *Reply) {
-	server.stringMutex.Lock()
-	defer server.stringMutex.Unlock()
-
 	key, _ := cmd.ArgAtIndex(1)
 	newvalue, err := server.incrStringEntry(key, 1)
-	reply = ReplySwitch(err, IntegerReply(newvalue))
+	if err != nil {
+		reply = ErrorReply(err)
+	} else {
+		reply = IntegerReply(newvalue)
+	}
 	return
 }
 
 func (server *GoRedisServer) OnINCRBY(cmd *Command) (reply *Reply) {
-	server.stringMutex.Lock()
-	defer server.stringMutex.Unlock()
-
 	key, _ := cmd.ArgAtIndex(1)
 	chg, e1 := strconv.Atoi(cmd.StringAtIndex(2))
 	if e1 != nil {
@@ -99,24 +101,26 @@ func (server *GoRedisServer) OnINCRBY(cmd *Command) (reply *Reply) {
 		return
 	}
 	newvalue, err := server.incrStringEntry(key, chg)
-	reply = ReplySwitch(err, IntegerReply(newvalue))
+	if err != nil {
+		reply = ErrorReply(err)
+	} else {
+		reply = IntegerReply(newvalue)
+	}
 	return
 }
 
 func (server *GoRedisServer) OnDECR(cmd *Command) (reply *Reply) {
-	server.stringMutex.Lock()
-	defer server.stringMutex.Unlock()
-
 	key, _ := cmd.ArgAtIndex(1)
 	newvalue, err := server.incrStringEntry(key, -1)
-	reply = ReplySwitch(err, IntegerReply(newvalue))
+	if err != nil {
+		reply = ErrorReply(err)
+	} else {
+		reply = IntegerReply(newvalue)
+	}
 	return
 }
 
 func (server *GoRedisServer) OnDECRBY(cmd *Command) (reply *Reply) {
-	server.stringMutex.Lock()
-	defer server.stringMutex.Unlock()
-
 	key, _ := cmd.ArgAtIndex(1)
 	chg, e1 := strconv.Atoi(cmd.StringAtIndex(2))
 	if e1 != nil {
@@ -124,6 +128,10 @@ func (server *GoRedisServer) OnDECRBY(cmd *Command) (reply *Reply) {
 		return
 	}
 	newvalue, err := server.incrStringEntry(key, chg*-1)
-	reply = ReplySwitch(err, IntegerReply(newvalue))
+	if err != nil {
+		reply = ErrorReply(err)
+	} else {
+		reply = IntegerReply(newvalue)
+	}
 	return
 }

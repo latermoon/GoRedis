@@ -1,7 +1,7 @@
 package goredis_server
 
 import (
-	. "GoRedis/libs/goredis"
+	. "GoRedis/goredis"
 	"os"
 	"runtime"
 	"runtime/pprof"

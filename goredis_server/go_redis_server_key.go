@@ -6,7 +6,7 @@ keynext [min] [count]
 */
 
 import (
-	. "GoRedis/libs/goredis"
+	. "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
 )
 

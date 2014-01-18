@@ -2,6 +2,7 @@
 
 echo "Install GoRedis libs ..."
 
+go install "GoRedis/goredis"
 go install "GoRedis/libs/iotool"
 go install "GoRedis/libs/levelredis"
 go install "GoRedis/libs/lrucache"
@@ -14,6 +15,5 @@ go install "GoRedis/libs/queueprocess"
 go install "GoRedis/libs/rdb"
 go install "GoRedis/libs/rdb/crc64"
 go install "GoRedis/libs/geo"
-go install "GoRedis/libs/goredis"
 
 echo "finish"

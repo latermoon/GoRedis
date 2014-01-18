@@ -34,20 +34,15 @@ func (r *Reply) String() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("<")
 	buf.WriteString(replyTypeDesc[r.Type])
-	buf.WriteString(":>")
-	return buf.String()
-}
-
-/**
- * 返回错误Reply或正确Reply（精简判断语句）
- * @param err 如果err != nil，返回ErrorReply，否则返回提供的正确Reply
- */
-func ReplySwitch(err error, successReply *Reply) *Reply {
-	if err != nil {
-		return ErrorReply(err)
-	} else {
-		return successReply
+	buf.WriteString(":")
+	switch r.Value.(type) {
+	case []byte:
+		buf.WriteString(string(r.Value.([]byte)))
+	default:
+		buf.WriteString(fmt.Sprint(r.Value))
 	}
+	buf.WriteString(">")
+	return buf.String()
 }
 
 /**

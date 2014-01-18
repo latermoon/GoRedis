@@ -5,7 +5,7 @@ package goredis_server
 
 import (
 	"./util"
-	. "GoRedis/libs/goredis"
+	. "GoRedis/goredis"
 	// "GoRedis/libs/stdlog"
 	"strconv"
 	"strings"

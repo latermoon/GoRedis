@@ -6,7 +6,7 @@ slaveClient.Stop()
 */
 import (
 	"./monitor"
-	. "GoRedis/libs/goredis"
+	. "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
 	qp "GoRedis/libs/queueprocess"
 	"GoRedis/libs/stdlog"

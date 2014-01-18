@@ -17,8 +17,7 @@ import (
 // Session维护一个net.Conn连接，代表一个客户端会话
 // 提供各种标准的Reply方法, Status/Error/Integer/Bulk/MultiBulks
 // cmd, err := session.ReadCommand()
-// session.WriteReply(IntegerReply(10))
-// session.WriteReply(StatusReply("OK"))
+// session.Reply(StatusReply("OK"))
 // 协议参考：http://redis.io/topics/protocol
 // ==============================
 type Session struct {
@@ -240,7 +239,13 @@ func (s *Session) replyInteger(i int) (err error) {
 // Bulk Reply
 func (s *Session) replyBulk(bulk interface{}) (err error) {
 	// NULL Bulk Reply
-	if bulk == nil {
+	isnil := bulk == nil
+	if !isnil {
+		// []byte 需要类型转换后才能判断
+		b, ok := bulk.([]byte)
+		isnil = ok && b == nil
+	}
+	if isnil {
 		_, err = s.conn.Write([]byte("$-1\r\n"))
 		return
 	}
@@ -291,12 +296,17 @@ func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 			buf.Write(b)
 			buf.WriteString(CRLF)
 		case []byte:
-			buf.WriteString("$")
 			b := bulk.([]byte)
-			buf.WriteString(strconv.Itoa(len(b)))
-			buf.WriteString(CRLF)
-			buf.Write(b)
-			buf.WriteString(CRLF)
+			if b == nil {
+				buf.WriteString("$-1")
+				buf.WriteString(CRLF)
+			} else {
+				buf.WriteString("$")
+				buf.WriteString(strconv.Itoa(len(b)))
+				buf.WriteString(CRLF)
+				buf.Write(b)
+				buf.WriteString(CRLF)
+			}
 		case int:
 			buf.WriteString(":")
 			buf.WriteString(strconv.Itoa(bulk.(int)))

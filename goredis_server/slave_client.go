@@ -1,7 +1,7 @@
 package goredis_server
 
 import (
-	. "GoRedis/libs/goredis"
+	. "GoRedis/goredis"
 	"GoRedis/libs/iotool"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/rdb"

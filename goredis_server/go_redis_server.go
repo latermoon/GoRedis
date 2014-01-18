@@ -2,7 +2,7 @@ package goredis_server
 
 import (
 	"./monitor"
-	. "GoRedis/libs/goredis"
+	. "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
@@ -10,7 +10,6 @@ import (
 	"container/list"
 	"errors"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -20,8 +19,9 @@ import (
 const VERSION = "1.0.16"
 
 var (
-	WrongKindError = errors.New("Wrong kind opration")
-	WrongKindReply = ErrorReply(WrongKindError)
+	WrongKindError      = errors.New("Wrong kind opration")
+	WrongKindReply      = ErrorReply(WrongKindError)
+	ErrBadArgumentCount = errors.New("bad argument count")
 )
 
 var goredisPrefix string = "__goredis:"
@@ -50,8 +50,6 @@ type GoRedisServer struct {
 	uid              string // 实例id
 	slavelist        *list.List
 	needSyncCmdTable map[string]bool // 需要同步的指令
-	// locks
-	stringMutex sync.Mutex
 	// monitor
 	monitorlist  *list.List
 	monitorMutex sync.Mutex
@@ -109,9 +107,6 @@ func (server *GoRedisServer) SessionOpened(session *Session) {
 // ServerHandler.SessionClosed()
 func (server *GoRedisServer) SessionClosed(session *Session, err error) {
 	stdlog.Println("end connection", session.RemoteAddr(), err)
-	if err != io.EOF {
-		// 非io原因关闭
-	}
 }
 
 // ServerHandler.On()
