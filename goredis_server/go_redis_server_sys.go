@@ -9,10 +9,6 @@ import (
 	"strings"
 )
 
-func (server *GoRedisServer) formatFloat(f float64) string {
-	return strconv.FormatFloat(f, 'g', 12, 64)
-}
-
 func (server *GoRedisServer) OnGC(cmd *Command) (reply *Reply) {
 	runtime.GC()
 	reply = StatusReply("OK")
