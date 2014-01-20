@@ -1,6 +1,6 @@
 # install GoRedis into $GOPATH
 
-echo "Install GoRedis libs ..."
+echo "install goredis libs ..."
 
 go install "GoRedis/goredis"
 go install "GoRedis/libs/iotool"
@@ -16,4 +16,5 @@ go install "GoRedis/libs/rdb"
 go install "GoRedis/libs/rdb/crc64"
 go install "GoRedis/libs/geo"
 
-echo "finish"
+echo "ok"
+
