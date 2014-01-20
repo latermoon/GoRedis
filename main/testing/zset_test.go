@@ -1,7 +1,7 @@
 package main
 
 import (
-	"./tool"
+	. "./tool"
 	"fmt"
 	"reflect"
 	"testing"
@@ -9,17 +9,19 @@ import (
 
 var host = ":1602"
 
-func TestZAdd(t *testing.T) {
-	conn := tool.GetRedisPool(host).Get()
+func TestSortedSet(t *testing.T) {
+	conn := RedisPool(host).Get()
 	defer conn.Close()
 
-	fmt.Println("zadd", "zz", "1", "a", "2", "b", "101", "c")
-	reply, err := conn.Do("zadd", "zz", "1", "a", "2", "b", "101", "c")
-	if err != nil {
-		t.Error(err)
-	}
-	if reflect.TypeOf(reply).Kind() != reflect.Int64 {
-		t.Errorf("bad reply type %s", reflect.TypeOf(reply))
-	}
+	key := "zz1"
+	reply, err := conn.Do("del", key)
+	CheckErr(t, err)
+	reply, err = conn.Do("zadd", key, "1", "a", "2", "b", "3", "c")
+	CheckErr(t, err)
+	CheckType(t, reply, reflect.Int64)
 	fmt.Println("->", reply.(int64))
+
+	reply, err = conn.Do("zscore", key, "b")
+	CheckErr(t, err)
+	fmt.Println(reply, reflect.TypeOf(reply))
 }
