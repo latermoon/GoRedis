@@ -9,15 +9,10 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-<<<<<<< HEAD
-	"io"
-	"io/ioutil"
-=======
 	"github.com/latermoon/levigo"
 	"github.com/latermoon/msgpackgo/codec"
 	"io"
 	"net"
->>>>>>> GoRedisDev
 	"os"
 	"strconv"
 	"strings"
@@ -156,17 +151,10 @@ func (s *SlaveClient) recvRdb() (err error) {
 
 	// read
 	w := bufio.NewWriter(f)
-<<<<<<< HEAD
-	var written int64
-	written, err = iotool.RateLimitCopy(w, io.LimitReader(s.session, size), 40*1024*1024, func(written int64, rate int) {
-		stdlog.Println("copy:", written, "rate:", rate)
-=======
 	// var written int64
 	_, err = iotool.RateLimitCopy(w, io.LimitReader(s.session, size), 40*1024*1024, func(written int64, rate int) {
 		s.callback.RdbRecvProcessCallback(s, written, rate)
->>>>>>> GoRedisDev
 	})
-	stdlog.Println("finish:", written)
 	// _, err = io.CopyN(w, s.session, size)
 	if err != nil {
 		return
