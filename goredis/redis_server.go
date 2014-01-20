@@ -108,6 +108,10 @@ func (server *RedisServer) handleConnection(session *Session) {
 		reply := server.handler.On(session, cmd)
 		if reply != nil {
 			lastErr = session.Reply(reply)
+			if lastErr != nil {
+				session.Close()
+				break
+			}
 		}
 	}
 

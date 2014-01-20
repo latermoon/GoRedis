@@ -83,8 +83,6 @@ func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
 	pos1 := bytes.Index(scorekey[sepr:], []byte(SEP)) + sepr
 	member = copyBytes(scorekey[pos2+1:])
 	score = copyBytes(scorekey[pos1+1+1 : pos2]) // +1 skip sign "0/1"
-	// stdlog.Println("pos2", pos2, "sepr", sepr, "pos1", pos1)
-	// stdlog.Println("scorekey", string(scorekey), string(member), string(score))
 	return
 }
 
