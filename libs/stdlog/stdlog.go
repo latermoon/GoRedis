@@ -1,11 +1,13 @@
+// Copyright 2013 Latermoon. All rights reserved.
+
+// 一个简洁通用的log工具，模仿golang原生的log
+//
+// 最主要的变化是使用函数作为Prefix，可以灵活输出想要的时间格式，以及Target、runtime.Caller等，而golang原生log无法定制
+//
+// 同时只保留最主要的Print/Printf/Println函数
 package stdlog
 
 /*
-一个简洁通用的日志，模仿golang原生的log
-【最主要的变化】
-最主要的变化是使用函数作为Prefix，可以灵活输出想要的时间格式，以及Target、runtime.Caller等，而golang原生log无法定制
-同时只保留最主要的Print/Printf/Println函数，清晰易读
-
 Install:
 go get github.com/latermoon/GoRedis/libs/stdlog
 
@@ -62,10 +64,8 @@ func init() {
 	defaultLogger = Log("")
 }
 
-/**
- * 获取一个指定的Logger
- * @param name 日志名称
- */
+// 获取一个指定的Logger
+// name
 func Log(name string) (l Logger) {
 	mu.Lock()
 	defer mu.Unlock()

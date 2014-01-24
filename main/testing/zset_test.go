@@ -1,7 +1,7 @@
 package main
 
 import (
-	"./tool"
+	. "./tool"
 	"fmt"
 	"reflect"
 	"testing"
@@ -9,17 +9,45 @@ import (
 
 var host = ":1602"
 
-func TestZAdd(t *testing.T) {
-	conn := tool.GetRedisPool(host).Get()
+var pool = RedisPool(host)
+
+var lastT *testing.T
+
+func TestSortedSet(t *testing.T) {
+	lastT = t
+
+	key := "zz1"
+	checkCommand("del", key)
+	checkCommand("zadd", key, "1", "a", "2", "b", "3", "c")
+	checkCommand("zscore", key, "b")
+	checkCommand("zcard", key)
+	checkCommand("zrank", key, "c")
+	checkCommand("zrevrank", key, "c")
+	checkCommand("zrangebyscore", key, "0", "2")
+
+}
+
+// 发出指令，并打印返回值
+func checkCommand(cmdName string, args ...interface{}) {
+	conn := pool.Get()
 	defer conn.Close()
 
-	fmt.Println("zadd", "zz", "1", "a", "2", "b", "101", "c")
-	reply, err := conn.Do("zadd", "zz", "1", "a", "2", "b", "101", "c")
+	reply, err := conn.Do(cmdName, args...)
 	if err != nil {
-		t.Error(err)
+		lastT.Error(err)
 	}
-	if reflect.TypeOf(reply).Kind() != reflect.Int64 {
-		t.Errorf("bad reply type %s", reflect.TypeOf(reply))
+	fmt.Print("<--: ", cmdName)
+	for _, arg := range args {
+		fmt.Print(" ")
+		fmt.Print(arg)
 	}
-	fmt.Println("->", reply.(int64))
+	fmt.Println()
+	fmt.Print("-->: ")
+	switch reply.(type) {
+	case []byte:
+		fmt.Print("\"", string(reply.([]byte)), "\"")
+	default:
+		fmt.Print(reply)
+	}
+	fmt.Printf(" (%s)\n\n", reflect.TypeOf(reply))
 }

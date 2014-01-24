@@ -1,9 +1,5 @@
-// Copyright (c) 2013, Latermoon <lptmoon@gmail.com>
-// All rights reserved.
-//
-// 客户端指令
-// @author latermoon
-// @since 2013-08-27
+// Copyright 2013 Latermoon. All rights reserved.
+
 package goredis
 
 import (
@@ -13,13 +9,7 @@ import (
 	"strconv"
 )
 
-// ==============================
-// 代表一条客户端指令
-// SET name Latermoon
-// cmd.StringAtIndex(0) == cmd.Name() == "SET"
-// cmd.StringAtIndex(1) == "name"
-// cmd.StringAtIndex(2) == "Latermoon"
-// ==============================
+// Command
 type Command struct {
 	Args [][]byte
 }
@@ -30,13 +20,11 @@ func NewCommand(args ...[]byte) (cmd *Command) {
 	return
 }
 
-// 指令名称
-// cmd.StringAtIndex(0) == cmd.Name() == "SET"
+// Name returns cmd.Args[0]
 func (cmd *Command) Name() string {
 	return string(cmd.Args[0])
 }
 
-// 参数按字符串返回
 func (cmd *Command) StringAtIndex(i int) string {
 	if i >= len(cmd.Args) {
 		return ""

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func GetRedisPool(host string) (pool *redis.Pool) {
+func RedisPool(host string) (pool *redis.Pool) {
 	pool = &redis.Pool{
 		MaxIdle:     100,
 		IdleTimeout: 240 * time.Second,

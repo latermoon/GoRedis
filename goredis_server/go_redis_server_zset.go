@@ -26,6 +26,7 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 		// replace score
 		scoreInt := int64(scorefloat)
 		args[i] = util.Int64ToBytes(scoreInt)
+		args[i+1] = scoreMembers[i+1]
 	}
 	// add
 	zset := server.levelRedis.GetSortedSet(key)

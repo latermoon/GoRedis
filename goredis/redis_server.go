@@ -1,11 +1,6 @@
-// Copyright (c) 2013, Latermoon <lptmoon@gmail.com>
-// All rights reserved.
-//
-// Go版RedisServer
-// @author latermoon
-// @since 2013-08-14
-// @last 2013-09-07
+// Copyright 2013 Latermoon. All rights reserved.
 
+// 使用Go实现RedisServer，并提供Redis协议读写所需要的各种方法
 package goredis
 
 import (
@@ -108,6 +103,10 @@ func (server *RedisServer) handleConnection(session *Session) {
 		reply := server.handler.On(session, cmd)
 		if reply != nil {
 			lastErr = session.Reply(reply)
+			if lastErr != nil {
+				session.Close()
+				break
+			}
 		}
 	}
 
