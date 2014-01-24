@@ -8,6 +8,7 @@ import (
 	"GoRedis/libs/stdlog"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"time"
@@ -74,5 +75,5 @@ func redirectLogOutput(directory string) {
 		panic(err)
 	}
 	// 同时输出到屏幕和文件
-	stdlog.SetOutput(stdlog.NewMultiWriter(oldout, os.Stdout))
+	stdlog.SetOutput(io.MultiWriter(oldout, os.Stdout))
 }
