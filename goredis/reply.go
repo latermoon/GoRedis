@@ -1,6 +1,5 @@
-// Copyright (c) 2013, Latermoon <lptmoon@gmail.com>
-// All rights reserved.
-//
+// Copyright 2013 Latermoon. All rights reserved.
+
 package goredis
 
 import (

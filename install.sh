@@ -15,6 +15,7 @@ go install "GoRedis/libs/queueprocess"
 go install "GoRedis/libs/rdb"
 go install "GoRedis/libs/rdb/crc64"
 go install "GoRedis/libs/geo"
+go install "GoRedis/goredis_server/slave"
 
 echo "ok"
 
