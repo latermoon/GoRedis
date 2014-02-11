@@ -3,6 +3,7 @@ package goredis_server
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/stdlog"
+	"github.com/latermoon/levigo"
 	"strings"
 )
 
@@ -24,6 +25,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 		return
 	}
 	server.slavelist.PushBack(sc)
+	go server.sendSnapshot(sc)
 
 	// slave := server.findSlaveById(uid)
 	// if slave == nil {
@@ -37,7 +39,30 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	// 	slave.SetSession(session)
 	// 	go slave.ContinueSync()
 	// }
+
 	return // SYNC不需要Reply
+}
+
+func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
+	snap := server.levelRedis.DB().NewSnapshot()
+	defer server.levelRedis.DB().ReleaseSnapshot(snap)
+
+	ro := levigo.NewReadOptions()
+	ro.SetSnapshot(snap)
+	defer ro.Close()
+
+	iter := server.levelRedis.DB().NewIterator(ro)
+	defer iter.Close()
+
+	for {
+		iter.Next()
+		if !iter.Valid() {
+			break
+		}
+		// t := server.levelRedis.TypeOf(iter.Key())
+	}
+
+	sc.SendSnapshotFinish()
 }
 
 // func (server *GoRedisServer) findSlaveById(uid string) (slave *SyncClient) {

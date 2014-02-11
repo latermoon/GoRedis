@@ -16,7 +16,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.18"
+const VERSION = "1.0.19"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -123,6 +123,7 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 		go server.monitorOutput(session, cmd)
 	}
 
+	// 这里要注意并发
 	go func() {
 		cmdName := strings.ToUpper(cmd.Name())
 		server.cmdCounters.Get(cmdName).Incr(1)

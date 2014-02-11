@@ -3,14 +3,11 @@ package goredis_server
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/iotool"
-	"GoRedis/libs/levelredis"
 	"GoRedis/libs/rdb"
 	"GoRedis/libs/stdlog"
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/latermoon/levigo"
-	"github.com/latermoon/msgpackgo/codec"
 	"io"
 	"net"
 	"os"
@@ -29,7 +26,6 @@ type SlaveClientCallback interface {
 }
 
 var slavelog = stdlog.Log("slaveof")
-var msgpack_handle codec.MsgpackHandle
 
 /**
 
@@ -39,10 +35,9 @@ client.Cancel()
 
 */
 type SlaveClient struct {
-	session    *Session
-	server     *GoRedisServer
-	callback   SlaveClientCallback
-	levelredis *levelredis.LevelRedis
+	session  *Session
+	server   *GoRedisServer
+	callback SlaveClientCallback
 }
 
 func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient) {
@@ -61,7 +56,7 @@ func (s *SlaveClient) RemoteAddr() net.Addr {
 }
 
 func (s *SlaveClient) directory() string {
-	return s.server.directory + "slaveof_" + fmt.Sprint(s.session.RemoteAddr()) + "/"
+	return s.server.directory + "sync_" + fmt.Sprint(s.session.RemoteAddr()) + "/"
 }
 
 func (s *SlaveClient) rdbfilename() string {
@@ -97,7 +92,6 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 				break
 			}
 			rdbsaved = true
-			s.initLeveldb() // init for command sync
 		} else if c == '\n' {
 			s.session.ReadByte()
 			s.callback.IdleCallback(s)
@@ -111,20 +105,6 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 		}
 	}
 	return
-}
-
-func (s *SlaveClient) initLeveldb() {
-	opts := levigo.NewOptions()
-	opts.SetCache(levigo.NewLRUCache(32 * 1024 * 1024))
-	opts.SetCompression(levigo.SnappyCompression)
-	opts.SetBlockSize(32 * 1024)
-	opts.SetWriteBufferSize(128 * 1024 * 1024)
-	opts.SetCreateIfMissing(true)
-	db, e1 := levigo.Open(s.directory()+"/db0", opts)
-	if e1 != nil {
-		panic(e1)
-	}
-	s.levelredis = levelredis.NewLevelRedis(db)
 }
 
 func (s *SlaveClient) recvRdb() (err error) {
@@ -244,14 +224,10 @@ func newSlaveCallback(server *GoRedisServer) (s *slaveCallback) {
 
 func (s *slaveCallback) RdbSizeCallback(client *SlaveClient, totalsize int64) {
 	slavelog.Printf("[M %s] rdb size: %d\n", client.RemoteAddr(), totalsize)
-	// create leveldb
 }
 
 func (s *slaveCallback) RdbRecvFinishCallback(client *SlaveClient, r *bufio.Reader) {
 	slavelog.Printf("[M %s] rdb recv finish \n", client.RemoteAddr())
-
-	// init levellist
-
 	// decode
 	dec := newRdbDecoder(client)
 	err := rdb.Decode(r, dec)
@@ -285,38 +261,6 @@ func (s *slaveCallback) CommandRecvCallback(client *SlaveClient, cmd *Command) {
 		return
 	}
 	s.server.On(client.session, cmd)
-	// lst := client.levelredis.GetList("cmdlist_0")
-	// out, err := s.encodeCommand(cmd)
-	// if err == nil {
-	// 	lst.RPush(out)
-	// } else {
-	// 	slavelog.Printf("[M %s] encode error %s, %s\n", client.RemoteAddr(), cmd, err)
-	// }
-}
-
-func (s *slaveCallback) encodeCommand(cmd *Command) (out []byte, err error) {
-	enc := codec.NewEncoderBytes(&out, &msgpack_handle)
-	err = enc.Encode(cmd.Args)
-	return
-}
-
-func (s *slaveCallback) decodeCommand(in []byte) (cmd *Command, err error) {
-	dec := codec.NewDecoderBytes(in, &msgpack_handle)
-	var v interface{}
-	err = dec.Decode(&v)
-	if err == nil {
-		objs, ok := v.([]interface{})
-		if !ok {
-			err = errors.New("bad command bytes")
-			return
-		}
-		args := make([][]byte, 0, len(objs))
-		for i := 0; i < len(objs); i++ {
-			args = append(args, objs[i].([]byte))
-		}
-		cmd = NewCommand(args...)
-	}
-	return
 }
 
 // =============================================
