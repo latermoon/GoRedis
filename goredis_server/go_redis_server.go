@@ -133,8 +133,8 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 		// 同步到从库
 		if needSync(cmdName) {
 			for e := server.slavelist.Front(); e != nil; e = e.Next() {
-				// TODO
-				// e.Value.(*SlaveSession).AsyncSendCommand(cmd)
+				sc := e.Value.(*SyncClient)
+				sc.SendCommand(cmd)
 			}
 		}
 	}()

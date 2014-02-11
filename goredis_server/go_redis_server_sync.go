@@ -2,19 +2,28 @@ package goredis_server
 
 import (
 	. "GoRedis/goredis"
-	// "strings"
+	"GoRedis/libs/stdlog"
+	"strings"
 )
 
 // 向从库发送数据
 // SYNC uid 70ecc21580
 // 对应 go_redis_server_slaveof.go
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
-	// // 客户端标识 SYNC uid 70ecc21580
-	// uid := ""
-	// args := cmd.StringArgs()
-	// if len(args) >= 3 && strings.ToLower(args[1]) == "uid" {
-	// 	uid = args[2]
-	// }
+	// 客户端标识 SYNC uid 70ecc21580
+	uid := ""
+	args := cmd.StringArgs()
+	if len(args) >= 3 && strings.ToLower(args[1]) == "uid" {
+		uid = args[2]
+	}
+	stdlog.Printf("[%s] new slave uid %s\n", session.RemoteAddr(), uid)
+
+	sc, err := NewSyncClient(session, server.directory)
+	if err != nil {
+		stdlog.Printf("[%s] new slave error %s", session.RemoteAddr(), err)
+		return
+	}
+	server.slavelist.PushBack(sc)
 
 	// slave := server.findSlaveById(uid)
 	// if slave == nil {
@@ -28,12 +37,10 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	// 	slave.SetSession(session)
 	// 	go slave.ContinueSync()
 	// }
-	// SYNC不需要Reply
-	reply = nil
-	return
+	return // SYNC不需要Reply
 }
 
-// func (server *GoRedisServer) findSlaveById(uid string) (slave *SlaveSessionServer) {
+// func (server *GoRedisServer) findSlaveById(uid string) (slave *SyncClient) {
 // 	if len(uid) == 0 {
 // 		return
 // 	}

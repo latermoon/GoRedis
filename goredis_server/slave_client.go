@@ -280,17 +280,18 @@ func (s *slaveCallback) IdleCallback(client *SlaveClient) {
 }
 
 func (s *slaveCallback) CommandRecvCallback(client *SlaveClient, cmd *Command) {
-	slavelog.Printf("[M %s] recv: %s\n", client.RemoteAddr(), cmd)
+	// slavelog.Printf("[M %s] recv: %s\n", client.RemoteAddr(), cmd)
 	if cmd.Name() == "PING" {
 		return
 	}
-	lst := client.levelredis.GetList("cmdlist_0")
-	out, err := s.encodeCommand(cmd)
-	if err == nil {
-		lst.RPush(out)
-	} else {
-		slavelog.Printf("[M %s] encode error %s, %s\n", client.RemoteAddr(), cmd, err)
-	}
+	s.server.On(client.session, cmd)
+	// lst := client.levelredis.GetList("cmdlist_0")
+	// out, err := s.encodeCommand(cmd)
+	// if err == nil {
+	// 	lst.RPush(out)
+	// } else {
+	// 	slavelog.Printf("[M %s] encode error %s, %s\n", client.RemoteAddr(), cmd, err)
+	// }
 }
 
 func (s *slaveCallback) encodeCommand(cmd *Command) (out []byte, err error) {
