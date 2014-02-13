@@ -28,6 +28,7 @@ type SlaveClient struct {
 	session *Session
 	server  *GoRedisServer
 	buffer  chan *Command // 缓存实时指令
+	broken  bool          // 无效连接
 }
 
 func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient) {
@@ -91,12 +92,18 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 			s.CommandRecvCallback(cmd)
 		}
 	}
+	// 跳出循环必定有错误
+	s.Destory()
 	return
 }
 
 func (s *SlaveClient) recvCmd() {
 	for {
+		if s.broken {
+			break
+		}
 		cmd := <-s.buffer
+		slavelog.Printf("[M %s] buffer: %s\n", s.RemoteAddr(), cmd)
 		s.server.On(s.session, cmd)
 	}
 }
@@ -109,11 +116,6 @@ func (s *SlaveClient) recvRdb() (err error) {
 		return
 	}
 	slavelog.Printf("[M %s] create rdb:%s\n", s.RemoteAddr(), s.rdbfilename())
-	defer func() {
-		filename := f.Name()
-		f.Close()
-		os.Remove(filename)
-	}()
 
 	s.session.ReadByte()
 	var size int64
@@ -135,13 +137,19 @@ func (s *SlaveClient) recvRdb() (err error) {
 	}
 	w.Flush()
 	f.Seek(0, 0)
-	// callback
-	s.RdbRecvFinishCallback(bufio.NewReader(f))
+	// 不阻塞进行接收command
+	go func() {
+		s.RdbRecvFinishCallback(bufio.NewReader(f))
+		filename := f.Name()
+		f.Close()
+		os.Remove(filename)
+	}()
 	return
 }
 
 // 清空本地的同步状态
 func (s *SlaveClient) Destory() (err error) {
+	s.broken = true
 	return
 }
 
@@ -218,6 +226,7 @@ func (s *SlaveClient) RdbRecvFinishCallback(r *bufio.Reader) {
 	if err != nil {
 		// must cancel
 		slavelog.Printf("[M %s] decode error %s\n", s.RemoteAddr(), err)
+		s.Destory()
 	}
 	return
 }
@@ -241,7 +250,7 @@ func (s *SlaveClient) IdleCallback() {
 }
 
 func (s *SlaveClient) CommandRecvCallback(cmd *Command) {
-	slavelog.Printf("[M %s] recv: %s\n", s.RemoteAddr(), cmd)
+	// slavelog.Printf("[M %s] recv: %s\n", s.RemoteAddr(), cmd)
 	s.buffer <- cmd
 }
 
