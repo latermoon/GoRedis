@@ -72,6 +72,7 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 		}
 		server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCateCounters.Get(cateName), cateName, padding, "ChangedCount"))
 	}
+	server.cmdMonitor.Add(monitor.NewCountFormater(server.counters.Get("connection"), "connection", 11, ""))
 	go server.cmdMonitor.Start()
 }
 

@@ -3,7 +3,6 @@ package goredis_server
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/stdlog"
-	"github.com/latermoon/levigo"
 	"strings"
 )
 
@@ -44,24 +43,10 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 }
 
 func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
-	snap := server.levelRedis.DB().NewSnapshot()
-	defer server.levelRedis.DB().ReleaseSnapshot(snap)
+	server.levelRedis.AllKeys(func(i int, key, keytype []byte, quit *bool) {
+		stdlog.Printf("snapshot: %s,%s\n", string(key), string(keytype))
 
-	ro := levigo.NewReadOptions()
-	ro.SetSnapshot(snap)
-	defer ro.Close()
-
-	iter := server.levelRedis.DB().NewIterator(ro)
-	defer iter.Close()
-
-	for {
-		iter.Next()
-		if !iter.Valid() {
-			break
-		}
-		// t := server.levelRedis.TypeOf(iter.Key())
-	}
-
+	})
 	sc.SendSnapshotFinish()
 }
 

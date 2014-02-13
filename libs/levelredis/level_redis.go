@@ -282,7 +282,7 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IterDirection, fn 
 	min := prefix
 	max := append(prefix, MAXBYTE)
 	j := -1
-	l.Enumerate(min, max, direction, func(i int, key, value []byte, quit *bool) {
+	l.RangeEnumerate(min, max, direction, func(i int, key, value []byte, quit *bool) {
 		if bytes.HasPrefix(key, prefix) {
 			j++
 			fn(j, key, value, quit)
@@ -291,11 +291,35 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IterDirection, fn 
 	return
 }
 
-// 范围扫描
-func (l *LevelRedis) Enumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
-	l.incrCounter("enum")
+func (l *LevelRedis) RangeEnumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
 	iter := l.db.NewIterator(l.ro)
 	defer iter.Close()
+	l.Enumerate(iter, min, max, direction, fn)
+}
+
+func (l *LevelRedis) AllKeys(fn func(i int, key, keytype []byte, quit *bool)) {
+	snap := l.db.NewSnapshot()
+	defer l.db.ReleaseSnapshot(snap)
+
+	ro := levigo.NewReadOptions()
+	ro.SetSnapshot(snap)
+	defer ro.Close()
+
+	iter := l.db.NewIterator(ro)
+	defer iter.Close()
+
+	min := joinStringBytes(KEY_PREFIX, SEP_LEFT)
+	max := append(min, MAXBYTE)
+	l.Enumerate(iter, min, max, IterForward, func(i int, key, value []byte, quit *bool) {
+		left := bytes.Index(key, []byte(SEP_LEFT))
+		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
+		fn(i, key[left+1:right], key[right+1:], quit)
+	})
+}
+
+// 范围扫描
+func (l *LevelRedis) Enumerate(iter *levigo.Iterator, min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
+	l.incrCounter("enum")
 
 	found := false
 	if direction == IterBackward {

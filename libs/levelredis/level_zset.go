@@ -213,7 +213,7 @@ func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count i
 	min2 := joinBytes(l.scoreKeyPrefix(), min)
 	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
 	scoreMembers = make([][]byte, 0, 2)
-	l.redis.Enumerate(min2, max2, direction, func(i int, key, value []byte, quit *bool) {
+	l.redis.RangeEnumerate(min2, max2, direction, func(i int, key, value []byte, quit *bool) {
 		if i < offset { // skip
 			return
 		}
@@ -292,7 +292,7 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	l.redis.Enumerate(min2, max2, IterForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.RangeEnumerate(min2, max2, IterForward, func(i int, key, value []byte, quit *bool) {
 		score, member := l.splitScoreKey(key)
 		batch.Delete(l.memberKey(member))
 		batch.Delete(l.scoreKey(member, score))

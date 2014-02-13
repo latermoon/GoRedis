@@ -95,11 +95,13 @@ func (server *GoRedisServer) UID() (uid string) {
 
 // ServerHandler.SessionOpened()
 func (server *GoRedisServer) SessionOpened(session *Session) {
+	server.counters.Get("connection").Incr(1)
 	stdlog.Println("connection accepted from", session.RemoteAddr())
 }
 
 // ServerHandler.SessionClosed()
 func (server *GoRedisServer) SessionClosed(session *Session, err error) {
+	server.counters.Get("connection").Incr(-1)
 	stdlog.Println("end connection", session.RemoteAddr(), err)
 }
 

@@ -15,16 +15,6 @@ import (
 	"strings"
 )
 
-type SlaveStatus int
-
-type SlaveClientCallback interface {
-	RdbSizeCallback(client *SlaveClient, totalsize int64)
-	RdbRecvFinishCallback(client *SlaveClient, r *bufio.Reader)
-	RdbRecvProcessCallback(client *SlaveClient, size int64, rate int)
-	IdleCallback(client *SlaveClient)
-	CommandRecvCallback(client *SlaveClient, cmd *Command)
-}
-
 var slavelog = stdlog.Log("slaveof")
 
 /**
@@ -35,20 +25,17 @@ client.Cancel()
 
 */
 type SlaveClient struct {
-	session  *Session
-	server   *GoRedisServer
-	callback SlaveClientCallback
+	session *Session
+	server  *GoRedisServer
+	buffer  chan *Command // 缓存实时指令
 }
 
 func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient) {
 	s = &SlaveClient{}
 	s.server = server
 	s.session = session
+	s.buffer = make(chan *Command, 1000*10000)
 	return
-}
-
-func (s *SlaveClient) SetCallback(callback SlaveClientCallback) {
-	s.callback = callback
 }
 
 func (s *SlaveClient) RemoteAddr() net.Addr {
@@ -94,17 +81,24 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 			rdbsaved = true
 		} else if c == '\n' {
 			s.session.ReadByte()
-			s.callback.IdleCallback(s)
+			s.IdleCallback()
 		} else {
 			var cmd *Command
 			cmd, err = s.session.ReadCommand()
 			if err != nil {
 				break
 			}
-			s.callback.CommandRecvCallback(s, cmd)
+			s.CommandRecvCallback(cmd)
 		}
 	}
 	return
+}
+
+func (s *SlaveClient) recvCmd() {
+	for {
+		cmd := <-s.buffer
+		s.server.On(s.session, cmd)
+	}
 }
 
 func (s *SlaveClient) recvRdb() (err error) {
@@ -127,13 +121,13 @@ func (s *SlaveClient) recvRdb() (err error) {
 	if err != nil {
 		return
 	}
-	s.callback.RdbSizeCallback(s, size)
+	s.RdbSizeCallback(size)
 
 	// read
 	w := bufio.NewWriter(f)
 	// var written int64
 	_, err = iotool.RateLimitCopy(w, io.LimitReader(s.session, size), 40*1024*1024, func(written int64, rate int) {
-		s.callback.RdbRecvProcessCallback(s, written, rate)
+		s.RdbRecvProcessCallback(written, rate)
 	})
 	// _, err = io.CopyN(w, s.session, size)
 	if err != nil {
@@ -142,7 +136,7 @@ func (s *SlaveClient) recvRdb() (err error) {
 	w.Flush()
 	f.Seek(0, 0)
 	// callback
-	s.callback.RdbRecvFinishCallback(s, bufio.NewReader(f))
+	s.RdbRecvFinishCallback(bufio.NewReader(f))
 	return
 }
 
@@ -211,56 +205,44 @@ func (s *SlaveClient) masterInfo() (isgoredis bool, version string, err error) {
 // ==============================
 // 处理获得的数据
 // ==============================
-type slaveCallback struct {
-	SlaveClientCallback
-	server *GoRedisServer
+
+func (s *SlaveClient) RdbSizeCallback(totalsize int64) {
+	slavelog.Printf("[M %s] rdb size: %d\n", s.RemoteAddr(), totalsize)
 }
 
-func newSlaveCallback(server *GoRedisServer) (s *slaveCallback) {
-	s = &slaveCallback{}
-	s.server = server
-	return
-}
-
-func (s *slaveCallback) RdbSizeCallback(client *SlaveClient, totalsize int64) {
-	slavelog.Printf("[M %s] rdb size: %d\n", client.RemoteAddr(), totalsize)
-}
-
-func (s *slaveCallback) RdbRecvFinishCallback(client *SlaveClient, r *bufio.Reader) {
-	slavelog.Printf("[M %s] rdb recv finish \n", client.RemoteAddr())
+func (s *SlaveClient) RdbRecvFinishCallback(r *bufio.Reader) {
+	slavelog.Printf("[M %s] rdb recv finish, start decoding... \n", s.RemoteAddr())
 	// decode
-	dec := newRdbDecoder(client)
+	dec := newRdbDecoder(s)
 	err := rdb.Decode(r, dec)
 	if err != nil {
 		// must cancel
-		slavelog.Printf("[M %s] decode error %s\n", client.RemoteAddr(), err)
+		slavelog.Printf("[M %s] decode error %s\n", s.RemoteAddr(), err)
 	}
 	return
 }
 
 func (s *SlaveClient) rdbDecodeCommand(client *SlaveClient, cmd *Command) {
-	slavelog.Printf("[M %s] rdb decode %s\n", client.RemoteAddr(), cmd)
+	// slavelog.Printf("[M %s] rdb decode %s\n", client.RemoteAddr(), cmd)
 	s.server.On(client.session, cmd)
 }
 
 func (s *SlaveClient) rdbDecodeFinish(client *SlaveClient, n int64) {
 	slavelog.Printf("[M %s] rdb decode finish, items: %d\n", client.RemoteAddr(), n)
+	go s.recvCmd() // 开始消化command
 }
 
-func (s *slaveCallback) RdbRecvProcessCallback(client *SlaveClient, size int64, rate int) {
-	slavelog.Printf("[M %s] rdb recv: %d, rate:%d\n", client.RemoteAddr(), size, rate)
+func (s *SlaveClient) RdbRecvProcessCallback(size int64, rate int) {
+	slavelog.Printf("[M %s] rdb recv: %d, rate:%d\n", s.RemoteAddr(), size, rate)
 }
 
-func (s *slaveCallback) IdleCallback(client *SlaveClient) {
-	slavelog.Printf("[M %s] slaveof waiting\n", client.RemoteAddr())
+func (s *SlaveClient) IdleCallback() {
+	slavelog.Printf("[M %s] slaveof waiting\n", s.RemoteAddr())
 }
 
-func (s *slaveCallback) CommandRecvCallback(client *SlaveClient, cmd *Command) {
-	// slavelog.Printf("[M %s] recv: %s\n", client.RemoteAddr(), cmd)
-	if cmd.Name() == "PING" {
-		return
-	}
-	s.server.On(client.session, cmd)
+func (s *SlaveClient) CommandRecvCallback(cmd *Command) {
+	slavelog.Printf("[M %s] recv: %s\n", s.RemoteAddr(), cmd)
+	s.buffer <- cmd
 }
 
 // =============================================
