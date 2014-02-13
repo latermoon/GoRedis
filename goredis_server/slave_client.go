@@ -17,13 +17,6 @@ import (
 
 var slavelog = stdlog.Log("slaveof")
 
-/**
-
-client := NewSlaveClient(...)
-client.Sync(uid)
-client.Cancel()
-
-*/
 type SlaveClient struct {
 	session *Session
 	server  *GoRedisServer
