@@ -51,6 +51,10 @@ func (l *LevelZSet) zsetValue() []byte {
 	return []byte(s)
 }
 
+func zmemberKey(key, member []byte) []byte {
+	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, string(key), SEP_RIGHT, "m", SEP, string(member))
+}
+
 func (l *LevelZSet) memberKey(member []byte) []byte {
 	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, "m", SEP, string(member))
 }

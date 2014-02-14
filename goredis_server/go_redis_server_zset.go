@@ -202,10 +202,11 @@ func (server *GoRedisServer) OnZINCRBY(cmd *Command) (reply *Reply) {
 // ZSCORE key member
 // Get the score associated with the given member in a sorted set
 func (server *GoRedisServer) OnZSCORE(cmd *Command) (reply *Reply) {
-	key := cmd.StringAtIndex(1)
+	key, _ := cmd.ArgAtIndex(1)
 	member, _ := cmd.ArgAtIndex(2)
-	zset := server.levelRedis.GetSortedSet(key)
-	score := zset.Score(member)
+	// zset := server.levelRedis.GetSortedSet(key)
+	// score := zset.Score(member)
+	score := server.levelRedis.Global().ZScore(key, member)
 	if score == nil {
 		return BulkReply(nil)
 	}

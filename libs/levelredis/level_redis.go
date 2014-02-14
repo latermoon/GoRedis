@@ -96,6 +96,7 @@ type LevelRedis struct {
 	lruCache *lru.LRUCache // LRU缓存，管理string以外的key
 	mus      []sync.Mutex  // Key Hash线程池
 	lstring  *LevelString
+	g        *global
 	// stats
 	muCount  sync.Mutex
 	counters map[string]int64
@@ -108,6 +109,7 @@ func NewLevelRedis(db *levigo.DB) (l *LevelRedis) {
 	l.ro = levigo.NewReadOptions()
 	l.wo = levigo.NewWriteOptions()
 	l.lstring = NewLevelString(l)
+	l.g = newGlobal(l)
 	l.lruCache = lru.NewLRUCache(lruCacheSize)
 	l.mus = make([]sync.Mutex, objCacheCreateThread)
 	// 初始化最大的key，对于Enumerate从后面开始扫描key非常重要
@@ -119,6 +121,10 @@ func NewLevelRedis(db *levigo.DB) (l *LevelRedis) {
 
 func (l *LevelRedis) DB() (db *levigo.DB) {
 	return l.db
+}
+
+func (l *LevelRedis) Global() *global {
+	return l.g
 }
 
 // leveldb操作数，计数器
