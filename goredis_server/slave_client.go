@@ -2,8 +2,10 @@ package goredis_server
 
 import (
 	. "GoRedis/goredis"
+	"GoRedis/libs/counter"
 	"GoRedis/libs/iotool"
 	"GoRedis/libs/rdb"
+	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
 	"bufio"
 	"errors"
@@ -18,10 +20,12 @@ import (
 var slavelog = stdlog.Log("slaveof")
 
 type SlaveClient struct {
-	session *Session
-	server  *GoRedisServer
-	buffer  chan *Command // 缓存实时指令
-	broken  bool          // 无效连接
+	session  *Session
+	server   *GoRedisServer
+	buffer   chan *Command // 缓存实时指令
+	broken   bool          // 无效连接
+	counters *counter.Counters
+	synclog  *statlog.StatLogger
 }
 
 func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient) {
@@ -29,7 +33,33 @@ func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient) {
 	s.server = server
 	s.session = session
 	s.buffer = make(chan *Command, 1000*10000)
+	s.counters = counter.NewCounters()
+	s.initLog()
 	return
+}
+
+func (s *SlaveClient) initLog() error {
+	path := fmt.Sprintf("%s/sync.log", s.directory())
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	s.synclog = statlog.NewStatLogger(file)
+	s.synclog.Add(statlog.TimeItem("time"))
+	s.synclog.Add(statlog.Item("rdb", func() interface{} {
+		return s.counters.Get("rdb").ChangedCount()
+	}, &statlog.Opt{Padding: 8}))
+	s.synclog.Add(statlog.Item("recv", func() interface{} {
+		return s.counters.Get("recv").ChangedCount()
+	}, &statlog.Opt{Padding: 8}))
+	s.synclog.Add(statlog.Item("proc", func() interface{} {
+		return s.counters.Get("proc").ChangedCount()
+	}, &statlog.Opt{Padding: 8}))
+	s.synclog.Add(statlog.Item("buffer", func() interface{} {
+		return s.counters.Get("buffer").Count()
+	}, &statlog.Opt{Padding: 10}))
+	go s.synclog.Start()
+	return nil
 }
 
 func (s *SlaveClient) RemoteAddr() net.Addr {
@@ -96,7 +126,8 @@ func (s *SlaveClient) recvCmd() {
 			break
 		}
 		cmd := <-s.buffer
-		slavelog.Printf("[M %s] buffer: %s\n", s.RemoteAddr(), cmd)
+		s.counters.Get("proc").Incr(1)
+		// slavelog.Printf("[M %s] buffer: %s\n", s.RemoteAddr(), cmd)
 		s.server.On(s.session, cmd)
 	}
 }
@@ -143,6 +174,7 @@ func (s *SlaveClient) recvRdb() (err error) {
 // 清空本地的同步状态
 func (s *SlaveClient) Destory() (err error) {
 	s.broken = true
+	s.synclog.Stop()
 	return
 }
 
@@ -226,6 +258,7 @@ func (s *SlaveClient) RdbRecvFinishCallback(r *bufio.Reader) {
 
 func (s *SlaveClient) rdbDecodeCommand(client *SlaveClient, cmd *Command) {
 	// slavelog.Printf("[M %s] rdb decode %s\n", client.RemoteAddr(), cmd)
+	s.counters.Get("rdb").Incr(1)
 	s.server.On(client.session, cmd)
 }
 
@@ -244,6 +277,7 @@ func (s *SlaveClient) IdleCallback() {
 
 func (s *SlaveClient) CommandRecvCallback(cmd *Command) {
 	// slavelog.Printf("[M %s] recv: %s\n", s.RemoteAddr(), cmd)
+	s.counters.Get("recv").Incr(1)
 	s.buffer <- cmd
 }
 
