@@ -10,10 +10,12 @@ func (server *GoRedisServer) OnSADD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	members := cmd.Args[2:]
 	hash := server.levelRedis.GetSet(key)
-	n := 0
+	// 使用leveldb的mset，无法得知新增key数量
+	fieldVals := make([][]byte, 0, len(members)*2)
 	for _, member := range members {
-		n += hash.Set(member, []byte("true"))
+		fieldVals = append(fieldVals, member, []byte(""))
 	}
+	n := hash.Set(fieldVals...)
 	return IntegerReply(n)
 }
 
