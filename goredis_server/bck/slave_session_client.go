@@ -13,7 +13,7 @@ import (
 	"errors"
 	"fmt"
 	// "github.com/latermoon/levigo"
-	levigo "github.com/bsm/go-rocksdb"
+	levigo "GoRedis/libs/go-rocksdb"
 	"github.com/latermoon/msgpackgo/codec"
 	"os"
 	"time"

@@ -6,7 +6,7 @@ package levelredis
 import (
 	"bytes"
 	// "github.com/latermoon/levigo"
-	levigo "github.com/bsm/go-rocksdb"
+	levigo "GoRedis/libs/go-rocksdb"
 	"strconv"
 	"strings"
 	"sync"

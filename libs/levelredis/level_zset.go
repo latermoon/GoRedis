@@ -6,7 +6,7 @@ import (
 	"GoRedis/libs/stdlog"
 	"bytes"
 	// "github.com/latermoon/levigo"
-	levigo "github.com/bsm/go-rocksdb"
+	levigo "GoRedis/libs/go-rocksdb"
 	"runtime/debug"
 	"strconv"
 	"sync"

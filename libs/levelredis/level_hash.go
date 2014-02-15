@@ -4,7 +4,7 @@ import (
 	// "fmt"
 	"bytes"
 	// "github.com/latermoon/levigo"
-	levigo "github.com/bsm/go-rocksdb"
+	levigo "GoRedis/libs/go-rocksdb"
 	"sync"
 )
 

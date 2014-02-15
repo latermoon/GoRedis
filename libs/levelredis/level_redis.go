@@ -4,7 +4,7 @@ import (
 	lru "GoRedis/libs/lrucache"
 	"bytes"
 	// "github.com/latermoon/levigo"
-	levigo "github.com/bsm/go-rocksdb"
+	levigo "GoRedis/libs/go-rocksdb"
 	"math"
 	"sync"
 )
