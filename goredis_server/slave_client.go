@@ -15,6 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 var slavelog = stdlog.Log("slaveof")
@@ -23,7 +24,9 @@ type SlaveClient struct {
 	session  *Session
 	server   *GoRedisServer
 	buffer   chan *Command // 缓存实时指令
-	broken   bool          // 无效连接
+	rdbjobs  chan int      // 并发工作
+	wg       sync.WaitGroup
+	broken   bool // 无效连接
 	counters *counter.Counters
 	synclog  *statlog.StatLogger
 }
@@ -33,6 +36,7 @@ func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient, er
 	s.server = server
 	s.session = session
 	s.buffer = make(chan *Command, 1000*10000)
+	s.rdbjobs = make(chan int, 200)
 	s.counters = counter.NewCounters()
 	os.Mkdir(s.directory(), os.ModePerm)
 	err = s.initLog()
@@ -235,10 +239,6 @@ func (s *SlaveClient) masterInfo() (isgoredis bool, version string, err error) {
 	return
 }
 
-// ==============================
-// 处理获得的数据
-// ==============================
-
 func (s *SlaveClient) RdbSizeCallback(totalsize int64) {
 	slavelog.Printf("[M %s] rdb size: %d\n", s.RemoteAddr(), totalsize)
 }
@@ -259,11 +259,18 @@ func (s *SlaveClient) RdbRecvFinishCallback(r *bufio.Reader) {
 func (s *SlaveClient) rdbDecodeCommand(cmd *Command) {
 	// slavelog.Printf("[M %s] rdb decode %s\n", client.RemoteAddr(), cmd)
 	s.counters.Get("rdb").Incr(1)
-	s.server.On(s.session, cmd)
+	s.rdbjobs <- 1
+	s.wg.Add(1)
+	go func() {
+		s.server.On(s.session, cmd)
+		<-s.rdbjobs
+		s.wg.Done()
+	}()
 }
 
 func (s *SlaveClient) rdbDecodeFinish(n int64) {
 	slavelog.Printf("[M %s] rdb decode finish, items: %d\n", s.RemoteAddr(), n)
+	s.wg.Wait()
 	go s.recvCmd() // 开始消化command
 }
 
