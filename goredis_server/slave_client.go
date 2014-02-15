@@ -330,7 +330,7 @@ func (p *rdbDecoder) StartHash(key []byte, length, expiry int64) {
 	} else {
 		p.hashEntry = make([][]byte, 0, p.bufsize)
 	}
-	p.hashEntry = append(p.hashEntry, []byte("HSET"))
+	p.hashEntry = append(p.hashEntry, []byte("HMSET"))
 	p.hashEntry = append(p.hashEntry, key)
 	p.keyCount++
 }
@@ -342,7 +342,7 @@ func (p *rdbDecoder) Hset(key, field, value []byte) {
 		cmd := NewCommand(p.hashEntry...)
 		p.client.rdbDecodeCommand(cmd)
 		p.hashEntry = make([][]byte, 0, p.bufsize)
-		p.hashEntry = append(p.hashEntry, []byte("HSET"))
+		p.hashEntry = append(p.hashEntry, []byte("HMSET"))
 		p.hashEntry = append(p.hashEntry, key)
 	}
 }
