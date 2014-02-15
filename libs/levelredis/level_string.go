@@ -1,9 +1,5 @@
 package levelredis
 
-import (
-// "github.com/latermoon/levigo"
-)
-
 type LevelString struct {
 	redis *LevelRedis
 }

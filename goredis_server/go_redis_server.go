@@ -16,7 +16,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.18"
+const VERSION = "1.0.30"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -28,6 +28,7 @@ var goredisPrefix string = "__goredis:"
 var (
 	slowexec = 30 // ms
 	slowlog  = stdlog.Log("slow")
+	errlog   = stdlog.Log("err")
 )
 
 // GoRedisServer
@@ -95,11 +96,13 @@ func (server *GoRedisServer) UID() (uid string) {
 
 // ServerHandler.SessionOpened()
 func (server *GoRedisServer) SessionOpened(session *Session) {
+	server.counters.Get("connection").Incr(1)
 	stdlog.Println("connection accepted from", session.RemoteAddr())
 }
 
 // ServerHandler.SessionClosed()
 func (server *GoRedisServer) SessionClosed(session *Session, err error) {
+	server.counters.Get("connection").Incr(-1)
 	stdlog.Println("end connection", session.RemoteAddr(), err)
 }
 
@@ -107,6 +110,7 @@ func (server *GoRedisServer) SessionClosed(session *Session, err error) {
 // 由GoRedis协议层触发，通过反射调用OnGET/OnSET等方法
 func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 	if err := verifyCommand(cmd); err != nil {
+		errlog.Printf("[%s] bad command %s\n", session.RemoteAddr(), cmd)
 		return ErrorReply(err)
 	}
 	// slowlog
@@ -123,6 +127,7 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 		go server.monitorOutput(session, cmd)
 	}
 
+	// 这里要注意并发
 	go func() {
 		cmdName := strings.ToUpper(cmd.Name())
 		server.cmdCounters.Get(cmdName).Incr(1)
@@ -133,8 +138,8 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 		// 同步到从库
 		if needSync(cmdName) {
 			for e := server.slavelist.Front(); e != nil; e = e.Next() {
-				// TODO
-				// e.Value.(*SlaveSession).AsyncSendCommand(cmd)
+				sc := e.Value.(*SyncClient)
+				sc.SendCommand(cmd)
 			}
 		}
 	}()

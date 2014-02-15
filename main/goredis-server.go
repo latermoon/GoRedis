@@ -70,10 +70,11 @@ func redirectLogOutput(directory string) {
 	if err != nil {
 		panic(err)
 	}
+	// 同时输出到屏幕和文件
+	stdlog.SetOutput(io.MultiWriter(oldout, os.Stdout))
+
 	os.Stderr, err = os.OpenFile(directory+"stderr.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
-	// 同时输出到屏幕和文件
-	stdlog.SetOutput(io.MultiWriter(oldout, os.Stdout))
 }

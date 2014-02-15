@@ -38,6 +38,7 @@ type StatLogger struct {
 	beforeFunc          func()
 	afterFunc           func()
 	TitleOutputInterval int // 输出标题的间隔, 需要的话增加setter/getter
+	shouldStop          bool
 }
 
 func NewStatLogger(wr io.Writer) (s *StatLogger) {
@@ -62,10 +63,14 @@ func (s *StatLogger) Add(item *StatItem) {
 }
 
 func (s *StatLogger) Start() {
+	s.shouldStop = false
 	ticker := time.NewTicker(time.Millisecond * 1000)
 	// 当然打印间隔
 	printInterval := 0
 	for _ = range ticker.C {
+		if s.shouldStop {
+			break
+		}
 		// 跳过第一行错误数据，并用于打印title
 		if !s.skipFirstLine {
 			s.skipFirstLine = true
@@ -87,6 +92,10 @@ func (s *StatLogger) Start() {
 		}
 		printInterval++
 	}
+}
+
+func (s *StatLogger) Stop() {
+	s.shouldStop = true
 }
 
 func (s *StatLogger) printTitle() {

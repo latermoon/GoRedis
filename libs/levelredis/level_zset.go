@@ -5,7 +5,8 @@ package levelredis
 import (
 	"GoRedis/libs/stdlog"
 	"bytes"
-	"github.com/latermoon/levigo"
+	// "github.com/latermoon/levigo"
+	levigo "GoRedis/libs/go-rocksdb"
 	"runtime/debug"
 	"strconv"
 	"sync"
@@ -49,6 +50,10 @@ func (l *LevelZSet) zsetKey() []byte {
 func (l *LevelZSet) zsetValue() []byte {
 	s := strconv.Itoa(l.totalCount)
 	return []byte(s)
+}
+
+func zmemberKey(key, member []byte) []byte {
+	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, string(key), SEP_RIGHT, "m", SEP, string(member))
 }
 
 func (l *LevelZSet) memberKey(member []byte) []byte {
@@ -213,7 +218,7 @@ func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count i
 	min2 := joinBytes(l.scoreKeyPrefix(), min)
 	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
 	scoreMembers = make([][]byte, 0, 2)
-	l.redis.Enumerate(min2, max2, direction, func(i int, key, value []byte, quit *bool) {
+	l.redis.RangeEnumerate(min2, max2, direction, func(i int, key, value []byte, quit *bool) {
 		if i < offset { // skip
 			return
 		}
@@ -292,7 +297,7 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	l.redis.Enumerate(min2, max2, IterForward, func(i int, key, value []byte, quit *bool) {
+	l.redis.RangeEnumerate(min2, max2, IterForward, func(i int, key, value []byte, quit *bool) {
 		score, member := l.splitScoreKey(key)
 		batch.Delete(l.memberKey(member))
 		batch.Delete(l.scoreKey(member, score))

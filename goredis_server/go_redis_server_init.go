@@ -6,12 +6,16 @@ import (
 	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
 	"fmt"
-	"github.com/latermoon/levigo"
+	// "github.com/latermoon/levigo"
+	levigo "GoRedis/libs/go-rocksdb"
 	"os"
 	"time"
 )
 
 func (server *GoRedisServer) Init() (err error) {
+	// init errlog
+	errlog.SetOutput(os.Stderr)
+
 	stdlog.Println("server init ...")
 	err = server.initLevelDB()
 	if err != nil {
@@ -46,9 +50,13 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 	opts.SetCache(levigo.NewLRUCache(128 * 1024 * 1024))
 	opts.SetCompression(levigo.SnappyCompression)
 	opts.SetBlockSize(32 * 1024)
+	opts.SetMaxBackgroundCompactions(6)
 	opts.SetWriteBufferSize(128 * 1024 * 1024)
 	opts.SetMaxOpenFiles(100000)
 	opts.SetCreateIfMissing(true)
+	env := levigo.NewDefaultEnv()
+	env.SetBackgroundThreads(6)
+	opts.SetEnv(env)
 	db, e1 := levigo.Open(server.directory+"/db0", opts)
 	if e1 != nil {
 		return e1
@@ -72,6 +80,7 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 		}
 		server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCateCounters.Get(cateName), cateName, padding, "ChangedCount"))
 	}
+	server.cmdMonitor.Add(monitor.NewCountFormater(server.counters.Get("connection"), "connection", 11, ""))
 	go server.cmdMonitor.Start()
 }
 
