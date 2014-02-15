@@ -24,8 +24,11 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 	}
 	reply = StatusReply("OK")
 	// 异步处理
-	slaveClient := NewSlaveClient(server, NewSession(conn))
+	slaveClient, err := NewSlaveClient(server, NewSession(conn))
+	if err != nil {
+		reply = ErrorReply(err)
+		return
+	}
 	go slaveClient.Sync(server.UID())
-
 	return
 }

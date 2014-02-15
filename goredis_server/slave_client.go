@@ -28,13 +28,14 @@ type SlaveClient struct {
 	synclog  *statlog.StatLogger
 }
 
-func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient) {
+func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient, err error) {
 	s = &SlaveClient{}
 	s.server = server
 	s.session = session
 	s.buffer = make(chan *Command, 1000*10000)
 	s.counters = counter.NewCounters()
-	s.initLog()
+	os.Mkdir(s.directory(), os.ModePerm)
+	err = s.initLog()
 	return
 }
 
@@ -134,7 +135,6 @@ func (s *SlaveClient) recvCmd() {
 
 func (s *SlaveClient) recvRdb() (err error) {
 	var f *os.File
-	os.Mkdir(s.directory(), os.ModePerm)
 	f, err = os.OpenFile(s.rdbfilename(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		return
