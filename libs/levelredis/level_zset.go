@@ -5,7 +5,8 @@ package levelredis
 import (
 	"GoRedis/libs/stdlog"
 	"bytes"
-	"github.com/latermoon/levigo"
+	// "github.com/latermoon/levigo"
+	levigo "github.com/bsm/go-rocksdb"
 	"runtime/debug"
 	"strconv"
 	"sync"

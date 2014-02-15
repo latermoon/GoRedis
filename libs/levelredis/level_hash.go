@@ -3,7 +3,8 @@ package levelredis
 import (
 	// "fmt"
 	"bytes"
-	"github.com/latermoon/levigo"
+	// "github.com/latermoon/levigo"
+	levigo "github.com/bsm/go-rocksdb"
 	"sync"
 )
 

@@ -6,7 +6,8 @@ import (
 	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
 	"fmt"
-	"github.com/latermoon/levigo"
+	// "github.com/latermoon/levigo"
+	levigo "github.com/bsm/go-rocksdb"
 	"os"
 	"time"
 )

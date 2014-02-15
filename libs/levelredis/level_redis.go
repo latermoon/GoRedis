@@ -1,5 +1,14 @@
 package levelredis
 
+import (
+	lru "GoRedis/libs/lrucache"
+	"bytes"
+	// "github.com/latermoon/levigo"
+	levigo "github.com/bsm/go-rocksdb"
+	"math"
+	"sync"
+)
+
 /*
 基于leveldb实现的redis持久化层
 
@@ -37,15 +46,6 @@ zset
 	_z[user_rank]s#1#100423 = ""
 	_z[user_rank]s#2#300000 = ""
 */
-
-import (
-	lru "GoRedis/libs/lrucache"
-	"bytes"
-	// "../stdlog"
-	"github.com/latermoon/levigo"
-	"math"
-	"sync"
-)
 
 // 共用字段
 const (

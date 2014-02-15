@@ -5,8 +5,8 @@ package levelredis
 
 import (
 	"bytes"
-	// "fmt"
-	"github.com/latermoon/levigo"
+	// "github.com/latermoon/levigo"
+	levigo "github.com/bsm/go-rocksdb"
 	"strconv"
 	"strings"
 	"sync"
