@@ -57,7 +57,7 @@ func (s *SlaveClient) initLog() error {
 		return s.counters.Get("proc").ChangedCount()
 	}, &statlog.Opt{Padding: 8}))
 	s.synclog.Add(statlog.Item("buffer", func() interface{} {
-		return s.counters.Get("buffer").Count()
+		return len(s.buffer)
 	}, &statlog.Opt{Padding: 10}))
 	go s.synclog.Start()
 	return nil
@@ -256,14 +256,14 @@ func (s *SlaveClient) RdbRecvFinishCallback(r *bufio.Reader) {
 	return
 }
 
-func (s *SlaveClient) rdbDecodeCommand(client *SlaveClient, cmd *Command) {
+func (s *SlaveClient) rdbDecodeCommand(cmd *Command) {
 	// slavelog.Printf("[M %s] rdb decode %s\n", client.RemoteAddr(), cmd)
 	s.counters.Get("rdb").Incr(1)
-	s.server.On(client.session, cmd)
+	s.server.On(s.session, cmd)
 }
 
-func (s *SlaveClient) rdbDecodeFinish(client *SlaveClient, n int64) {
-	slavelog.Printf("[M %s] rdb decode finish, items: %d\n", client.RemoteAddr(), n)
+func (s *SlaveClient) rdbDecodeFinish(n int64) {
+	slavelog.Printf("[M %s] rdb decode finish, items: %d\n", s.RemoteAddr(), n)
 	go s.recvCmd() // 开始消化command
 }
 
@@ -314,13 +314,13 @@ func (p *rdbDecoder) EndDatabase(n int) {
 }
 
 func (p *rdbDecoder) EndRDB() {
-	p.client.rdbDecodeFinish(p.client, p.keyCount)
+	p.client.rdbDecodeFinish(p.keyCount)
 }
 
 // Set
 func (p *rdbDecoder) Set(key, value []byte, expiry int64) {
 	cmd := NewCommand([]byte("SET"), key, value)
-	p.client.rdbDecodeCommand(p.client, cmd)
+	p.client.rdbDecodeCommand(cmd)
 	p.keyCount++
 }
 
@@ -340,7 +340,7 @@ func (p *rdbDecoder) Hset(key, field, value []byte) {
 	p.hashEntry = append(p.hashEntry, value)
 	if len(p.hashEntry) >= p.bufsize {
 		cmd := NewCommand(p.hashEntry...)
-		p.client.rdbDecodeCommand(p.client, cmd)
+		p.client.rdbDecodeCommand(cmd)
 		p.hashEntry = make([][]byte, 0, p.bufsize)
 		p.hashEntry = append(p.hashEntry, []byte("HSET"))
 		p.hashEntry = append(p.hashEntry, key)
@@ -351,7 +351,7 @@ func (p *rdbDecoder) Hset(key, field, value []byte) {
 func (p *rdbDecoder) EndHash(key []byte) {
 	if len(p.hashEntry) > 2 {
 		cmd := NewCommand(p.hashEntry...)
-		p.client.rdbDecodeCommand(p.client, cmd)
+		p.client.rdbDecodeCommand(cmd)
 	}
 }
 
@@ -367,10 +367,10 @@ func (p *rdbDecoder) StartSet(key []byte, cardinality, expiry int64) {
 }
 
 func (p *rdbDecoder) Sadd(key, member []byte) {
-	p.setEntry = append(p.setEntry)
+	p.setEntry = append(p.setEntry, member)
 	if len(p.setEntry) >= p.bufsize {
 		cmd := NewCommand(p.setEntry...)
-		p.client.rdbDecodeCommand(p.client, cmd)
+		p.client.rdbDecodeCommand(cmd)
 		p.setEntry = make([][]byte, 0, p.bufsize)
 		p.setEntry = append(p.setEntry, []byte("SADD"))
 		p.setEntry = append(p.setEntry, key)
@@ -381,7 +381,7 @@ func (p *rdbDecoder) Sadd(key, member []byte) {
 func (p *rdbDecoder) EndSet(key []byte) {
 	if len(p.setEntry) > 2 {
 		cmd := NewCommand(p.setEntry...)
-		p.client.rdbDecodeCommand(p.client, cmd)
+		p.client.rdbDecodeCommand(cmd)
 	}
 }
 
@@ -401,7 +401,7 @@ func (p *rdbDecoder) Rpush(key, value []byte) {
 	p.listEntry = append(p.listEntry, value)
 	if len(p.listEntry) >= p.bufsize {
 		cmd := NewCommand(p.listEntry...)
-		p.client.rdbDecodeCommand(p.client, cmd)
+		p.client.rdbDecodeCommand(cmd)
 		p.listEntry = make([][]byte, 0, p.bufsize)
 		p.listEntry = append(p.listEntry, []byte("RPUSH"))
 		p.listEntry = append(p.listEntry, key)
@@ -413,7 +413,7 @@ func (p *rdbDecoder) Rpush(key, value []byte) {
 func (p *rdbDecoder) EndList(key []byte) {
 	if len(p.listEntry) > 2 {
 		cmd := NewCommand(p.listEntry...)
-		p.client.rdbDecodeCommand(p.client, cmd)
+		p.client.rdbDecodeCommand(cmd)
 	}
 }
 
@@ -434,7 +434,7 @@ func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
 	p.zsetEntry = append(p.zsetEntry, member)
 	if len(p.zsetEntry) >= p.bufsize {
 		cmd := NewCommand(p.zsetEntry...)
-		p.client.rdbDecodeCommand(p.client, cmd)
+		p.client.rdbDecodeCommand(cmd)
 		p.zsetEntry = make([][]byte, 0, p.bufsize)
 		p.zsetEntry = append(p.zsetEntry, []byte("ZADD"))
 		p.zsetEntry = append(p.zsetEntry, key)
@@ -446,6 +446,6 @@ func (p *rdbDecoder) Zadd(key []byte, score float64, member []byte) {
 func (p *rdbDecoder) EndZSet(key []byte) {
 	if len(p.zsetEntry) > 2 {
 		cmd := NewCommand(p.zsetEntry...)
-		p.client.rdbDecodeCommand(p.client, cmd)
+		p.client.rdbDecodeCommand(cmd)
 	}
 }

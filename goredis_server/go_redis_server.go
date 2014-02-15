@@ -16,7 +16,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.22"
+const VERSION = "1.0.24"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -28,6 +28,7 @@ var goredisPrefix string = "__goredis:"
 var (
 	slowexec = 30 // ms
 	slowlog  = stdlog.Log("slow")
+	errlog   = stdlog.Log("err")
 )
 
 // GoRedisServer
@@ -109,6 +110,7 @@ func (server *GoRedisServer) SessionClosed(session *Session, err error) {
 // 由GoRedis协议层触发，通过反射调用OnGET/OnSET等方法
 func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 	if err := verifyCommand(cmd); err != nil {
+		errlog.Printf("[%s] bad command %s\n", session.RemoteAddr(), cmd)
 		return ErrorReply(err)
 	}
 	// slowlog

@@ -12,6 +12,9 @@ import (
 )
 
 func (server *GoRedisServer) Init() (err error) {
+	// init errlog
+	errlog.SetOutput(os.Stderr)
+
 	stdlog.Println("server init ...")
 	err = server.initLevelDB()
 	if err != nil {
