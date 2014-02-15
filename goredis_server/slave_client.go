@@ -36,7 +36,7 @@ func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient, er
 	s.server = server
 	s.session = session
 	s.buffer = make(chan *Command, 1000*10000)
-	s.rdbjobs = make(chan int, 200)
+	s.rdbjobs = make(chan int, 10)
 	s.counters = counter.NewCounters()
 	os.Mkdir(s.directory(), os.ModePerm)
 	err = s.initLog()
