@@ -298,7 +298,11 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IterDirection, fn 
 }
 
 func (l *LevelRedis) RangeEnumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
-	iter := l.db.NewIterator(l.ro)
+	ro := levigo.NewReadOptions()
+	ro.SetFillCache(false)
+	defer ro.Close()
+
+	iter := l.db.NewIterator(ro)
 	defer iter.Close()
 	l.Enumerate(iter, min, max, direction, fn)
 }
@@ -308,6 +312,7 @@ func (l *LevelRedis) AllKeys(fn func(i int, key, keytype []byte, quit *bool)) {
 	defer l.db.ReleaseSnapshot(snap)
 
 	ro := levigo.NewReadOptions()
+	ro.SetFillCache(false)
 	ro.SetSnapshot(snap)
 	defer ro.Close()
 
