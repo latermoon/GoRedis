@@ -56,6 +56,7 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 	opts.SetCreateIfMissing(true)
 	env := levigo.NewDefaultEnv()
 	env.SetBackgroundThreads(6)
+	env.SetHighPriorityBackgroundThreads(2)
 	opts.SetEnv(env)
 	db, e1 := levigo.Open(server.directory+"/db0", opts)
 	if e1 != nil {
