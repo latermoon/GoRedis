@@ -1,10 +1,9 @@
 package levelredis
 
 import (
+	levigo "GoRedis/libs/go-rocksdb"
 	lru "GoRedis/libs/lrucache"
 	"bytes"
-	// "github.com/latermoon/levigo"
-	levigo "GoRedis/libs/go-rocksdb"
 	"math"
 	"sync"
 )
@@ -84,6 +83,11 @@ const (
 	IterBackward
 )
 
+const (
+	NoCompression     = levigo.NoCompression
+	SnappyCompression = levigo.SnappyCompression
+)
+
 var (
 	lruCacheSize         = uint64(100000) // cache size
 	objCacheCreateThread = 100            // obj create threads
@@ -121,6 +125,26 @@ func NewLevelRedis(db *levigo.DB) (l *LevelRedis) {
 
 func (l *LevelRedis) DB() (db *levigo.DB) {
 	return l.db
+}
+
+func NewOptions() *levigo.Options {
+	return levigo.NewOptions()
+}
+
+func NewDefaultEnv() *levigo.Env {
+	return levigo.NewDefaultEnv()
+}
+
+func NewLRUCache(capacity int) *levigo.Cache {
+	return levigo.NewLRUCache(capacity)
+}
+
+func Open(dbname string, o *levigo.Options) (*levigo.DB, error) {
+	return levigo.Open(dbname, o)
+}
+
+func (l *LevelRedis) Stats() string {
+	return l.db.PropertyValue("rocksdb.stats")
 }
 
 func (l *LevelRedis) Global() *global {

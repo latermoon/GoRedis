@@ -6,8 +6,6 @@ import (
 	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
 	"fmt"
-	// "github.com/latermoon/levigo"
-	levigo "GoRedis/libs/go-rocksdb"
 	"os"
 	"time"
 )
@@ -46,19 +44,19 @@ func (server *GoRedisServer) initConfig() {
 }
 
 func (server *GoRedisServer) initLevelDB() (err error) {
-	opts := levigo.NewOptions()
-	opts.SetCache(levigo.NewLRUCache(128 * 1024 * 1024))
-	opts.SetCompression(levigo.SnappyCompression)
+	opts := levelredis.NewOptions()
+	opts.SetCache(levelredis.NewLRUCache(128 * 1024 * 1024))
+	opts.SetCompression(levelredis.SnappyCompression)
 	opts.SetBlockSize(32 * 1024)
 	opts.SetMaxBackgroundCompactions(6)
 	opts.SetWriteBufferSize(128 * 1024 * 1024)
 	opts.SetMaxOpenFiles(100000)
 	opts.SetCreateIfMissing(true)
-	env := levigo.NewDefaultEnv()
+	env := levelredis.NewDefaultEnv()
 	env.SetBackgroundThreads(6)
 	env.SetHighPriorityBackgroundThreads(2)
 	opts.SetEnv(env)
-	db, e1 := levigo.Open(server.directory+"/db0", opts)
+	db, e1 := levelredis.Open(server.directory+"/db0", opts)
 	if e1 != nil {
 		return e1
 	}
@@ -129,8 +127,7 @@ func (server *GoRedisServer) initLeveldbStatsLog(path string) {
 			t := time.Now()
 			tm := fmt.Sprintf("# %04d-%02d-%02d %02d:%02d:%02d\n", t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
 			file.WriteString(tm)
-			txt := server.levelRedis.DB().PropertyValue("leveldb.stats")
-			file.WriteString(txt)
+			file.WriteString(server.levelRedis.Stats())
 			file.WriteString("\n")
 		}
 	}()
