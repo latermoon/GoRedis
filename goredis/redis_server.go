@@ -72,23 +72,23 @@ func (server *RedisServer) Listen(host string) error {
 
 // 处理一个客户端连接
 func (server *RedisServer) handleConnection(session *Session) {
-	// 异常处理
+	var lastErr error
+
 	defer func() {
+		// 异常处理
 		if v := recover(); v != nil {
 			os.Stderr.WriteString(fmt.Sprintf("[goredis] fatal %s %s\n%s\n", session.RemoteAddr(), v, string(debug.Stack())))
-			session.Close()
-			// callback
-			err, ok := v.(error)
-			if !ok {
-				err = errors.New(fmt.Sprint(v))
+			var ok bool
+			if lastErr, ok = v.(error); !ok {
+				lastErr = errors.New(fmt.Sprint(v))
 			}
-			server.handler.SessionClosed(session, err)
+			session.Close()
 		}
+		server.handler.SessionClosed(session, lastErr)
 	}()
 
 	server.handler.SessionOpened(session)
 
-	var lastErr error
 	for {
 		var cmd *Command
 		cmd, lastErr = session.ReadCommand()
@@ -109,6 +109,4 @@ func (server *RedisServer) handleConnection(session *Session) {
 			}
 		}
 	}
-
-	server.handler.SessionClosed(session, lastErr)
 }
