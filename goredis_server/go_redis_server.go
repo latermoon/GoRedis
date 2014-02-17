@@ -16,7 +16,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.30"
+const VERSION = "1.0.31"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
