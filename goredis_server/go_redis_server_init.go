@@ -7,6 +7,8 @@ import (
 	"GoRedis/libs/stdlog"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -38,6 +40,19 @@ func (server *GoRedisServer) Init() (err error) {
 	// slave
 	server.initSlaveSessions()
 	return
+}
+
+// 处理退出事件
+func (server *GoRedisServer) initSignalNotify() {
+	server.sigs = make(chan os.Signal, 1)
+	signal.Notify(server.sigs, syscall.SIGTERM)
+	go func() {
+		sig := <-server.sigs
+		stdlog.Println("recv signal:", sig)
+		server.levelRedis.Close()
+		stdlog.Println("db closed, bye")
+		os.Exit(0)
+	}()
 }
 
 func (server *GoRedisServer) initConfig() {
