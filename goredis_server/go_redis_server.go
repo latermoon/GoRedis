@@ -9,6 +9,7 @@ import (
 	"GoRedis/libs/uuid"
 	"container/list"
 	"errors"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -54,6 +55,9 @@ type GoRedisServer struct {
 	monitorMutex sync.Mutex
 	// 缓存处理函数，减少relect次数
 	methodCache map[string]reflect.Value
+	// exit
+	sigs     chan os.Signal
+	quitdone chan bool // 准备好退出
 }
 
 /*

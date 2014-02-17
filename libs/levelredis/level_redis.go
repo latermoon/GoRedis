@@ -127,6 +127,12 @@ func (l *LevelRedis) DB() (db *levigo.DB) {
 	return l.db
 }
 
+func (l *LevelRedis) Close() {
+	l.ro.Close()
+	l.wo.Close()
+	l.db.Close()
+}
+
 func NewOptions() *levigo.Options {
 	return levigo.NewOptions()
 }
@@ -141,6 +147,25 @@ func NewLRUCache(capacity int) *levigo.Cache {
 
 func Open(dbname string, o *levigo.Options) (*levigo.DB, error) {
 	return levigo.Open(dbname, o)
+}
+
+func Repair(dbname string) error {
+	opts := levigo.NewOptions()
+	defer opts.Close()
+	opts.SetCache(levigo.NewLRUCache(128 * 1024 * 1024))
+	opts.SetCompression(levigo.SnappyCompression)
+	opts.SetBlockSize(32 * 1024)
+	opts.SetMaxBackgroundCompactions(6)
+	opts.SetWriteBufferSize(128 * 1024 * 1024)
+	opts.SetMaxOpenFiles(100000)
+	opts.SetCreateIfMissing(true)
+	env := levigo.NewDefaultEnv()
+	defer env.Close()
+	env.SetBackgroundThreads(6)
+	env.SetHighPriorityBackgroundThreads(2)
+	opts.SetEnv(env)
+
+	return levigo.RepairDatabase(dbname, opts)
 }
 
 func (l *LevelRedis) Stats() string {
