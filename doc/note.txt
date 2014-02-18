@@ -1,4 +1,16 @@
 
+
+echo 'downloading ...'
+wget ssd002:8801/goredis-server -O goredis-server -q
+chmod +x goredis-server
+wget http://ssd002:8801/libgflags.so.2 -O libgflags.so.2 -q
+wget http://ssd002:8801/librocksdb.so -O librocksdb.so -q
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.
+./goredis-server -v
+
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.:/usr/local/lib:/usr/lib:/usr/lib64
+
 go tool pprof goredis-server /tmp/goredis_1602/mem.prof
 
 

@@ -3,10 +3,9 @@ package levelredis
 // 基于leveldb实现的zset，用于海量存储，节约内存
 
 import (
+	levigo "GoRedis/libs/go-rocksdb"
 	"GoRedis/libs/stdlog"
 	"bytes"
-	// "github.com/latermoon/levigo"
-	levigo "GoRedis/libs/go-rocksdb"
 	"runtime/debug"
 	"strconv"
 	"sync"
@@ -138,8 +137,11 @@ func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 	score := l.score(member)
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
+	// stdlog.Println("zincrby", l.key, string(member), incr, BytesToInt64(score))
+	oldcount := l.totalCount
 	if score == nil {
 		newscore = Int64ToBytes(incr)
+		l.totalCount++
 	} else {
 		batch.Delete(l.scoreKey(member, score))
 		scoreInt := BytesToInt64(score)
@@ -147,9 +149,13 @@ func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 	}
 	batch.Put(l.memberKey(member), newscore)
 	batch.Put(l.scoreKey(member, newscore), nil)
+	if l.totalCount != oldcount {
+		batch.Put(l.zsetKey(), l.zsetValue())
+	}
 	err := l.redis.WriteBatch(batch)
 	if err != nil {
-		panic(err)
+		l.totalCount = oldcount
+		panic(err) // need refect
 	}
 	return
 }
