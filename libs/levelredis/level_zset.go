@@ -3,7 +3,7 @@ package levelredis
 // 基于leveldb实现的zset，用于海量存储，节约内存
 
 import (
-	levigo "GoRedis/libs/go-rocksdb"
+	levigo "GoRedis/libs/gorocks"
 	"GoRedis/libs/stdlog"
 	"bytes"
 	"runtime/debug"

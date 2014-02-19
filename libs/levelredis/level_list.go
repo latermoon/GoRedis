@@ -4,7 +4,7 @@ package levelredis
 // 本页面命名注意，idx都表示大于l.start的那个索引序号，而不是0开始的数组序号
 
 import (
-	levigo "GoRedis/libs/go-rocksdb"
+	levigo "GoRedis/libs/gorocks"
 	"bytes"
 	"strconv"
 	"strings"

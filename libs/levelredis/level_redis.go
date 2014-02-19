@@ -1,7 +1,7 @@
 package levelredis
 
 import (
-	levigo "GoRedis/libs/go-rocksdb"
+	levigo "GoRedis/libs/gorocks"
 	lru "GoRedis/libs/lrucache"
 	"bytes"
 	"math"
