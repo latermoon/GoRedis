@@ -3,6 +3,7 @@
 echo "install goredis libs ..."
 
 go install "GoRedis/goredis"
+go install "GoRedis/libs/gorocks"
 go install "GoRedis/libs/counter"
 go install "GoRedis/libs/iotool"
 go install "GoRedis/libs/levelredis"
