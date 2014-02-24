@@ -4,7 +4,6 @@ import (
 	levigo "GoRedis/libs/gorocks"
 	lru "GoRedis/libs/lrucache"
 	"bytes"
-	"fmt"
 	"math"
 	"sync"
 )
@@ -400,7 +399,6 @@ func (l *LevelRedis) SnapshotEnumerate(min, max []byte, fn func(i int, key, valu
 		iter.Seek(min)
 	}
 	found = iter.Valid()
-	fmt.Println("found", found)
 	if !found {
 		return
 	}
@@ -418,7 +416,6 @@ func (l *LevelRedis) SnapshotEnumerate(min, max []byte, fn func(i int, key, valu
 	for {
 		iter.Next()
 		found = iter.Valid()
-		fmt.Println("found 2", found)
 		if found && between(iter.Key(), min, max) {
 			i++
 			quit := false

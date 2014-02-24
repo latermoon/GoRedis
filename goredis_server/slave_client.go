@@ -136,7 +136,7 @@ func (s *SlaveClient) recvCmd() {
 		}
 		cmd := <-s.buffer
 		s.counters.Get("proc").Incr(1)
-		// slavelog.Printf("[M %s] buffer: %s\n", s.RemoteAddr(), cmd)
+		// slavelog.Printf("[M %s] cmd: %s\n", s.RemoteAddr(), cmd)
 		s.server.On(s.session, cmd)
 	}
 }

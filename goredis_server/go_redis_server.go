@@ -117,11 +117,11 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 		errlog.Printf("[%s] bad command %s\n", session.RemoteAddr(), cmd)
 		return ErrorReply(err)
 	}
-	// slowlog
+	// invoke & time
 	begin := time.Now()
-	// invoke
 	reply = server.invokeCommandHandler(session, cmd)
 	elapsed := time.Now().Sub(begin)
+
 	if elapsed.Nanoseconds() > int64(time.Millisecond*time.Duration(slowexec)) {
 		slowlog.Printf("[%s] exec %0.2f ms [%s]\n", session.RemoteAddr(), elapsed.Seconds()*1000, cmd)
 	}
