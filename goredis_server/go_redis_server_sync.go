@@ -44,7 +44,7 @@ func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 			stdlog.Printf("[%s] send snapshot error %s\n", sc.session.RemoteAddr(), cmd)
 			*quit = true
 		}
-		stdlog.Printf("snapshot: %s,%s\n", string(key), string(value))
+		// stdlog.Printf("snapshot: %s,%s\n", string(key), string(value))
 	})
 	stdlog.Printf("[%s] send snapshot finish\n", sc.session.RemoteAddr())
 	if sc.Available() {
