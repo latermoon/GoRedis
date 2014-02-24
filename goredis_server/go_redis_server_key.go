@@ -85,7 +85,7 @@ func (server *GoRedisServer) OnRAW_KEYSEARCH(cmd *Command) (reply *Reply) {
 	return MultiBulksReply(bulks)
 }
 
-// 获取原始内容
+// 操作原始内容
 func (server *GoRedisServer) OnRAW_GET(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
 	value := server.levelRedis.RawGet(key)
@@ -95,6 +95,22 @@ func (server *GoRedisServer) OnRAW_GET(cmd *Command) (reply *Reply) {
 		reply = BulkReply(value)
 	}
 	return
+}
+
+// 操作原始内容 RAW_SET +[hash]name latermoon
+func (server *GoRedisServer) OnRAW_SET(cmd *Command) (reply *Reply) {
+	key, value := cmd.Args[1], cmd.Args[2]
+	err := server.levelRedis.RawSet(key, value)
+	if err != nil {
+		return ErrorReply(err)
+	} else {
+		return StatusReply("OK")
+	}
+}
+
+func (server *GoRedisServer) OnRAW_SET_NOREPLY(cmd *Command) (reply *Reply) {
+	server.OnRAW_SET(cmd)
+	return nil
 }
 
 /**
