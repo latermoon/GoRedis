@@ -2,7 +2,9 @@ package goredis_server
 
 import (
 	. "GoRedis/goredis"
+	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
+	"bytes"
 	"strings"
 )
 
@@ -24,41 +26,28 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 		return
 	}
 	server.slavelist.PushBack(sc)
+	stdlog.Printf("[%s] start send snapshot\n", session.RemoteAddr())
 	go server.sendSnapshot(sc)
-
-	// slave := server.findSlaveById(uid)
-	// if slave == nil {
-	// 	server.stdlog.Info("[%s] new slave %s", uid, session.RemoteAddr())
-	// 	snapshot := server.levelRedis.DB().NewSnapshot()
-	// 	slave = NewSlaveSessionServer(server, session, uid)
-	// 	server.slavelist.PushBack(slave)
-	// 	go slave.SendSnapshot(snapshot)
-	// } else {
-	// 	server.stdlog.Info("[%s] slave already exists", uid)
-	// 	slave.SetSession(session)
-	// 	go slave.ContinueSync()
-	// }
 
 	return // SYNC不需要Reply
 }
 
 func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
-	server.levelRedis.AllKeys(func(i int, key, keytype []byte, quit *bool) {
-		stdlog.Printf("snapshot: %s,%s\n", string(key), string(keytype))
-
+	cmdName := []byte("RAW_SET_NOREPLY")
+	server.levelRedis.SnapshotEnumerate([]byte{}, []byte{levelredis.MAXBYTE}, func(i int, key, value []byte, quit *bool) {
+		if bytes.HasPrefix(key, []byte(goredisPrefix)) {
+			return
+		}
+		cmd := NewCommand(cmdName, key, value)
+		err := sc.Send(cmd)
+		if err != nil {
+			stdlog.Printf("[%s] send snapshot error %s\n", sc.session.RemoteAddr(), cmd)
+			*quit = true
+		}
+		stdlog.Printf("snapshot: %s,%s\n", string(key), string(value))
 	})
-	sc.SendSnapshotFinish()
+	stdlog.Printf("[%s] send snapshot finish\n", sc.session.RemoteAddr())
+	if sc.Available() {
+		sc.StartSync()
+	}
 }
-
-// func (server *GoRedisServer) findSlaveById(uid string) (slave *SyncClient) {
-// 	if len(uid) == 0 {
-// 		return
-// 	}
-// 	for e := server.slavelist.Front(); e != nil; e = e.Next() {
-// 		if e.Value.(*SlaveSessionServer).UID() == uid {
-// 			slave = e.Value.(*SlaveSessionServer)
-// 			return
-// 		}
-// 	}
-// 	return
-// }

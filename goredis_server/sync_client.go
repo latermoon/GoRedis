@@ -1,38 +1,44 @@
 package goredis_server
 
 import (
-	"./monitor"
 	. "GoRedis/goredis"
+	"GoRedis/libs/counter"
 	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
 )
 
+var (
+	SyncError            = errors.New("sync errors")
+	SyncOutOfBufferError = errors.New("sync out of buffer")
+)
+
+// 负责传输数据到从库
+// status = none/connected/disconnect
 type SyncClient struct {
 	session     *Session
 	home        string
 	buffer      chan *Command
 	synclog     *statlog.StatLogger
-	counters    *monitor.Counters
-	unavailable bool       // 连接不可用
-	snaplock    sync.Mutex // 是否已经发完snapshot
+	counters    *counter.Counters
+	unavailable bool // 连接不可用
+	mu          sync.Mutex
 }
 
 func NewSyncClient(session *Session, home string) (s *SyncClient, err error) {
 	s = &SyncClient{}
 	s.session = session
 	s.home = home
-	s.buffer = make(chan *Command, 1000*10000)
-	s.counters = monitor.NewCounters()
+	s.buffer = make(chan *Command, 500*10000)
+	s.counters = counter.NewCounters()
 	// log
 	logfile := fmt.Sprintf("%s/slave_%s.log", home, session.RemoteAddr())
 	if err = s.initSyncLog(logfile); err != nil {
 		return
 	}
-	s.snaplock.Lock()
-	go s.runloop()
 	return
 }
 
@@ -43,14 +49,11 @@ func (s *SyncClient) initSyncLog(filename string) error {
 		s.synclog = statlog.NewStatLogger(file)
 	}
 	s.synclog.Add(statlog.TimeItem("time"))
-	s.synclog.Add(statlog.Item("snap", func() interface{} {
-		return s.counters.Get("snap").ChangedCount()
+	s.synclog.Add(statlog.Item("in", func() interface{} {
+		return s.counters.Get("in").ChangedCount()
 	}, &statlog.Opt{Padding: 10}))
-	s.synclog.Add(statlog.Item("recv", func() interface{} {
-		return s.counters.Get("recv").ChangedCount()
-	}, &statlog.Opt{Padding: 10}))
-	s.synclog.Add(statlog.Item("send", func() interface{} {
-		return s.counters.Get("send").ChangedCount()
+	s.synclog.Add(statlog.Item("out", func() interface{} {
+		return s.counters.Get("out").ChangedCount()
 	}, &statlog.Opt{Padding: 10}))
 	s.synclog.Add(statlog.Item("buffer", func() interface{} {
 		return len(s.buffer)
@@ -58,50 +61,65 @@ func (s *SyncClient) initSyncLog(filename string) error {
 	return nil
 }
 
-func (s *SyncClient) SendCommand(cmd *Command) {
-	if s.unavailable {
-		return
-	}
-	s.counters.Get("recv").Incr(1)
-	s.buffer <- cmd
+func (s *SyncClient) Available() bool {
+	return !s.unavailable
 }
 
-func (s *SyncClient) SendSnapshotCommand(cmd *Command) (err error) {
-	s.counters.Get("snap").Incr(1)
+// 将要发送的指令放入待传输队列
+func (s *SyncClient) Enqueue(cmd *Command) (err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.unavailable {
+		return SyncError
+	}
+	if len(s.buffer) == cap(s.buffer) {
+		return SyncOutOfBufferError
+	}
+	s.counters.Get("in").Incr(1)
+	s.buffer <- cmd
+	return
+}
+
+func (s *SyncClient) Send(cmd *Command) (err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.counters.Get("out").Incr(1)
 	err = s.session.WriteCommand(cmd)
 	if err != nil {
 		stdlog.Printf("sync error %s %s\n", s.session.RemoteAddr(), err)
-		s.Cancel()
+		s.cancel()
 	}
 	return
 }
 
-func (s *SyncClient) SendSnapshotFinish() {
-	s.snaplock.Unlock()
+// 开始同步
+func (s *SyncClient) StartSync() {
+	go func() {
+		for {
+			if s.unavailable {
+				break
+			}
+			cmd, ok := <-s.buffer
+			if !ok {
+				break
+			}
+			if err := s.Send(cmd); err != nil {
+				break
+			}
+		}
+		stdlog.Printf("[%s] syncloop closed", s.session.RemoteAddr())
+	}()
 }
 
 func (s *SyncClient) Cancel() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cancel()
+}
+
+func (s *SyncClient) cancel() {
 	stdlog.Printf("[%s] sync cancel", s.session.RemoteAddr())
 	s.unavailable = true
 	s.synclog.Stop()
-	s.snaplock.Unlock()
-}
-
-// 将buffer中的command发出去
-func (s *SyncClient) runloop() {
-	s.snaplock.Lock()
-	s.snaplock.Unlock()
-	for {
-		if s.unavailable {
-			break
-		}
-		cmd := <-s.buffer
-		s.counters.Get("send").Incr(1)
-		err := s.session.WriteCommand(cmd)
-		if err != nil {
-			stdlog.Printf("sync error %s %s\n", s.session.RemoteAddr(), err)
-			s.Cancel()
-			break
-		}
-	}
+	close(s.buffer)
 }

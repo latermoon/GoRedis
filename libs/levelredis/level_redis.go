@@ -4,6 +4,7 @@ import (
 	levigo "GoRedis/libs/gorocks"
 	lru "GoRedis/libs/lrucache"
 	"bytes"
+	"fmt"
 	"math"
 	"sync"
 )
@@ -375,6 +376,62 @@ func (l *LevelRedis) AllKeys(fn func(i int, key, keytype []byte, quit *bool)) {
 		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
 		fn(i, key[left+1:right], key[right+1:], quit)
 	})
+}
+
+// 快照枚举
+func (l *LevelRedis) SnapshotEnumerate(min, max []byte, fn func(i int, key, value []byte, quit *bool)) {
+	l.incrCounter("enum")
+
+	snap := l.db.NewSnapshot()
+	defer l.db.ReleaseSnapshot(snap)
+
+	ro := levigo.NewReadOptions()
+	ro.SetFillCache(false)
+	ro.SetSnapshot(snap)
+	defer ro.Close()
+
+	iter := l.db.NewIterator(ro)
+	defer iter.Close()
+
+	found := false
+	if len(min) == 0 {
+		iter.SeekToFirst()
+	} else {
+		iter.Seek(min)
+	}
+	found = iter.Valid()
+	fmt.Println("found", found)
+	if !found {
+		return
+	}
+
+	i := -1
+	// 范围判断
+	if found && between(iter.Key(), min, max) {
+		i++
+		quit := false
+		fn(i, iter.Key(), iter.Value(), &quit)
+		if quit {
+			return
+		}
+	}
+	for {
+		iter.Next()
+		found = iter.Valid()
+		fmt.Println("found 2", found)
+		if found && between(iter.Key(), min, max) {
+			i++
+			quit := false
+			fn(i, iter.Key(), iter.Value(), &quit)
+			if quit {
+				return
+			}
+		} else {
+			break
+		}
+	}
+
+	return
 }
 
 // 范围扫描

@@ -17,7 +17,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.37"
+const VERSION = "1.0.38"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -126,29 +126,36 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 		slowlog.Printf("[%s] exec %0.2f ms [%s]\n", session.RemoteAddr(), elapsed.Seconds()*1000, cmd)
 	}
 
+	cmdName := strings.ToUpper(cmd.Name())
+
+	// 同步到从库
+	if needSync(cmdName) {
+		server.syncCommand(cmd)
+	}
+	go server.incrCommandCounter(cmdName)
+
 	// monitor
 	if server.monitorlist.Len() > 0 {
 		go server.monitorOutput(session, cmd)
 	}
-
-	// 这里要注意并发
-	go func() {
-		cmdName := strings.ToUpper(cmd.Name())
-		server.cmdCounters.Get(cmdName).Incr(1)
-		cate := commandCategory(cmdName)
-		server.cmdCateCounters.Get(string(cate)).Incr(1)
-		server.cmdCateCounters.Get("total").Incr(1)
-
-		// 同步到从库
-		if needSync(cmdName) {
-			for e := server.slavelist.Front(); e != nil; e = e.Next() {
-				sc := e.Value.(*SyncClient)
-				sc.SendCommand(cmd)
-			}
-		}
-	}()
-
 	return
+}
+
+func (server *GoRedisServer) syncCommand(cmd *Command) {
+	for e := server.slavelist.Front(); e != nil; e = e.Next() {
+		sc := e.Value.(*SyncClient)
+		if sc.Available() {
+			sc.Enqueue(cmd)
+		}
+	}
+}
+
+// 指令计数器
+func (server *GoRedisServer) incrCommandCounter(cmdName string) {
+	server.cmdCounters.Get(cmdName).Incr(1)
+	cate := commandCategory(cmdName)
+	server.cmdCateCounters.Get(string(cate)).Incr(1)
+	server.cmdCateCounters.Get("total").Incr(1)
 }
 
 // 首先搜索"On+大写NAME"格式的函数，存在则调用，不存在则调用On
