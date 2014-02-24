@@ -52,8 +52,9 @@ http://redis.io/commands
 	zcard/zscore
 	NOTSUPPORTED(zcount/zincrby/zinterstore/zrank/...)
 
-
-
+### table
+	table_index blogs blogid create_time update_time
+	table_update blogs blogid 1032 create_time '2014-02-23' '2014-04-03' content 'hello GoRedis!' ...
 
 
 [program:goredis]
