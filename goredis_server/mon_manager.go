@@ -1,5 +1,6 @@
 package goredis_server
 
+// 管理当前发起monitor的连接
 import (
 	. "GoRedis/goredis"
 	"container/list"
@@ -10,7 +11,6 @@ import (
 	"time"
 )
 
-// 管理当前发起monitor的连接
 type MonManager struct {
 	clients *list.List
 	mu      sync.Mutex

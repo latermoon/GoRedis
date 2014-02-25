@@ -10,7 +10,6 @@ import (
 # > 100ms (microseconds)
 slowlog-log-slower-than 100000
 
-
 */
 
 func (server *GoRedisServer) OnCONFIG(cmd *Command) (reply *Reply) {

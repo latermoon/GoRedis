@@ -1,5 +1,6 @@
 package goredis_server
 
+// 管理多个从库SyncClient对象
 import (
 	. "GoRedis/goredis"
 	"container/list"
@@ -7,7 +8,6 @@ import (
 	"time"
 )
 
-// 管理多个从库SyncClient对象
 type SyncManager struct {
 	clients *list.List
 	mu      sync.Mutex

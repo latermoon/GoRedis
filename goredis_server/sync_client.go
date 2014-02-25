@@ -1,5 +1,6 @@
 package goredis_server
 
+// 管理同步连接，向slave发送全部数据
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"

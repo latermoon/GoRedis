@@ -1,7 +1,7 @@
 package goredis_server
 
+// 管理SlaveClient对象
 import (
-	// . "GoRedis/goredis"
 	"GoRedis/libs/stdlog"
 	"container/list"
 	"sync"

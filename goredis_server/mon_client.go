@@ -1,5 +1,6 @@
 package goredis_server
 
+// 管理发出monitor指令的连接，传输实时指令
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/stdlog"

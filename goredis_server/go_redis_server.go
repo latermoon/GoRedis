@@ -1,5 +1,6 @@
 package goredis_server
 
+// GoRedis核心类
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"

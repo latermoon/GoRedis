@@ -1,5 +1,6 @@
 package goredis_server
 
+// 管理同步连接，从master获取数据更新到本地
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"

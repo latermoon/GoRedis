@@ -13,7 +13,6 @@ func (server *GoRedisServer) OnMONITOR(session *Session, cmd *Command) (reply *R
 		server.monitorKeys(session, cmd)
 		return
 	}
-
 	session.WriteReply(StatusReply("OK"))
 	client := NewMonClient(session)
 	server.monmgr.Add(client)

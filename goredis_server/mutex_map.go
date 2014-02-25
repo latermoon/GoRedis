@@ -1,5 +1,6 @@
 package goredis_server
 
+// 共享锁
 // 本类尝试非典型写法，只暴露接口，隐藏局部变量
 import (
 	"crypto/md5"

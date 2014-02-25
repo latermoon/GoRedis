@@ -1,13 +1,13 @@
 package goredis_server
 
+// 验证指令是否合法
+// 传入的参数数量，key里是否包含非法字符
 import (
 	. "GoRedis/goredis"
 	"errors"
 	"strings"
 )
 
-// 验证指令是否合法
-// 传入的参数数量，key里是否包含非法字符
 var (
 	BadCommandError    = errors.New("bad command")
 	WrongArgumentCount = errors.New("wrong argument count")
