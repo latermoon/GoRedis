@@ -83,6 +83,9 @@ func (s *SyncClient) Enqueue(cmd *Command) (err error) {
 func (s *SyncClient) Send(cmd *Command) (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.unavailable {
+		return SyncError
+	}
 	s.counters.Get("out").Incr(1)
 	err = s.session.WriteCommand(cmd)
 	if err != nil {
@@ -118,7 +121,7 @@ func (s *SyncClient) Cancel() {
 }
 
 func (s *SyncClient) cancel() {
-	stdlog.Printf("[%s] sync cancel", s.session.RemoteAddr())
+	stdlog.Printf("[%s] sync cancel\n", s.session.RemoteAddr())
 	s.unavailable = true
 	s.synclog.Stop()
 	close(s.buffer)

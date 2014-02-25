@@ -7,17 +7,15 @@ import (
 	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
 	"GoRedis/libs/uuid"
-	"container/list"
 	"errors"
 	"os"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.38"
+const VERSION = "1.0.39"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -48,13 +46,15 @@ type GoRedisServer struct {
 	cmdMonitor    *monitor.StatusLogger
 	leveldbStatus *statlog.StatLogger
 	// 从库
-	uid       string // 实例id
-	slavelist *list.List
+	uid      string        // 实例id
+	syncmgr  *SyncManager  // as master
+	slavemgr *SlaveManager // as slave
 	// monitor
-	monitorlist  *list.List
-	monitorMutex sync.Mutex
+	monmgr *MonManager
 	// 缓存处理函数，减少relect次数
 	methodCache map[string]reflect.Value
+	// 指令队列，异步处理统计、从库、monitor输出
+	cmdChan chan *Command
 	// exit
 	sigs     chan os.Signal
 	quitdone chan bool // 准备好退出
@@ -70,10 +70,13 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	// set as itself
 	server.SetHandler(server)
 	server.methodCache = make(map[string]reflect.Value)
+	server.cmdChan = make(chan *Command, 1000)
+	go server.processCommandChan()
+	server.syncmgr = NewSyncManager()
+	server.slavemgr = NewSlaveManager()
+	server.monmgr = NewMonManager()
 	// default datasource
 	server.directory = directory
-	server.slavelist = list.New()
-	server.monitorlist = list.New()
 	// counter
 	server.counters = monitor.NewCounters()
 	server.cmdCounters = monitor.NewCounters()
@@ -125,27 +128,27 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 	if elapsed.Nanoseconds() > int64(time.Millisecond*time.Duration(slowexec)) {
 		slowlog.Printf("[%s] exec %0.2f ms [%s]\n", session.RemoteAddr(), elapsed.Seconds()*1000, cmd)
 	}
-
-	cmdName := strings.ToUpper(cmd.Name())
-
-	// 同步到从库
-	if needSync(cmdName) {
-		server.syncCommand(cmd)
-	}
-	go server.incrCommandCounter(cmdName)
-
-	// monitor
-	if server.monitorlist.Len() > 0 {
-		go server.monitorOutput(session, cmd)
-	}
+	// see processCommandChan()
+	server.cmdChan <- cmd
 	return
 }
 
-func (server *GoRedisServer) syncCommand(cmd *Command) {
-	for e := server.slavelist.Front(); e != nil; e = e.Next() {
-		sc := e.Value.(*SyncClient)
-		if sc.Available() {
-			sc.Enqueue(cmd)
+// 异步串行处理
+func (server *GoRedisServer) processCommandChan() {
+	for {
+		cmd := <-server.cmdChan
+		cmdName := strings.ToUpper(cmd.Name())
+
+		server.incrCommandCounter(cmdName)
+
+		// 从库
+		if server.syncmgr.Count() > 0 && needSync(cmdName) {
+			server.syncmgr.BroadcastCommand(cmd)
+		}
+
+		// monitor
+		if server.monmgr.Count() > 0 {
+			server.monmgr.BroadcastCommand(cmd)
 		}
 	}
 }

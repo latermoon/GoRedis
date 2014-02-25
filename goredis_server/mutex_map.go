@@ -26,12 +26,12 @@ func init() {
 	}
 
 	mutexof = func(key string) (mu *sync.Mutex) {
+		mclock.Lock()
+		mclock.Unlock()
 		var ok bool
 		if mu, ok = mutexCache[key]; !ok {
-			mclock.Lock()
 			mu = &sync.Mutex{}
 			mutexCache[key] = mu
-			mclock.Unlock()
 		}
 		return
 	}

@@ -25,7 +25,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 		stdlog.Printf("[%s] new slave error %s", session.RemoteAddr(), err)
 		return
 	}
-	server.slavelist.PushBack(sc)
+	server.syncmgr.Add(sc)
 	stdlog.Printf("[%s] start send snapshot\n", session.RemoteAddr())
 	go server.sendSnapshot(sc)
 

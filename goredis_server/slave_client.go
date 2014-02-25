@@ -134,7 +134,11 @@ func (s *SlaveClient) recvCmd() {
 		if s.broken {
 			break
 		}
-		cmd := <-s.buffer
+		cmd, ok := <-s.buffer
+		if !ok {
+			s.Destory()
+			break
+		}
 		s.counters.Get("proc").Incr(1)
 		// slavelog.Printf("[M %s] cmd: %s\n", s.RemoteAddr(), cmd)
 		s.server.On(s.session, cmd)
