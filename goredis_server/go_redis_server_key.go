@@ -2,12 +2,20 @@ package goredis_server
 
 /*
 keysearch [prefix] [count]
-keynext [min] [count]
+keynext [seek] [count] [withtype] [withvalue]
+keyprev nearby:m15:f:fghjkmn 10
+keynext nearby:m15:f:fghjkmn 10 withtype withvalue
+1) nearby:m15:f:fghjkmn
+2) string
+3) "{JSON}"
+keyrange [min] [max] [limit]
 */
 
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
+	"GoRedis/libs/stdlog"
+	"strings"
 )
 
 func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
@@ -20,6 +28,47 @@ func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
 // 这里还是把keys禁用
 func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 	return ErrorReply("keys is not supported by GoRedis, use 'keysearch [prefix] [count] [withtype]' instead")
+}
+
+// keynext [seek] [count] [withtype] [withvalue]
+func (server *GoRedisServer) OnKEYNEXT(cmd *Command) (reply *Reply) {
+	seek := cmd.Args[1]
+	count := 1
+	withtype := false
+	withvalue := false
+	argcount := len(cmd.Args)
+	if argcount > 2 {
+		var err error
+		count, err = cmd.IntAtIndex(2)
+		if err != nil {
+			return ErrorReply(err)
+		}
+		if count < 1 || count > 10000 {
+			return ErrorReply("count range: 1 < count < 10000")
+		}
+	}
+	if argcount > 3 {
+		withtype = strings.ToUpper(cmd.StringAtIndex(3)) == "WITHTYPE"
+	}
+	// 必须withtype才能withvalue
+	if withtype && argcount > 4 {
+		withvalue = strings.ToUpper(cmd.StringAtIndex(4)) == "WITHVALUE"
+	}
+	maxkey := append(seek, levelredis.MAXBYTE)
+	bulks := make([]interface{}, 0, count)
+	server.levelRedis.KeyEnumerate(seek, maxkey, levelredis.IterForward, func(i int, key, value []byte, quit *bool) {
+		stdlog.Println(i, string(key), string(value))
+		bulks = append(bulks, key)
+		if withtype {
+			if withvalue {
+				bulks = append(bulks, value)
+			}
+		}
+		if i >= count-1 {
+			*quit = true
+		}
+	})
+	return MultiBulksReply(bulks)
 }
 
 // 找出下一个key
@@ -40,7 +89,7 @@ func (server *GoRedisServer) OnKEYSEARCH(cmd *Command) (reply *Reply) {
 	}
 	withtype := false
 	if len(cmd.Args) > 3 {
-		withtype = cmd.StringAtIndex(3) == "withtype"
+		withtype = strings.ToUpper(cmd.StringAtIndex(3)) == "WITHTYPE"
 	}
 	// search
 	bulks := make([]interface{}, 0, 10)

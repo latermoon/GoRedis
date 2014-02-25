@@ -22,6 +22,10 @@ const (
 
 // 存放指令格式规则，参数范围
 var cmdrules = map[string][]interface{}{
+	// key
+	"DEL":     []interface{}{2, -1},
+	"TYPE":    []interface{}{2, 2},
+	"KEYNEXT": []interface{}{2, -1},
 	// string
 	"GET":    []interface{}{2, 2},
 	"SET":    []interface{}{3, -1},

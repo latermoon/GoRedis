@@ -346,6 +346,18 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IterDirection, fn 
 	return
 }
 
+func (l *LevelRedis) KeyEnumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
+	ro := levigo.NewReadOptions()
+	ro.SetFillCache(false)
+	defer ro.Close()
+
+	iter := l.db.NewIterator(ro)
+	defer iter.Close()
+	minkey := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(min))
+	maxkey := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(max))
+	l.Enumerate(iter, minkey, maxkey, direction, fn)
+}
+
 func (l *LevelRedis) RangeEnumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
 	ro := levigo.NewReadOptions()
 	ro.SetFillCache(false)
@@ -354,27 +366,6 @@ func (l *LevelRedis) RangeEnumerate(min, max []byte, direction IterDirection, fn
 	iter := l.db.NewIterator(ro)
 	defer iter.Close()
 	l.Enumerate(iter, min, max, direction, fn)
-}
-
-func (l *LevelRedis) AllKeys(fn func(i int, key, keytype []byte, quit *bool)) {
-	snap := l.db.NewSnapshot()
-	defer l.db.ReleaseSnapshot(snap)
-
-	ro := levigo.NewReadOptions()
-	ro.SetFillCache(false)
-	ro.SetSnapshot(snap)
-	defer ro.Close()
-
-	iter := l.db.NewIterator(ro)
-	defer iter.Close()
-
-	min := joinStringBytes(KEY_PREFIX, SEP_LEFT)
-	max := append(min, MAXBYTE)
-	l.Enumerate(iter, min, max, IterForward, func(i int, key, value []byte, quit *bool) {
-		left := bytes.Index(key, []byte(SEP_LEFT))
-		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
-		fn(i, key[left+1:right], key[right+1:], quit)
-	})
 }
 
 // 快照枚举
