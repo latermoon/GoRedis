@@ -1,7 +1,6 @@
 package goredis_server
 
 import (
-	"./monitor"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
@@ -83,10 +82,17 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 
 // 命令执行监控
 func (server *GoRedisServer) initCommandMonitor(path string) {
-	// monitor
-	server.cmdMonitor = monitor.NewStatusLogger(path)
-	server.cmdMonitor.Add(monitor.NewTimeFormater("time", 8))
-	server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCateCounters.Get("total"), "total", 7, "ChangedCount"))
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	server.cmdMonitor = statlog.NewStatLogger(file)
+	server.cmdMonitor.Add(statlog.TimeItem("time"))
+	opt := &statlog.Opt{Padding: 7}
+	server.cmdMonitor.Add(statlog.Item("total", func() interface{} {
+		c := server.cmdCateCounters.Get("total")
+		return c.ChangedCount()
+	}, opt))
 	// key, string, hash, list, ...
 	for _, cate := range CommandCategoryList {
 		cateName := string(cate)
@@ -94,9 +100,19 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 		if padding < 7 {
 			padding = 7
 		}
-		server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCateCounters.Get(cateName), cateName, padding, "ChangedCount"))
+		func(name string, padding int) {
+			opt := &statlog.Opt{Padding: padding}
+			server.cmdMonitor.Add(statlog.Item(name, func() interface{} {
+				c := server.cmdCateCounters.Get(cateName)
+				return c.ChangedCount()
+			}, opt))
+		}(cateName, padding)
 	}
-	server.cmdMonitor.Add(monitor.NewCountFormater(server.counters.Get("connection"), "connection", 11, ""))
+	opt = &statlog.Opt{Padding: 11}
+	server.cmdMonitor.Add(statlog.Item("connection", func() interface{} {
+		c := server.counters.Get("connection")
+		return c.Count()
+	}, opt))
 	go server.cmdMonitor.Start()
 }
 

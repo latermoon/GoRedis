@@ -1,8 +1,8 @@
 package goredis_server
 
 import (
-	"./monitor"
 	. "GoRedis/goredis"
+	"GoRedis/libs/counter"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
@@ -15,7 +15,7 @@ import (
 )
 
 // 版本号，每次更新都需要升级一下
-const VERSION = "1.0.39"
+const VERSION = "1.0.41"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -39,11 +39,11 @@ type GoRedisServer struct {
 	levelRedis *levelredis.LevelRedis
 	config     *Config
 	// counters
-	counters        *monitor.Counters
-	cmdCounters     *monitor.Counters
-	cmdCateCounters *monitor.Counters // 指令集统计
+	counters        *counter.Counters
+	cmdCounters     *counter.Counters
+	cmdCateCounters *counter.Counters // 指令集统计
 	// logger
-	cmdMonitor    *monitor.StatusLogger
+	cmdMonitor    *statlog.StatLogger
 	leveldbStatus *statlog.StatLogger
 	// 从库
 	uid      string        // 实例id
@@ -78,9 +78,9 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	// default datasource
 	server.directory = directory
 	// counter
-	server.counters = monitor.NewCounters()
-	server.cmdCounters = monitor.NewCounters()
-	server.cmdCateCounters = monitor.NewCounters()
+	server.counters = counter.NewCounters()
+	server.cmdCounters = counter.NewCounters()
+	server.cmdCateCounters = counter.NewCounters()
 	return
 }
 
@@ -161,7 +161,7 @@ func (server *GoRedisServer) incrCommandCounter(cmdName string) {
 	server.cmdCateCounters.Get("total").Incr(1)
 }
 
-// 首先搜索"On+大写NAME"格式的函数，存在则调用，不存在则调用On
+// 首先搜索"On+大写NAME"格式的函数，存在则调用，不存在则调用OnUndefined
 // OnGET(cmd *Command) (reply *Reply)
 // OnGET(session *Session, cmd *Command) (reply *Reply)
 func (server *GoRedisServer) invokeCommandHandler(session *Session, cmd *Command) (reply *Reply) {

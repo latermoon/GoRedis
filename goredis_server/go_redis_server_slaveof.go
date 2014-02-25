@@ -29,6 +29,7 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 		reply = ErrorReply(err)
 		return
 	}
+	server.slavemgr.Add(slaveClient)
 	go slaveClient.Sync(server.UID())
 	return
 }

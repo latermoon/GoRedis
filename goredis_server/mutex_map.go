@@ -12,6 +12,7 @@ var inthash func(b []byte, max int) int
 // 获取一个mutex对象
 var mutexof func(key string) (mu *sync.Mutex)
 
+// implement
 func init() {
 	var mclock sync.Mutex
 	mutexCache := make(map[string]*sync.Mutex)
@@ -27,12 +28,12 @@ func init() {
 
 	mutexof = func(key string) (mu *sync.Mutex) {
 		mclock.Lock()
-		mclock.Unlock()
 		var ok bool
 		if mu, ok = mutexCache[key]; !ok {
 			mu = &sync.Mutex{}
 			mutexCache[key] = mu
 		}
+		mclock.Unlock()
 		return
 	}
 }

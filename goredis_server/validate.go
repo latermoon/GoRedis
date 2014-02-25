@@ -95,6 +95,7 @@ func verifyCommand(cmd *Command) error {
 		}
 	}
 
+	// 拒绝使用内部关键字 #[]
 	if cmd.Len() > 1 {
 		key := cmd.StringAtIndex(1)
 		if strings.ContainsAny(key, "#[] ") {

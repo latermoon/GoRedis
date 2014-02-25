@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-// 指令集名称 CommandCategory
+// 指令集分类
 type CCate string
 
 const (
@@ -63,14 +63,13 @@ func init() {
 	}
 }
 
-// 获取指令类别
-// 要求cmd大写
-func commandCategory(cmd string) (cate CCate) {
-	var ok bool
-	if cate, ok = ccatemap[cmd]; !ok {
-		cate = CCateUnknown
+// 获取指令类别，传入大写cmd
+func commandCategory(cmd string) CCate {
+	if cate, ok := ccatemap[cmd]; ok {
+		return cate
+	} else {
+		return CCateUnknown
 	}
-	return
 }
 
 // 判断指令是否需要同步

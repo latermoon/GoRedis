@@ -29,6 +29,7 @@ type SlaveClient struct {
 	broken   bool // 无效连接
 	counters *counter.Counters
 	synclog  *statlog.StatLogger
+	status   string
 }
 
 func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient, err error) {
@@ -67,6 +68,10 @@ func (s *SlaveClient) initLog() error {
 	return nil
 }
 
+func (s *SlaveClient) Status() string {
+	return s.status
+}
+
 func (s *SlaveClient) RemoteAddr() net.Addr {
 	return s.session.RemoteAddr()
 }
@@ -81,6 +86,7 @@ func (s *SlaveClient) rdbfilename() string {
 
 // 开始同步
 func (s *SlaveClient) Sync(uid string) (err error) {
+	s.status = "waiting"
 	isgoredis, version, e1 := s.masterInfo()
 	if e1 != nil {
 		return e1
@@ -130,6 +136,7 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 }
 
 func (s *SlaveClient) recvCmd() {
+	s.status = "online"
 	for {
 		if s.broken {
 			break
@@ -146,6 +153,7 @@ func (s *SlaveClient) recvCmd() {
 }
 
 func (s *SlaveClient) recvRdb() (err error) {
+	s.status = "recvrdb"
 	var f *os.File
 	f, err = os.OpenFile(s.rdbfilename(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
@@ -183,8 +191,13 @@ func (s *SlaveClient) recvRdb() (err error) {
 	return
 }
 
+func (s *SlaveClient) Broken() bool {
+	return s.broken
+}
+
 // 清空本地的同步状态
 func (s *SlaveClient) Destory() (err error) {
+	s.status = "broken"
 	s.broken = true
 	s.synclog.Stop()
 	return

@@ -2,6 +2,7 @@ package goredis_server
 
 import (
 	// . "GoRedis/goredis"
+	"GoRedis/libs/stdlog"
 	"container/list"
 	"sync"
 	"time"
@@ -16,17 +17,23 @@ func NewSlaveManager() (s *SlaveManager) {
 	s = &SlaveManager{
 		clients: list.New(),
 	}
-	go s.pingRunloop()
+	go s.checkRunloop()
 	return
 }
 
-func (s *SlaveManager) pingRunloop() {
+func (s *SlaveManager) checkRunloop() {
 	ticker := time.NewTicker(time.Second * 1)
-	go func() {
-		for _ = range ticker.C {
-
+	for _ = range ticker.C {
+		s.mu.Lock()
+		for e := s.clients.Front(); e != nil; e = e.Next() {
+			c := e.Value.(*SlaveClient)
+			if c.Broken() {
+				stdlog.Printf("[M %s] master broken, removed\n", c.session.RemoteAddr())
+				s.clients.Remove(e)
+			}
 		}
-	}()
+		s.mu.Unlock()
+	}
 }
 
 func (s *SlaveManager) Count() int {
@@ -45,4 +52,10 @@ func (s *SlaveManager) Client(i int) (c *SlaveClient) {
 		cur++
 	}
 	return
+}
+
+func (s *SlaveManager) Add(c *SlaveClient) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.clients.PushBack(c)
 }

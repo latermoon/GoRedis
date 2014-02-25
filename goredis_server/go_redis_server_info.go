@@ -138,12 +138,12 @@ func (server *GoRedisServer) replicationInfo() string {
 	buf.WriteString(fmt.Sprintf("connected_slaves:%d\n", synccount))
 	for i := 0; i < synccount; i++ {
 		c := server.syncmgr.Client(i)
-		buf.WriteString(fmt.Sprintf("slave%d:%s,online\n", i, c.session.RemoteAddr()))
+		buf.WriteString(fmt.Sprintf("slave%d:%s,%s\n", i, c.session.RemoteAddr(), c.Status()))
 	}
-	buf.WriteString(fmt.Sprintf("connected_master:%d\n", slavecount))
+	buf.WriteString(fmt.Sprintf("connected_masters:%d\n", slavecount))
 	for i := 0; i < slavecount; i++ {
 		c := server.slavemgr.Client(i)
-		buf.WriteString(fmt.Sprintf("master%d:%s,online\n", i, c.session.RemoteAddr()))
+		buf.WriteString(fmt.Sprintf("master%d:%s,%s\n", i, c.session.RemoteAddr(), c.Status()))
 	}
 	return buf.String()
 }

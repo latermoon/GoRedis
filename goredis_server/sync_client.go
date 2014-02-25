@@ -26,6 +26,7 @@ type SyncClient struct {
 	counters    *counter.Counters
 	unavailable bool // 连接不可用
 	mu          sync.Mutex
+	status      string
 }
 
 func NewSyncClient(session *Session, home string) (s *SyncClient, err error) {
@@ -39,6 +40,7 @@ func NewSyncClient(session *Session, home string) (s *SyncClient, err error) {
 	if err = s.initSyncLog(logfile); err != nil {
 		return
 	}
+	s.status = "sendbulk"
 	return
 }
 
@@ -59,6 +61,10 @@ func (s *SyncClient) initSyncLog(filename string) error {
 		return len(s.buffer)
 	}, &statlog.Opt{Padding: 10}))
 	return nil
+}
+
+func (s *SyncClient) Status() string {
+	return s.status
 }
 
 func (s *SyncClient) Available() bool {
@@ -97,6 +103,7 @@ func (s *SyncClient) Send(cmd *Command) (err error) {
 
 // 开始同步
 func (s *SyncClient) StartSync() {
+	s.status = "online"
 	go func() {
 		for {
 			if s.unavailable {
@@ -121,6 +128,7 @@ func (s *SyncClient) Cancel() {
 }
 
 func (s *SyncClient) cancel() {
+	s.status = "offline"
 	stdlog.Printf("[%s] sync cancel\n", s.session.RemoteAddr())
 	s.unavailable = true
 	s.synclog.Stop()

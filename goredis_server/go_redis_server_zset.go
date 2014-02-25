@@ -1,7 +1,6 @@
 package goredis_server
 
 import (
-	"./util"
 	. "GoRedis/goredis"
 	"strconv"
 	"strings"
@@ -25,7 +24,7 @@ func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 		}
 		// replace score
 		scoreInt := int64(scorefloat)
-		args[i] = util.Int64ToBytes(scoreInt)
+		args[i] = Int64ToBytes(scoreInt)
 		args[i+1] = scoreMembers[i+1]
 	}
 	// add
@@ -84,7 +83,7 @@ func (server *GoRedisServer) rangeByIndex(cmd *Command, high2low bool) (reply *R
 	for i := 0; i < count; i += 2 {
 		bulks = append(bulks, scoreMembers[i+1])
 		if withScore {
-			scoreInt := util.BytesToInt64(scoreMembers[i])
+			scoreInt := BytesToInt64(scoreMembers[i])
 			bulks = append(bulks, []byte(strconv.FormatInt(scoreInt, 10)))
 		}
 	}
@@ -118,13 +117,13 @@ func (server *GoRedisServer) rangeByScore(cmd *Command, high2low bool) (reply *R
 		withScore = true
 	}
 	zset := server.levelRedis.GetSortedSet(key)
-	scoreMembers := zset.RangeByScore(high2low, util.Int64ToBytes(min), util.Int64ToBytes(max), 0, -1)
+	scoreMembers := zset.RangeByScore(high2low, Int64ToBytes(min), Int64ToBytes(max), 0, -1)
 	count := len(scoreMembers)
 	bulks := make([]interface{}, 0, count)
 	for i := 0; i < count; i += 2 {
 		bulks = append(bulks, scoreMembers[i+1])
 		if withScore {
-			scoreInt := util.BytesToInt64(scoreMembers[i])
+			scoreInt := BytesToInt64(scoreMembers[i])
 			bulks = append(bulks, []byte(strconv.FormatInt(scoreInt, 10)))
 		}
 	}
@@ -180,7 +179,7 @@ func (server *GoRedisServer) OnZREMRANGEBYSCORE(cmd *Command) (reply *Reply) {
 		return ErrorReply("Bad min/max")
 	}
 	zset := server.levelRedis.GetSortedSet(key)
-	n := zset.RemoveByScore(util.Int64ToBytes(min), util.Int64ToBytes(max))
+	n := zset.RemoveByScore(Int64ToBytes(min), Int64ToBytes(max))
 	reply = IntegerReply(n)
 	return
 }
@@ -194,7 +193,7 @@ func (server *GoRedisServer) OnZINCRBY(cmd *Command) (reply *Reply) {
 	}
 	zset := server.levelRedis.GetSortedSet(key)
 	score := zset.IncrBy(member, incrmemt)
-	scoreInt := util.BytesToInt64(score)
+	scoreInt := BytesToInt64(score)
 	reply = BulkReply(strconv.FormatInt(scoreInt, 10))
 	return
 }
@@ -210,7 +209,7 @@ func (server *GoRedisServer) OnZSCORE(cmd *Command) (reply *Reply) {
 	if score == nil {
 		return BulkReply(nil)
 	}
-	scoreInt := util.BytesToInt64(score)
+	scoreInt := BytesToInt64(score)
 	reply = BulkReply(strconv.FormatInt(scoreInt, 10))
 	return
 }
