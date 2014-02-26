@@ -1,20 +1,8 @@
 package goredis_server
 
-/*
-keysearch [prefix] [count]
-keynext [seek] [count] [withtype] [withvalue]
-keyprev nearby:m15:f:fghjkmn 10
-keynext nearby:m15:f:fghjkmn 10 withtype withvalue
-1) nearby:m15:f:fghjkmn
-2) string
-3) "{JSON}"
-keyrange [min] [max] [limit]
-*/
-
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
-	"GoRedis/libs/stdlog"
 	"strings"
 )
 
@@ -30,8 +18,23 @@ func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 	return ErrorReply("keys is not supported by GoRedis, use 'keysearch [prefix] [count] [withtype]' instead")
 }
 
+// keyprev [seek] [count] [withtype] [withvalue]
+func (server *GoRedisServer) OnKEYPREV(cmd *Command) (reply *Reply) {
+	return server.keyEnumerate(cmd, levelredis.IterBackward)
+}
+
 // keynext [seek] [count] [withtype] [withvalue]
+// 1) [key]
+// 2) [type]
+// 3) [value]
+// 4) [key2]
+// 5) [type2]
+// 6) [value2]
 func (server *GoRedisServer) OnKEYNEXT(cmd *Command) (reply *Reply) {
+	return server.keyEnumerate(cmd, levelredis.IterForward)
+}
+
+func (server *GoRedisServer) keyEnumerate(cmd *Command, direction levelredis.IterDirection) (reply *Reply) {
 	seek := cmd.Args[1]
 	count := 1
 	withtype := false
@@ -54,12 +57,20 @@ func (server *GoRedisServer) OnKEYNEXT(cmd *Command) (reply *Reply) {
 	if withtype && argcount > 4 {
 		withvalue = strings.ToUpper(cmd.StringAtIndex(4)) == "WITHVALUE"
 	}
-	maxkey := append(seek, levelredis.MAXBYTE)
-	bulks := make([]interface{}, 0, count)
-	server.levelRedis.KeyEnumerate(seek, maxkey, levelredis.IterForward, func(i int, key, value []byte, quit *bool) {
-		stdlog.Println(i, string(key), string(value))
+	// bulks初始大小
+	bufferSize := count
+	if withtype {
+		bufferSize = count * 2
+		if withvalue {
+			bufferSize = count * 3
+		}
+	}
+	bulks := make([]interface{}, 0, bufferSize)
+	server.levelRedis.KeyEnumerate(seek, direction, func(i int, key, keytype, value []byte, quit *bool) {
+		// stdlog.Println(i, string(key), string(keytype), string(value))
 		bulks = append(bulks, key)
 		if withtype {
+			bulks = append(bulks, keytype)
 			if withvalue {
 				bulks = append(bulks, value)
 			}

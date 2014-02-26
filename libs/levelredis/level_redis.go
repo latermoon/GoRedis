@@ -346,16 +346,25 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IterDirection, fn 
 	return
 }
 
-func (l *LevelRedis) KeyEnumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
+// key顺序扫描，常用于数据导出、附近搜索
+// 返回的key是面向用户的key，而非内部结构的raw_key
+func (l *LevelRedis) KeyEnumerate(seek []byte, direction IterDirection, fn func(i int, key, keytype, value []byte, quit *bool)) {
 	ro := levigo.NewReadOptions()
 	ro.SetFillCache(false)
 	defer ro.Close()
 
 	iter := l.db.NewIterator(ro)
 	defer iter.Close()
-	minkey := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(min))
-	maxkey := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(max))
-	l.Enumerate(iter, minkey, maxkey, direction, fn)
+	minkey := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(seek))
+	maxkey := []byte{MAXBYTE}
+	l.Enumerate(iter, minkey, maxkey, direction, func(i int, key, value []byte, quit *bool) {
+		left := bytes.Index(key, []byte(SEP_LEFT))
+		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
+		if left == -1 || right == -1 {
+			return // just skip
+		}
+		fn(i, key[left+1:right], key[right+1:], value, quit)
+	})
 }
 
 func (l *LevelRedis) RangeEnumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
