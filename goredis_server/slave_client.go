@@ -105,13 +105,13 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 	s.session.WriteCommand(NewCommand(args...))
 
 	rdbsaved := false
+	// GoRedis不会发送rdb，所以直接调用recvCmd
+	if isgoredis {
+		go s.recvCmd()
+	}
 	for {
 		var c byte
 		c, err = s.session.PeekByte()
-		// GoRedis不会发送rdb，所以直接调用recvCmd
-		if isgoredis {
-			go s.recvCmd()
-		}
 		if !rdbsaved && c == '$' {
 			err = s.recvRdb()
 			if err != nil {
