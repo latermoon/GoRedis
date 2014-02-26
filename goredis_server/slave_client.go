@@ -138,6 +138,7 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 
 func (s *SlaveClient) recvCmd() {
 	s.status = "online"
+	pool := NewFuncPool(10)
 	for {
 		if s.broken {
 			break
@@ -147,10 +148,15 @@ func (s *SlaveClient) recvCmd() {
 			s.Destory()
 			break
 		}
-		s.counters.Get("proc").Incr(1)
 		// slavelog.Printf("[M %s] cmd: %s\n", s.RemoteAddr(), cmd)
-		s.server.On(s.session, cmd)
+		s.counters.Get("proc").Incr(1)
+		func(c *Command) {
+			pool.Run(func() {
+				s.server.On(s.session, c)
+			})
+		}(cmd)
 	}
+	pool.Wait()
 }
 
 func (s *SlaveClient) recvRdb() (err error) {

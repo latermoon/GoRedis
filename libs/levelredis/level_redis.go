@@ -141,6 +141,10 @@ func NewDefaultEnv() *levigo.Env {
 	return levigo.NewDefaultEnv()
 }
 
+func NewWriteBatch() *levigo.WriteBatch {
+	return levigo.NewWriteBatch()
+}
+
 func NewLRUCache(capacity int) *levigo.Cache {
 	return levigo.NewLRUCache(capacity)
 }

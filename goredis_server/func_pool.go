@@ -1,22 +1,8 @@
-package main
+package goredis_server
 
-// 伪代码
 import (
-	"fmt"
+// "sync"
 )
-
-func main() {
-	pool := NewFuncPool(5)
-	for i := 0; i < 1000; i++ {
-		func(n int) {
-			pool.Run(func() {
-				fmt.Println(n)
-			})
-		}(i)
-	}
-	pool.Wait()
-	fmt.Println("OK")
-}
 
 type FuncPool struct {
 	buffer chan int
