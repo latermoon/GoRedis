@@ -32,7 +32,15 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	stdlog.Printf("[%s] start send snapshot\n", session.RemoteAddr())
 	go server.sendSnapshot(sc)
 
-	return // SYNC不需要Reply
+	return NOREPLY
+}
+
+// 收到来自从库的SEQ反馈 SYNC_BULK_FIN [SEQ]
+func (server *GoRedisServer) OnSYNC_BULK_FIN(session *Session, cmd *Command) (reply *Reply) {
+	// seq, _ := cmd.Int64AtIndex(1)
+	stdlog.Println(cmd)
+	// update_fin_stamp
+	return NOREPLY
 }
 
 func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {

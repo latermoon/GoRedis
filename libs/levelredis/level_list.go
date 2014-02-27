@@ -210,7 +210,7 @@ func (l *LevelList) LPop() (e *Element, err error) {
 	return
 }
 
-// 删除左边
+// 保留左边
 func (l *LevelList) TrimLeft(count uint) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()

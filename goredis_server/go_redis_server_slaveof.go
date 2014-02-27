@@ -8,7 +8,7 @@ import (
 
 // 从主库获取数据
 // 对应 go_redis_server_sync.go
-func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd *Command) (reply *Reply) {
 	// connect to master
 	host := cmd.StringAtIndex(1)
 	port := cmd.StringAtIndex(2)
@@ -31,5 +31,10 @@ func (server *GoRedisServer) OnSLAVEOF(cmd *Command) (reply *Reply) {
 	}
 	server.slavemgr.Add(slaveClient)
 	go slaveClient.Sync(server.UID())
+	return
+}
+
+// 收到来自主库的数据
+func (server *GoRedisServer) OnSYNC_BULK(session *Session, cmd *Command) (reply *Reply) {
 	return
 }

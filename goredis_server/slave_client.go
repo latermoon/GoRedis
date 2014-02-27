@@ -151,13 +151,14 @@ func (s *SlaveClient) recvCmd() {
 		}
 		// slavelog.Printf("[M %s] cmd: %s\n", s.RemoteAddr(), cmd)
 		s.counters.Get("proc").Incr(1)
-		if cmd.StringAtIndex(0) == "RAW_SET_NOREPLY" {
+		if cmd.StringAtIndex(0) == "RAW_SET_NOREPLY" || len(cmd.Args) == 1 {
 			func(c *Command) {
 				pool.Run(-1, func() {
 					s.server.On(s.session, cmd)
 				})
 			}(cmd)
 		} else {
+			pool.Wait()
 			s.server.On(s.session, cmd)
 		}
 	}

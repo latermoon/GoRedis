@@ -6,42 +6,38 @@ import (
 )
 
 func main() {
-	pool := NewFuncPool(5)
-	for i := 0; i < 1000; i++ {
-		func(n int) {
-			pool.Run(func() {
-				fmt.Println(n)
-			})
-		}(i)
-	}
-	pool.Wait()
-	fmt.Println("OK")
+
 }
 
-type FuncPool struct {
-	buffer chan int
+func sync() {
+
 }
 
-func NewFuncPool(size int) (f *FuncPool) {
-	f = &FuncPool{
-		buffer: make(chan int, size),
-	}
-	for i := 0; i < cap(f.buffer); i++ {
-		f.buffer <- i
-	}
-	return
+func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
 }
 
-func (f *FuncPool) Run(fn func()) {
-	i := <-f.buffer
-	go func() {
-		fn()
-		f.buffer <- i
-	}()
+// Master:
+// SYNC_BULK [SEQ] [CMD]
+
+// Slave:
+// SYNC_BULK_FIN [SEQ]
+func (server *GoRedisServer) OnSYNC_FIN(session *Session, cmd *Command) (reply *Reply) {
+	// <- SYNC_FIN [seq]
+	// db.CleanBulks(success)
+	// session.WriteCommand(SYNC_BULK ...)
+	// session.WriteCommand(SYNC_BULK_FIN)
 }
 
-func (f *FuncPool) Wait() {
-	for i := 0; i < cap(f.buffer); i++ {
-		<-f.buffer
-	}
+// slave
+func (server *GoRedisServer) OnSYNC_BULK(session *Session, cmd *Command) (reply *Reply) {
+	// <- SYNC_BULK cmd
+	// bulks = append(bulks, cmd)
+	// NO_REPLY
+}
+
+// -> SYNC_FIN [seq]
+func (server *GoRedisServer) OnSYNC_BULK_FIN(session *Session, cmd *Command) (reply *Reply) {
+	// <- SYNC_BULK_SEQ [seq]
+	// db.Write(bulks)
+	// -> SYNC_FIN [seq]
 }
