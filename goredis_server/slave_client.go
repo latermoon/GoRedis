@@ -4,6 +4,7 @@ package goredis_server
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"
+	"GoRedis/libs/funcpool"
 	"GoRedis/libs/iotool"
 	"GoRedis/libs/rdb"
 	"GoRedis/libs/statlog"
@@ -138,7 +139,7 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 
 func (s *SlaveClient) recvCmd() {
 	s.status = "online"
-	pool := NewFuncPool(10)
+	pool := funcpool.New(10)
 	for {
 		if s.broken {
 			break
@@ -150,13 +151,18 @@ func (s *SlaveClient) recvCmd() {
 		}
 		// slavelog.Printf("[M %s] cmd: %s\n", s.RemoteAddr(), cmd)
 		s.counters.Get("proc").Incr(1)
-		func(c *Command) {
-			pool.Run(func() {
-				s.server.On(s.session, c)
-			})
-		}(cmd)
+		if cmd.StringAtIndex(0) == "RAW_SET_NOREPLY" {
+			func(c *Command) {
+				pool.Run(-1, func() {
+					s.server.On(s.session, cmd)
+				})
+			}(cmd)
+		} else {
+			s.server.On(s.session, cmd)
+		}
 	}
 	pool.Wait()
+	pool.Close()
 }
 
 func (s *SlaveClient) recvRdb() (err error) {

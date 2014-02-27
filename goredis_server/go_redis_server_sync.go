@@ -9,7 +9,10 @@ import (
 )
 
 // 向从库发送数据
-// SYNC uid 70ecc21580
+// -> SYNC [uid]
+// <- +OK
+// -> SYNC_REQ [seq]
+// <-
 // 对应 go_redis_server_slaveof.go
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
 	// 客户端标识 SYNC uid 70ecc21580
