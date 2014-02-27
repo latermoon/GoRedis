@@ -1,10 +1,9 @@
 package levelredis
 
 import (
+	levigo "GoRedis/libs/gorocks"
 	lru "GoRedis/libs/lrucache"
 	"bytes"
-	// "github.com/latermoon/levigo"
-	levigo "GoRedis/libs/go-rocksdb"
 	"math"
 	"sync"
 )
@@ -84,6 +83,11 @@ const (
 	IterBackward
 )
 
+const (
+	NoCompression     = levigo.NoCompression
+	SnappyCompression = levigo.SnappyCompression
+)
+
 var (
 	lruCacheSize         = uint64(100000) // cache size
 	objCacheCreateThread = 100            // obj create threads
@@ -121,6 +125,55 @@ func NewLevelRedis(db *levigo.DB) (l *LevelRedis) {
 
 func (l *LevelRedis) DB() (db *levigo.DB) {
 	return l.db
+}
+
+func (l *LevelRedis) Close() {
+	l.ro.Close()
+	l.wo.Close()
+	l.db.Close()
+}
+
+func NewOptions() *levigo.Options {
+	return levigo.NewOptions()
+}
+
+func NewDefaultEnv() *levigo.Env {
+	return levigo.NewDefaultEnv()
+}
+
+func NewWriteBatch() *levigo.WriteBatch {
+	return levigo.NewWriteBatch()
+}
+
+func NewLRUCache(capacity int) *levigo.Cache {
+	return levigo.NewLRUCache(capacity)
+}
+
+func Open(dbname string, o *levigo.Options) (*levigo.DB, error) {
+	return levigo.Open(dbname, o)
+}
+
+func Repair(dbname string) error {
+	opts := levigo.NewOptions()
+	defer opts.Close()
+	opts.SetCache(levigo.NewLRUCache(128 * 1024 * 1024))
+	opts.SetCompression(levigo.SnappyCompression)
+	opts.SetBlockSize(32 * 1024)
+	opts.SetMaxBackgroundCompactions(6)
+	opts.SetWriteBufferSize(128 * 1024 * 1024)
+	opts.SetMaxOpenFiles(100000)
+	opts.SetCreateIfMissing(true)
+	env := levigo.NewDefaultEnv()
+	defer env.Close()
+	env.SetBackgroundThreads(6)
+	env.SetHighPriorityBackgroundThreads(2)
+	opts.SetEnv(env)
+
+	return levigo.RepairDatabase(dbname, opts)
+}
+
+func (l *LevelRedis) Stats() string {
+	return l.db.PropertyValue("rocksdb.stats")
 }
 
 func (l *LevelRedis) Global() *global {
@@ -297,30 +350,89 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IterDirection, fn 
 	return
 }
 
+// key顺序扫描，常用于数据导出、附近搜索
+// 返回的key是面向用户的key，而非内部结构的raw_key
+func (l *LevelRedis) KeyEnumerate(seek []byte, direction IterDirection, fn func(i int, key, keytype, value []byte, quit *bool)) {
+	ro := levigo.NewReadOptions()
+	ro.SetFillCache(false)
+	defer ro.Close()
+
+	iter := l.db.NewIterator(ro)
+	defer iter.Close()
+	minkey := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(seek))
+	maxkey := []byte{MAXBYTE}
+	l.Enumerate(iter, minkey, maxkey, direction, func(i int, key, value []byte, quit *bool) {
+		left := bytes.Index(key, []byte(SEP_LEFT))
+		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
+		if left == -1 || right == -1 {
+			return // just skip
+		}
+		fn(i, key[left+1:right], key[right+1:], value, quit)
+	})
+}
+
 func (l *LevelRedis) RangeEnumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
-	iter := l.db.NewIterator(l.ro)
+	ro := levigo.NewReadOptions()
+	ro.SetFillCache(false)
+	defer ro.Close()
+
+	iter := l.db.NewIterator(ro)
 	defer iter.Close()
 	l.Enumerate(iter, min, max, direction, fn)
 }
 
-func (l *LevelRedis) AllKeys(fn func(i int, key, keytype []byte, quit *bool)) {
+// 快照枚举
+func (l *LevelRedis) SnapshotEnumerate(min, max []byte, fn func(i int, key, value []byte, quit *bool)) {
+	l.incrCounter("enum")
+
 	snap := l.db.NewSnapshot()
 	defer l.db.ReleaseSnapshot(snap)
 
 	ro := levigo.NewReadOptions()
+	ro.SetFillCache(false)
 	ro.SetSnapshot(snap)
 	defer ro.Close()
 
 	iter := l.db.NewIterator(ro)
 	defer iter.Close()
 
-	min := joinStringBytes(KEY_PREFIX, SEP_LEFT)
-	max := append(min, MAXBYTE)
-	l.Enumerate(iter, min, max, IterForward, func(i int, key, value []byte, quit *bool) {
-		left := bytes.Index(key, []byte(SEP_LEFT))
-		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
-		fn(i, key[left+1:right], key[right+1:], quit)
-	})
+	found := false
+	if len(min) == 0 {
+		iter.SeekToFirst()
+	} else {
+		iter.Seek(min)
+	}
+	found = iter.Valid()
+	if !found {
+		return
+	}
+
+	i := -1
+	// 范围判断
+	if found && between(iter.Key(), min, max) {
+		i++
+		quit := false
+		fn(i, iter.Key(), iter.Value(), &quit)
+		if quit {
+			return
+		}
+	}
+	for {
+		iter.Next()
+		found = iter.Valid()
+		if found && between(iter.Key(), min, max) {
+			i++
+			quit := false
+			fn(i, iter.Key(), iter.Value(), &quit)
+			if quit {
+				return
+			}
+		} else {
+			break
+		}
+	}
+
+	return
 }
 
 // 范围扫描

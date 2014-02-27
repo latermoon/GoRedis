@@ -5,6 +5,7 @@ package main
 
 import (
 	"../goredis_server"
+	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
 	"flag"
 	"fmt"
@@ -29,6 +30,7 @@ func main() {
 	hostPtr := flag.String("h", "", "server host")
 	portPtr := flag.Int("p", 1602, "server port")
 	procsPtr := flag.Int("procs", 8, "GOMAXPROCS")
+	repair := flag.Bool("repair", false, "repaire rocksdb")
 	flag.Parse()
 
 	if *version {
@@ -38,17 +40,24 @@ func main() {
 
 	runtime.GOMAXPROCS(*procsPtr)
 
-	// 设置主路径
-	dbhome := "/data"
-	finfo, e1 := os.Stat(dbhome)
-	if os.IsNotExist(e1) || !finfo.IsDir() {
-		dbhome = "/tmp"
-	}
-	directory := fmt.Sprintf("%s/goredis_%d/", dbhome, *portPtr)
-	os.MkdirAll(directory, os.ModePerm)
+	directory := dbHome(*portPtr)
 
 	// 重定向日志输出位置
 	redirectLogOutput(directory)
+
+	if *repair {
+		dbhome := directory + "db0"
+		finfo, e1 := os.Stat(dbhome)
+		if os.IsNotExist(e1) || !finfo.IsDir() {
+			stdlog.Println("db not exist")
+			return
+		} else {
+			stdlog.Println("start repair", directory)
+			levelredis.Repair(dbhome)
+			stdlog.Println("repair finish")
+		}
+		return
+	}
 
 	host := fmt.Sprintf("%s:%d", *hostPtr, *portPtr)
 
@@ -60,6 +69,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func dbHome(port int) string {
+	// 设置主路径
+	dbhome := "/data"
+	finfo, e1 := os.Stat(dbhome)
+	if os.IsNotExist(e1) || !finfo.IsDir() {
+		dbhome = "/tmp"
+	}
+	directory := fmt.Sprintf("%s/goredis_%d/", dbhome, port)
+	os.MkdirAll(directory, os.ModePerm)
+	return directory
 }
 
 // 将Stdout, Stderr重定向到指定文件

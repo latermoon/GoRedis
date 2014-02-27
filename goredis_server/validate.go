@@ -1,13 +1,13 @@
 package goredis_server
 
+// 验证指令是否合法
+// 传入的参数数量，key里是否包含非法字符
 import (
 	. "GoRedis/goredis"
 	"errors"
 	"strings"
 )
 
-// 验证指令是否合法
-// 传入的参数数量，key里是否包含非法字符
 var (
 	BadCommandError    = errors.New("bad command")
 	WrongArgumentCount = errors.New("wrong argument count")
@@ -22,6 +22,10 @@ const (
 
 // 存放指令格式规则，参数范围
 var cmdrules = map[string][]interface{}{
+	// key
+	"DEL":     []interface{}{2, -1},
+	"TYPE":    []interface{}{2, 2},
+	"KEYNEXT": []interface{}{2, -1},
 	// string
 	"GET":    []interface{}{2, 2},
 	"SET":    []interface{}{3, -1},
@@ -95,6 +99,7 @@ func verifyCommand(cmd *Command) error {
 		}
 	}
 
+	// 拒绝使用内部关键字 #[]
 	if cmd.Len() > 1 {
 		key := cmd.StringAtIndex(1)
 		if strings.ContainsAny(key, "#[] ") {

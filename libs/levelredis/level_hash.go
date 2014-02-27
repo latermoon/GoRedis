@@ -1,10 +1,8 @@
 package levelredis
 
 import (
-	// "fmt"
+	levigo "GoRedis/libs/gorocks"
 	"bytes"
-	// "github.com/latermoon/levigo"
-	levigo "GoRedis/libs/go-rocksdb"
 	"sync"
 )
 
@@ -78,7 +76,9 @@ func (l *LevelHash) fieldInKey(fieldkey []byte) (field []byte) {
 func (l *LevelHash) Get(field []byte) (val []byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
+	return l.get(field)
+}
+func (l *LevelHash) get(field []byte) (val []byte) {
 	fieldkey := l.fieldKey(field)
 	val = l.redis.RawGet(fieldkey)
 	return
@@ -132,11 +132,12 @@ func (l *LevelHash) Remove(fields ...[]byte) (n int) {
 
 	n = 0
 	for _, field := range fields {
-		if l.Get(field) != nil {
+		if l.get(field) != nil {
 			l.redis.RawDel(l.fieldKey(field))
 			n++
 		}
 	}
+
 	// 检查是否已经删除完
 	hasElem := false
 	l.redis.PrefixEnumerate(l.fieldPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {

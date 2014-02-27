@@ -1,10 +1,11 @@
 package goredis_server
 
+// 指令集信息
 import (
 	"strings"
 )
 
-// 指令集名称 CommandCategory
+// 指令集分类
 type CCate string
 
 const (
@@ -40,7 +41,7 @@ var ccatemaplist = map[CCate]string{
 }
 
 // 需要同步到从库的命令
-var syncCmdlist = "SET,INCR,DECR,INCRBY,DECRBY,MSET,HDEL,HSET,HMSET,HINCRBY,LPOP,LPUSH,LREM,RPOP,RPUSH,SADD,SREM,ZADD,ZINCRBY,ZREM,DEL"
+var syncCmdlist = "SET,INCR,DECR,INCRBY,DECRBY,MSET,HDEL,HSET,HMSET,HINCRBY,LPOP,LPUSH,LREM,RPOP,RPUSH,SADD,SREM,ZADD,ZINCRBY,ZREM,DEL,RAW_SET,RAW_SET_NOREPLY"
 
 // 存放指令类别
 var ccatemap map[string]CCate
@@ -63,14 +64,13 @@ func init() {
 	}
 }
 
-// 获取指令类别
-// 要求cmd大写
-func commandCategory(cmd string) (cate CCate) {
-	var ok bool
-	if cate, ok = ccatemap[cmd]; !ok {
-		cate = CCateUnknown
+// 获取指令类别，传入大写cmd
+func commandCategory(cmd string) CCate {
+	if cate, ok := ccatemap[cmd]; ok {
+		return cate
+	} else {
+		return CCateUnknown
 	}
-	return
 }
 
 // 判断指令是否需要同步

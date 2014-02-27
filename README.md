@@ -20,17 +20,20 @@ GoRedis
 	4、校对全部由用户传入的数据格式是否合法
 
 #### Install:
-
+	复制代码，编译依赖包，编译GoRedis
 	git clone github.com/latermoon/GoRedis
-	cd main/
-	go build goredis-server.go
+	sh install.sh
+	sh build.sh
 
 #### Run:
-
+	cd /home/server/goredis/bin/
 	./goredis-server -procs 8 -p 1602
 
 #### 本地二次开发
 
-	将代码clone到本地$GOPATH/src下，然后运行 sh install.sh 编译依赖包
+	将GoRedis目录软连到本地$GOPATH/src下，然后运行 sh install.sh 编译依赖包获得语法提示
+	cd $GOAPTH/src
+	ln -s ~/Downloads/GitHub/GoRedis .
+	sh install.sh
 
 

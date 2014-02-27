@@ -1,8 +1,10 @@
 package goredis_server
 
+// 管理同步连接，从master获取数据更新到本地
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"
+	"GoRedis/libs/funcpool"
 	"GoRedis/libs/iotool"
 	"GoRedis/libs/rdb"
 	"GoRedis/libs/statlog"
@@ -29,6 +31,7 @@ type SlaveClient struct {
 	broken   bool // 无效连接
 	counters *counter.Counters
 	synclog  *statlog.StatLogger
+	status   string
 }
 
 func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient, err error) {
@@ -67,6 +70,10 @@ func (s *SlaveClient) initLog() error {
 	return nil
 }
 
+func (s *SlaveClient) Status() string {
+	return s.status
+}
+
 func (s *SlaveClient) RemoteAddr() net.Addr {
 	return s.session.RemoteAddr()
 }
@@ -81,6 +88,7 @@ func (s *SlaveClient) rdbfilename() string {
 
 // 开始同步
 func (s *SlaveClient) Sync(uid string) (err error) {
+	s.status = "waiting"
 	isgoredis, version, e1 := s.masterInfo()
 	if e1 != nil {
 		return e1
@@ -98,6 +106,10 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 	s.session.WriteCommand(NewCommand(args...))
 
 	rdbsaved := false
+	// GoRedis不会发送rdb，所以直接调用recvCmd
+	if isgoredis {
+		go s.recvCmd()
+	}
 	for {
 		var c byte
 		c, err = s.session.PeekByte()
@@ -126,18 +138,36 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 }
 
 func (s *SlaveClient) recvCmd() {
+	s.status = "online"
+	pool := funcpool.New(10)
 	for {
 		if s.broken {
 			break
 		}
-		cmd := <-s.buffer
+		cmd, ok := <-s.buffer
+		if !ok {
+			s.Destory()
+			break
+		}
+		// slavelog.Printf("[M %s] cmd: %s\n", s.RemoteAddr(), cmd)
 		s.counters.Get("proc").Incr(1)
-		// slavelog.Printf("[M %s] buffer: %s\n", s.RemoteAddr(), cmd)
-		s.server.On(s.session, cmd)
+		if cmd.StringAtIndex(0) == "RAW_SET_NOREPLY" || len(cmd.Args) == 1 {
+			func(c *Command) {
+				pool.Run(-1, func() {
+					s.server.On(s.session, cmd)
+				})
+			}(cmd)
+		} else {
+			pool.Wait()
+			s.server.On(s.session, cmd)
+		}
 	}
+	pool.Wait()
+	pool.Close()
 }
 
 func (s *SlaveClient) recvRdb() (err error) {
+	s.status = "recvrdb"
 	var f *os.File
 	f, err = os.OpenFile(s.rdbfilename(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
@@ -175,8 +205,13 @@ func (s *SlaveClient) recvRdb() (err error) {
 	return
 }
 
+func (s *SlaveClient) Broken() bool {
+	return s.broken
+}
+
 // 清空本地的同步状态
 func (s *SlaveClient) Destory() (err error) {
+	s.status = "broken"
 	s.broken = true
 	s.synclog.Stop()
 	return

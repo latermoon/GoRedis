@@ -4,9 +4,8 @@ package levelredis
 // 本页面命名注意，idx都表示大于l.start的那个索引序号，而不是0开始的数组序号
 
 import (
+	levigo "GoRedis/libs/gorocks"
 	"bytes"
-	// "github.com/latermoon/levigo"
-	levigo "GoRedis/libs/go-rocksdb"
 	"strconv"
 	"strings"
 	"sync"
@@ -211,27 +210,26 @@ func (l *LevelList) LPop() (e *Element, err error) {
 	return
 }
 
-// 删除左边
+// 保留左边
 func (l *LevelList) TrimLeft(count uint) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	oldlen := l.len()
-	if oldlen == 0 {
+	if oldlen == 0 || oldlen <= int64(count) {
 		return
 	}
 	oldstart, oldend := l.start, l.end
 	batch := levigo.NewWriteBatch()
 	defer batch.Close()
-	var i int64
-	for i = 0; i < int64(count) && i < oldlen; i++ {
+
+	for i := int64(count); i < oldlen; i++ {
 		idx := oldstart + i
+		// fmt.Println("LTRIM", l.entryKey, "i=", i, ", idx=", idx)
 		batch.Delete(l.idxKey(idx))
-		// fmt.Println("LTRIM", l.entryKey, "len:", oldlen, "i=", i, l.start, l.end, "idx=", idx)
-		l.start++
+		l.end--
 	}
 	shouldReset := l.len() == 0
-	// fmt.Println("shouldReset", shouldReset)
 	if shouldReset {
 		l.start = 0
 		l.end = -1

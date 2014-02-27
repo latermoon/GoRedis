@@ -1,20 +1,21 @@
 package goredis_server
 
 import (
-	"./monitor"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
 	"fmt"
-	// "github.com/latermoon/levigo"
-	levigo "GoRedis/libs/go-rocksdb"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
 func (server *GoRedisServer) Init() (err error) {
 	// init errlog
 	errlog.SetOutput(os.Stderr)
+
+	server.initSignalNotify()
 
 	stdlog.Println("server init ...")
 	err = server.initLevelDB()
@@ -40,24 +41,38 @@ func (server *GoRedisServer) Init() (err error) {
 	return
 }
 
+// 处理退出事件
+func (server *GoRedisServer) initSignalNotify() {
+	server.sigs = make(chan os.Signal, 1)
+	signal.Notify(server.sigs, syscall.SIGTERM)
+	go func() {
+		sig := <-server.sigs
+		stdlog.Println("recv signal:", sig)
+		server.levelRedis.Close()
+		stdlog.Println("db closed, bye")
+		os.Exit(0)
+	}()
+}
+
 func (server *GoRedisServer) initConfig() {
 	// slowlog-log-slower-than
 	// slst := server.config.IntForKey("slowlog-log-slower-than", 100*1000)
 }
 
 func (server *GoRedisServer) initLevelDB() (err error) {
-	opts := levigo.NewOptions()
-	opts.SetCache(levigo.NewLRUCache(128 * 1024 * 1024))
-	opts.SetCompression(levigo.SnappyCompression)
+	opts := levelredis.NewOptions()
+	opts.SetCache(levelredis.NewLRUCache(512 * 1024 * 1024))
+	opts.SetCompression(levelredis.SnappyCompression)
 	opts.SetBlockSize(32 * 1024)
 	opts.SetMaxBackgroundCompactions(6)
 	opts.SetWriteBufferSize(128 * 1024 * 1024)
 	opts.SetMaxOpenFiles(100000)
 	opts.SetCreateIfMissing(true)
-	env := levigo.NewDefaultEnv()
+	env := levelredis.NewDefaultEnv()
 	env.SetBackgroundThreads(6)
+	env.SetHighPriorityBackgroundThreads(2)
 	opts.SetEnv(env)
-	db, e1 := levigo.Open(server.directory+"/db0", opts)
+	db, e1 := levelredis.Open(server.directory+"/db0", opts)
 	if e1 != nil {
 		return e1
 	}
@@ -67,10 +82,17 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 
 // 命令执行监控
 func (server *GoRedisServer) initCommandMonitor(path string) {
-	// monitor
-	server.cmdMonitor = monitor.NewStatusLogger(path)
-	server.cmdMonitor.Add(monitor.NewTimeFormater("time", 8))
-	server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCateCounters.Get("total"), "total", 7, "ChangedCount"))
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	server.cmdMonitor = statlog.NewStatLogger(file)
+	server.cmdMonitor.Add(statlog.TimeItem("time"))
+	opt := &statlog.Opt{Padding: 7}
+	server.cmdMonitor.Add(statlog.Item("total", func() interface{} {
+		c := server.cmdCateCounters.Get("total")
+		return c.ChangedCount()
+	}, opt))
 	// key, string, hash, list, ...
 	for _, cate := range CommandCategoryList {
 		cateName := string(cate)
@@ -78,9 +100,19 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 		if padding < 7 {
 			padding = 7
 		}
-		server.cmdMonitor.Add(monitor.NewCountFormater(server.cmdCateCounters.Get(cateName), cateName, padding, "ChangedCount"))
+		func(name string, padding int) {
+			opt := &statlog.Opt{Padding: padding}
+			server.cmdMonitor.Add(statlog.Item(name, func() interface{} {
+				c := server.cmdCateCounters.Get(cateName)
+				return c.ChangedCount()
+			}, opt))
+		}(cateName, padding)
 	}
-	server.cmdMonitor.Add(monitor.NewCountFormater(server.counters.Get("connection"), "connection", 11, ""))
+	opt = &statlog.Opt{Padding: 11}
+	server.cmdMonitor.Add(statlog.Item("connection", func() interface{} {
+		c := server.counters.Get("connection")
+		return c.Count()
+	}, opt))
 	go server.cmdMonitor.Start()
 }
 
@@ -128,8 +160,7 @@ func (server *GoRedisServer) initLeveldbStatsLog(path string) {
 			t := time.Now()
 			tm := fmt.Sprintf("# %04d-%02d-%02d %02d:%02d:%02d\n", t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
 			file.WriteString(tm)
-			txt := server.levelRedis.DB().PropertyValue("leveldb.stats")
-			file.WriteString(txt)
+			file.WriteString(server.levelRedis.Stats())
 			file.WriteString("\n")
 		}
 	}()

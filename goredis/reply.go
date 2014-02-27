@@ -18,6 +18,8 @@ type Reply struct {
 
 type ReplyType int
 
+var NOREPLY *Reply = nil
+
 // 响应的种类
 const (
 	ReplyTypeStatus ReplyType = iota

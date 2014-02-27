@@ -1,5 +1,6 @@
 package goredis_server
 
+// 共享锁
 // 本类尝试非典型写法，只暴露接口，隐藏局部变量
 import (
 	"crypto/md5"
@@ -12,6 +13,7 @@ var inthash func(b []byte, max int) int
 // 获取一个mutex对象
 var mutexof func(key string) (mu *sync.Mutex)
 
+// implement
 func init() {
 	var mclock sync.Mutex
 	mutexCache := make(map[string]*sync.Mutex)
@@ -26,13 +28,13 @@ func init() {
 	}
 
 	mutexof = func(key string) (mu *sync.Mutex) {
+		mclock.Lock()
 		var ok bool
 		if mu, ok = mutexCache[key]; !ok {
-			mclock.Lock()
 			mu = &sync.Mutex{}
 			mutexCache[key] = mu
-			mclock.Unlock()
 		}
+		mclock.Unlock()
 		return
 	}
 }

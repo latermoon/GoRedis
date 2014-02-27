@@ -1,13 +1,9 @@
 package goredis_server
 
-/*
-keysearch [prefix] [count]
-keynext [min] [count]
-*/
-
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
+	"strings"
 )
 
 func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
@@ -20,6 +16,70 @@ func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
 // 这里还是把keys禁用
 func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 	return ErrorReply("keys is not supported by GoRedis, use 'keysearch [prefix] [count] [withtype]' instead")
+}
+
+// keyprev [seek] [count] [withtype] [withvalue]
+func (server *GoRedisServer) OnKEYPREV(cmd *Command) (reply *Reply) {
+	return server.keyEnumerate(cmd, levelredis.IterBackward)
+}
+
+// keynext [seek] [count] [withtype] [withvalue]
+// 1) [key]
+// 2) [type]
+// 3) [value]
+// 4) [key2]
+// 5) [type2]
+// 6) [value2]
+func (server *GoRedisServer) OnKEYNEXT(cmd *Command) (reply *Reply) {
+	return server.keyEnumerate(cmd, levelredis.IterForward)
+}
+
+func (server *GoRedisServer) keyEnumerate(cmd *Command, direction levelredis.IterDirection) (reply *Reply) {
+	seek := cmd.Args[1]
+	count := 1
+	withtype := false
+	withvalue := false
+	argcount := len(cmd.Args)
+	if argcount > 2 {
+		var err error
+		count, err = cmd.IntAtIndex(2)
+		if err != nil {
+			return ErrorReply(err)
+		}
+		if count < 1 || count > 10000 {
+			return ErrorReply("count range: 1 < count < 10000")
+		}
+	}
+	if argcount > 3 {
+		withtype = strings.ToUpper(cmd.StringAtIndex(3)) == "WITHTYPE"
+	}
+	// 必须withtype才能withvalue
+	if withtype && argcount > 4 {
+		withvalue = strings.ToUpper(cmd.StringAtIndex(4)) == "WITHVALUE"
+	}
+	// bulks初始大小
+	bufferSize := count
+	if withtype {
+		bufferSize = count * 2
+		if withvalue {
+			bufferSize = count * 3
+		}
+	}
+	bulks := make([]interface{}, 0, bufferSize)
+	server.levelRedis.KeyEnumerate(seek, direction, func(i int, key, keytype, value []byte, quit *bool) {
+		// stdlog.Println(i, string(key), string(keytype), string(value))
+		bulks = append(bulks, key)
+		if withtype {
+			bulks = append(bulks, keytype)
+			if withvalue {
+				bulks = append(bulks, value)
+			}
+		}
+		if i >= count-1 {
+			*quit = true
+		}
+	})
+	return MultiBulksReply(bulks)
 }
 
 // 找出下一个key
@@ -40,7 +100,7 @@ func (server *GoRedisServer) OnKEYSEARCH(cmd *Command) (reply *Reply) {
 	}
 	withtype := false
 	if len(cmd.Args) > 3 {
-		withtype = cmd.StringAtIndex(3) == "withtype"
+		withtype = strings.ToUpper(cmd.StringAtIndex(3)) == "WITHTYPE"
 	}
 	// search
 	bulks := make([]interface{}, 0, 10)
@@ -85,7 +145,7 @@ func (server *GoRedisServer) OnRAW_KEYSEARCH(cmd *Command) (reply *Reply) {
 	return MultiBulksReply(bulks)
 }
 
-// 获取原始内容
+// 操作原始内容
 func (server *GoRedisServer) OnRAW_GET(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
 	value := server.levelRedis.RawGet(key)
@@ -95,6 +155,22 @@ func (server *GoRedisServer) OnRAW_GET(cmd *Command) (reply *Reply) {
 		reply = BulkReply(value)
 	}
 	return
+}
+
+// 操作原始内容 RAW_SET +[hash]name latermoon
+func (server *GoRedisServer) OnRAW_SET(cmd *Command) (reply *Reply) {
+	key, value := cmd.Args[1], cmd.Args[2]
+	err := server.levelRedis.RawSet(key, value)
+	if err != nil {
+		return ErrorReply(err)
+	} else {
+		return StatusReply("OK")
+	}
+}
+
+func (server *GoRedisServer) OnRAW_SET_NOREPLY(cmd *Command) (reply *Reply) {
+	server.OnRAW_SET(cmd)
+	return nil
 }
 
 /**
