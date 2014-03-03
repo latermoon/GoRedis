@@ -2,9 +2,10 @@
 ### 安装GoRedis
 	wget ssd002:8801/install_goredis.sh -O install_goredis.sh
 	sh install_goredis.sh
+	
 ### 运行GoRedis
 	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.:/home/server/goredis/bin
-	./goredis-server
+	./goredis-server -procs 6 -p 6379
 
 ### Supervisor配置
 	[program:goredis]
@@ -22,6 +23,7 @@
 	stdout_events_enabled=false
 	loglevel=info
 	priority=1100
+	environment=LD_LIBRARY_PATH='/home/server/goredis/bin/'
 
 ### install_goredis.sh
 	echo 'downloading ...'
