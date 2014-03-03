@@ -9,10 +9,18 @@ import (
 // 适用于海量数据的扫描输出，比如iterator扫描整个数据库
 func (server *GoRedisServer) OnMONITOR(session *Session, cmd *Command) (reply *Reply) {
 	// 特殊使用，monitor输出全部key
-	if len(cmd.Args) > 1 && strings.ToLower(cmd.StringAtIndex(1)) == "keys" {
-		server.monitorKeys(session, cmd)
-		return
+	if len(cmd.Args) > 1 {
+		switch strings.ToLower(cmd.StringAtIndex(1)) {
+		case "keys":
+			server.monitorKeys(session, cmd)
+			return
+		case "sync":
+			cmd = NewCommand([]byte("SYNC"), []byte(""))
+			server.OnSYNC(session, cmd)
+			return
+		}
 	}
+
 	session.WriteReply(StatusReply("OK"))
 	client := NewMonClient(session)
 	server.monmgr.Add(client)

@@ -50,6 +50,7 @@ type GoRedisServer struct {
 	uid      string        // 实例id
 	syncmgr  *SyncManager  // as master
 	slavemgr *SlaveManager // as slave
+	synclog  *SyncLog
 	// monitor
 	monmgr *MonManager
 	// 缓存处理函数，减少relect次数
@@ -143,8 +144,8 @@ func (server *GoRedisServer) processCommandChan() {
 		server.incrCommandCounter(cmdName)
 
 		// 从库
-		if server.syncmgr.Count() > 0 && needSync(cmdName) {
-			server.syncmgr.BroadcastCommand(cmd)
+		if server.synclog.IsEnabled() && needSync(cmdName) {
+			server.synclog.Write(cmd.Bytes())
 		}
 
 		// monitor

@@ -5,60 +5,106 @@ import (
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
 	"bytes"
-	"strings"
+	"strconv"
+	"time"
 )
 
-// 向从库发送数据
-// -> SYNC [uid]
-// <- +OK
-// -> SYNC_REQ [seq]
-// <-
-// 对应 go_redis_server_slaveof.go
+// 从库的同步请求
+// SYNC [UID] [SEQ]
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
-	// 客户端标识 SYNC uid 70ecc21580
-	uid := ""
-	args := cmd.StringArgs()
-	if len(args) >= 3 && strings.ToLower(args[1]) == "uid" {
-		uid = args[2]
+	var uid string
+	var seq int64 = -1
+	if len(cmd.Args) >= 2 {
+		uid = cmd.StringAtIndex(1)
 	}
-	stdlog.Printf("[%s] new slave uid %s\n", session.RemoteAddr(), uid)
+	if len(cmd.Args) >= 3 {
+		var err error
+		seq, err = cmd.Int64AtIndex(2)
+		if err != nil {
+			return ErrorReply("bad [SEQ]")
+		}
+	}
+	stdlog.Printf("[S %s] new slave uid %s, seq %d\n", session.RemoteAddr(), uid, seq)
 
 	sc, err := NewSyncClient(session, server.directory)
 	if err != nil {
-		stdlog.Printf("[%s] new slave error %s", session.RemoteAddr(), err)
+		stdlog.Printf("[S %s] new slave error %s", session.RemoteAddr(), err)
 		return
 	}
-	server.syncmgr.Add(sc)
-	stdlog.Printf("[%s] start send snapshot\n", session.RemoteAddr())
-	go server.sendSnapshot(sc)
 
-	return NOREPLY
-}
+	if seq == -1 {
+		go server.sendSnapshot(sc)
+	} else {
+		go server.syncRunloop(sc, seq)
+	}
 
-// 收到来自从库的SEQ反馈 SYNC_BULK_FIN [SEQ]
-func (server *GoRedisServer) OnSYNC_BULK_FIN(session *Session, cmd *Command) (reply *Reply) {
-	// seq, _ := cmd.Int64AtIndex(1)
-	stdlog.Println(cmd)
-	// update_fin_stamp
 	return NOREPLY
 }
 
 func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
-	cmdName := []byte("RAW_SET_NOREPLY")
+	curseq := server.synclog.LastSeq()
+	stdlog.Printf("[S %s] snapshot start, cur seq %d\n", sc.session.RemoteAddr(), curseq)
+
+	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_BEG"))); err != nil {
+		stdlog.Printf("[%s] snapshot error\n", sc.session.RemoteAddr())
+		return
+	}
+
+	// scan snapshot
 	server.levelRedis.SnapshotEnumerate([]byte{}, []byte{levelredis.MAXBYTE}, func(i int, key, value []byte, quit *bool) {
 		if bytes.HasPrefix(key, []byte(goredisPrefix)) {
 			return
 		}
-		cmd := NewCommand(cmdName, key, value)
-		err := sc.Send(cmd)
+		cmd := NewCommand([]byte("SYNC_RAW"), key, value)
+		err := sc.session.WriteCommand(cmd)
 		if err != nil {
-			stdlog.Printf("[%s] send snapshot error %s\n", sc.session.RemoteAddr(), cmd)
+			stdlog.Printf("[%s] snapshot error %s\n", sc.session.RemoteAddr(), cmd)
 			*quit = true
 		}
-		// stdlog.Printf("snapshot: %s,%s\n", string(key), string(value))
 	})
-	stdlog.Printf("[%s] send snapshot finish\n", sc.session.RemoteAddr())
-	if sc.Available() {
-		sc.StartSync()
+
+	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
+		stdlog.Printf("[%s] snapshot error\n", sc.session.RemoteAddr())
+		return
+	}
+
+	stdlog.Printf("[S %s] snapshot finish\n", sc.session.RemoteAddr())
+
+	// PING
+	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_SEQ"), []byte(strconv.FormatInt(curseq, 10)))); err != nil {
+		stdlog.Printf("[S %s] sync seq error %s\n", sc.session.RemoteAddr(), err)
+		return
+	}
+	if err := sc.session.WriteCommand(NewCommand([]byte("PING"))); err != nil {
+		stdlog.Printf("[S %s] sync ping error %s\n", sc.session.RemoteAddr(), err)
+		return
+	}
+
+	curseq++
+	go server.syncRunloop(sc, curseq)
+}
+
+// SEQ [SEQ]
+// [CMD]
+func (server *GoRedisServer) syncRunloop(sc *SyncClient, lastseq int64) {
+	seq := lastseq
+	for {
+		val, ok := server.synclog.Read(seq)
+		if !ok {
+			time.Sleep(time.Millisecond * time.Duration(10))
+			continue
+		}
+
+		seqstr := strconv.FormatInt(seq, 10)
+		if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_SEQ"), []byte(seqstr))); err != nil {
+			stdlog.Printf("[S %s] sync seq error %s\n", sc.session.RemoteAddr(), err)
+			break
+		}
+
+		if _, err := sc.session.Write(val); err != nil {
+			stdlog.Printf("[S %s] sync cmd error %s\n", sc.session.RemoteAddr(), err)
+			break
+		}
+		seq++
 	}
 }

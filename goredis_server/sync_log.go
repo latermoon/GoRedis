@@ -3,6 +3,7 @@ package goredis_server
 import (
 	// . "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
+	"GoRedis/libs/stdlog"
 	"bytes"
 	"sync"
 )
@@ -21,7 +22,17 @@ func NewSyncLog(db *levelredis.LevelRedis, prefix string) (s *SyncLog) {
 		seq:    -1,
 		prefix: []byte(prefix),
 	}
+	s.initLastSeq()
 	return
+}
+
+func (s *SyncLog) initLastSeq() {
+	prefix := bytes.Join([][]byte{s.prefix, []byte(":id:")}, []byte(""))
+	s.db.PrefixEnumerate(prefix, levelredis.IterBackward, func(i int, key, value []byte, quit *bool) {
+		s.seq = s.splitSeqkey(key)
+		*quit = true
+	})
+	stdlog.Println("[synclog] last seq", s.seq)
 }
 
 // sync:id:[seq] = value
@@ -29,12 +40,17 @@ func (s *SyncLog) seqkey(seq int64) []byte {
 	return bytes.Join([][]byte{s.prefix, []byte(":id:"), Int64ToBytes(seq)}, []byte(""))
 }
 
+func (s *SyncLog) splitSeqkey(seqkey []byte) (seq int64) {
+	b := seqkey[len(s.prefix)+len([]byte(":id:")):]
+	return BytesToInt64(b)
+}
+
 func (s *SyncLog) enablekey() []byte {
 	return bytes.Join([][]byte{s.prefix, []byte(":enable")}, []byte(""))
 }
 
 func (s *SyncLog) IsEnabled() bool {
-	return false
+	return true
 }
 
 func (s *SyncLog) Enable() {
@@ -48,11 +64,6 @@ func (s *SyncLog) Disable() {
 func (s *SyncLog) LastSeq() int64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.seq == -1 {
-		prefix := bytes.Join([][]byte{s.prefix, []byte(":id:")}, []byte(""))
-		s.db.PrefixEnumerate(prefix, levelredis.IterBackward, func(i int, key, value []byte, quit *bool) {
-		})
-	}
 	return s.seq
 }
 
@@ -64,6 +75,7 @@ func (s *SyncLog) Write(val []byte) (seq int64, err error) {
 	if err == nil {
 		s.seq = seq
 	}
+	// stdlog.Printf("[synclog] %d, %s\n", s.seq, string(val))
 	return
 }
 

@@ -52,7 +52,7 @@ func main() {
 			stdlog.Println("db not exist")
 			return
 		} else {
-			stdlog.Println("start repair", directory)
+			stdlog.Println("start repair", dbhome)
 			levelredis.Repair(dbhome)
 			stdlog.Println("repair finish")
 		}
