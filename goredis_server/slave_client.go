@@ -224,6 +224,10 @@ func (s *SlaveClient) rdbFileWriter() (w *bufio.Writer, err error) {
 	return
 }
 
+func (s *SlaveClient) MasterInfo() (isgoredis bool, version string, err error) {
+	return s.masterInfo()
+}
+
 func (s *SlaveClient) masterInfo() (isgoredis bool, version string, err error) {
 	cmdinfo := NewCommand([]byte("info"), []byte("server"))
 	s.session.WriteCommand(cmdinfo)

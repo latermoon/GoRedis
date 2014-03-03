@@ -168,11 +168,6 @@ func (server *GoRedisServer) OnRAW_SET(cmd *Command) (reply *Reply) {
 	}
 }
 
-func (server *GoRedisServer) OnRAW_SET_NOREPLY(cmd *Command) (reply *Reply) {
-	server.OnRAW_SET(cmd)
-	return nil
-}
-
 /**
  * 过期时间，暂不支持
  * 1 if the timeout was set.

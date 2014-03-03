@@ -22,6 +22,10 @@ func (server *GoRedisServer) Init() (err error) {
 	if err != nil {
 		return
 	}
+	err = server.initSyncLog()
+	if err != nil {
+		return
+	}
 	// __goredis:config:xxx
 	server.config = NewConfig(server.levelRedis, goredisPrefix+"config:")
 	// monitor
@@ -78,6 +82,28 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 	}
 	server.levelRedis = levelredis.NewLevelRedis(db)
 	return
+}
+
+func (server *GoRedisServer) initSyncLog() error {
+	opts := levelredis.NewOptions()
+	opts.SetCache(levelredis.NewLRUCache(512 * 1024 * 1024))
+	opts.SetCompression(levelredis.NoCompression)
+	opts.SetBlockSize(32 * 1024)
+	opts.SetMaxBackgroundCompactions(2)
+	opts.SetWriteBufferSize(128 * 1024 * 1024)
+	opts.SetMaxOpenFiles(100000)
+	opts.SetCreateIfMissing(true)
+	env := levelredis.NewDefaultEnv()
+	env.SetBackgroundThreads(2)
+	env.SetHighPriorityBackgroundThreads(1)
+	opts.SetEnv(env)
+	db, e1 := levelredis.Open(server.directory+"/synclog", opts)
+	if e1 != nil {
+		return e1
+	}
+	ldb := levelredis.NewLevelRedis(db)
+	server.synclog = NewSyncLog(ldb, "sync")
+	return nil
 }
 
 // 命令执行监控

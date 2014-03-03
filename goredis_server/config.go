@@ -45,6 +45,11 @@ func (c *Config) StringForKey(key string) string {
 	return string(v)
 }
 
+func (c *Config) SetInt(key string, n int64) {
+	val := []byte(strconv.FormatInt(n, 10))
+	c.Set(key, val)
+}
+
 func (c *Config) IntForKey(key string, defval int64) (n int64) {
 	v := c.Get(key)
 	if v == nil || len(v) == 0 {

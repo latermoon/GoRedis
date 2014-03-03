@@ -10,7 +10,7 @@ func main() {
 }
 
 func sync() {
-
+	synclog.Init()
 }
 
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
