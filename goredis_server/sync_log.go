@@ -1,7 +1,6 @@
 package goredis_server
 
 import (
-	// . "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
 	"bytes"
@@ -10,10 +9,11 @@ import (
 
 // 同步日志，保存主库全部的更新操作
 type SyncLog struct {
-	db     *levelredis.LevelRedis
-	seq    int64 // 永远递增
-	prefix []byte
-	mu     sync.RWMutex
+	db      *levelredis.LevelRedis
+	seq     int64 // 永远递增
+	enabled bool  // 是否开启了日志写入
+	prefix  []byte
+	mu      sync.RWMutex
 }
 
 func NewSyncLog(db *levelredis.LevelRedis, prefix string) (s *SyncLog) {
@@ -32,7 +32,10 @@ func (s *SyncLog) initLastSeq() {
 		s.seq = s.splitSeqkey(key)
 		*quit = true
 	})
-	stdlog.Println("[synclog] last seq", s.seq)
+	s.enabled = s.seq != -1
+	if s.enabled {
+		stdlog.Println("synclog enabled, seq", s.seq)
+	}
 }
 
 // sync:id:[seq] = value
@@ -50,20 +53,18 @@ func (s *SyncLog) enablekey() []byte {
 }
 
 func (s *SyncLog) IsEnabled() bool {
-	return true
+	return s.enabled
 }
 
 func (s *SyncLog) Enable() {
-	// s.db.RawSet(append(, value)
+	s.enabled = true
 }
 
 func (s *SyncLog) Disable() {
-
+	s.enabled = false
 }
 
 func (s *SyncLog) LastSeq() int64 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 	return s.seq
 }
 
@@ -91,40 +92,4 @@ func (s *SyncLog) Trim(seq int64) (n int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return
-}
-
-// 仅用于传输快照
-type SnapList struct {
-	buffer chan [][]byte
-	quit   chan bool
-	closed bool
-}
-
-func NewSnapList() (s *SnapList) {
-	s = &SnapList{
-		buffer: make(chan [][]byte),
-	}
-	return
-}
-
-func (s *SnapList) Push(args ...[]byte) {
-	if s.closed {
-		return
-	}
-	s.buffer <- args
-}
-
-func (s *SnapList) Pop() (args [][]byte) {
-	if s.closed {
-		return
-	}
-	select {
-	case <-s.quit:
-	case args = <-s.buffer:
-	}
-	return
-}
-
-func (s *SnapList) Close() {
-	s.quit <- true
 }

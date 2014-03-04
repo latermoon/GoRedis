@@ -12,11 +12,11 @@ import (
 // 从库的同步请求
 // SYNC [UID] [SEQ]
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
-	var uid string
+	// var uid string
 	var seq int64 = -1
-	if len(cmd.Args) >= 2 {
-		uid = cmd.StringAtIndex(1)
-	}
+	// if len(cmd.Args) >= 2 {
+	// 	uid = cmd.StringAtIndex(1)
+	// }
 	if len(cmd.Args) >= 3 {
 		var err error
 		seq, err = cmd.Int64AtIndex(2)
@@ -24,15 +24,21 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 			return ErrorReply("bad [SEQ]")
 		}
 	}
-	stdlog.Printf("[S %s] new slave uid %s, seq %d\n", session.RemoteAddr(), uid, seq)
+	stdlog.Printf("[S %s] slave %s\n", session.RemoteAddr(), cmd)
 
 	sc, err := NewSyncClient(session, server.directory)
 	if err != nil {
-		stdlog.Printf("[S %s] new slave error %s", session.RemoteAddr(), err)
+		stdlog.Printf("[S %s] slave error %s", session.RemoteAddr(), err)
 		return
 	}
 
-	if seq == -1 {
+	// 第一次出现从库时才开启写日志
+	if !server.synclog.IsEnabled() {
+		stdlog.Println("synclog enable")
+		server.synclog.Enable()
+	}
+
+	if seq < 0 {
 		go server.sendSnapshot(sc)
 	} else {
 		go server.syncRunloop(sc, seq)
@@ -42,41 +48,42 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 }
 
 func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
-	curseq := server.synclog.LastSeq()
-	stdlog.Printf("[S %s] snapshot start, cur seq %d\n", sc.session.RemoteAddr(), curseq)
+	server.Suspend()                                   //挂起全部操作
+	snap := server.levelRedis.DB().NewSnapshot()       // 挂起更新后建立快照
+	defer server.levelRedis.DB().ReleaseSnapshot(snap) //
+	curseq := server.synclog.LastSeq()                 // 当前
+	server.Resume()                                    // WARN 唤醒，如果不调用Resume，整个服务器无法工作
+
+	stdlog.Printf("[S %s] snapshot, seq %d\n", sc.session.RemoteAddr(), curseq)
 
 	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_BEG"))); err != nil {
-		stdlog.Printf("[%s] snapshot error\n", sc.session.RemoteAddr())
+		stdlog.Printf("[S %s] snapshot error\n", sc.session.RemoteAddr())
 		return
 	}
 
 	// scan snapshot
-	server.levelRedis.SnapshotEnumerate([]byte{}, []byte{levelredis.MAXBYTE}, func(i int, key, value []byte, quit *bool) {
+	broken := false
+	server.levelRedis.SnapshotEnumerate(snap, []byte{}, []byte{levelredis.MAXBYTE}, func(i int, key, value []byte, quit *bool) {
 		if bytes.HasPrefix(key, []byte(goredisPrefix)) {
 			return
 		}
 		cmd := NewCommand([]byte("SYNC_RAW"), key, value)
 		err := sc.session.WriteCommand(cmd)
 		if err != nil {
-			stdlog.Printf("[%s] snapshot error %s\n", sc.session.RemoteAddr(), cmd)
+			stdlog.Printf("[S %s] snapshot error %s\n", sc.session.RemoteAddr(), cmd)
+			broken = true
 			*quit = true
 		}
 	})
 
-	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
-		stdlog.Printf("[%s] snapshot error\n", sc.session.RemoteAddr())
+	if broken {
 		return
 	}
 
 	stdlog.Printf("[S %s] snapshot finish\n", sc.session.RemoteAddr())
 
-	// PING
-	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_SEQ"), []byte(strconv.FormatInt(curseq, 10)))); err != nil {
-		stdlog.Printf("[S %s] sync seq error %s\n", sc.session.RemoteAddr(), err)
-		return
-	}
-	if err := sc.session.WriteCommand(NewCommand([]byte("PING"))); err != nil {
-		stdlog.Printf("[S %s] sync ping error %s\n", sc.session.RemoteAddr(), err)
+	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
+		stdlog.Printf("[S %s] sync error %s\n", sc.session.RemoteAddr(), err)
 		return
 	}
 
@@ -84,9 +91,14 @@ func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 	go server.syncRunloop(sc, curseq)
 }
 
-// SEQ [SEQ]
-// [CMD]
+// 每发送一个SYNC_SEQ再发送一个CMD
 func (server *GoRedisServer) syncRunloop(sc *SyncClient, lastseq int64) {
+	stdlog.Printf("[S %s] sync start seq %d\n", sc.session.RemoteAddr(), lastseq)
+
+	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_SEQ_BEG"))); err != nil {
+		stdlog.Printf("[S %s] sync error %s\n", sc.session.RemoteAddr(), err)
+		return
+	}
 	seq := lastseq
 	for {
 		val, ok := server.synclog.Read(seq)

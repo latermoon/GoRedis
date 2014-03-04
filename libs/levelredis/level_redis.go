@@ -382,11 +382,8 @@ func (l *LevelRedis) RangeEnumerate(min, max []byte, direction IterDirection, fn
 }
 
 // 快照枚举
-func (l *LevelRedis) SnapshotEnumerate(min, max []byte, fn func(i int, key, value []byte, quit *bool)) {
+func (l *LevelRedis) SnapshotEnumerate(snap *levigo.Snapshot, min, max []byte, fn func(i int, key, value []byte, quit *bool)) {
 	l.incrCounter("enum")
-
-	snap := l.db.NewSnapshot()
-	defer l.db.ReleaseSnapshot(snap)
 
 	ro := levigo.NewReadOptions()
 	ro.SetFillCache(false)

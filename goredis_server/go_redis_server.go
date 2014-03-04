@@ -12,11 +12,12 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 )
 
-// 版本号，每次更新都需要升级一下
-const VERSION = "1.0.46"
+// TODO 版本号，每次更新都需要升级一下
+const VERSION = "1.0.49"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -57,6 +58,8 @@ type GoRedisServer struct {
 	methodCache map[string]reflect.Value
 	// 指令队列，异步处理统计、从库、monitor输出
 	cmdChan chan *Command
+	rwlock  sync.RWMutex
+	rwwait  sync.WaitGroup
 	// exit
 	sigs     chan os.Signal
 	quitdone chan bool // 准备好退出
@@ -118,21 +121,43 @@ func (server *GoRedisServer) SessionClosed(session *Session, err error) {
 // ServerHandler.On()
 // 由GoRedis协议层触发，通过反射调用OnGET/OnSET等方法
 func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
+	// invoke & time
+	begin := time.Now()
+
+	// suspend & resume
+	server.rwlock.Lock()
+	server.rwlock.Unlock()
+
+	// varify command
 	if err := verifyCommand(cmd); err != nil {
 		errlog.Printf("[%s] bad command %s\n", session.RemoteAddr(), cmd)
 		return ErrorReply(err)
 	}
-	// invoke & time
-	begin := time.Now()
-	reply = server.invokeCommandHandler(session, cmd)
-	elapsed := time.Now().Sub(begin)
 
+	// invoke
+	reply = server.invokeCommandHandler(session, cmd)
+
+	// async: counter/sync/monitor
+	server.rwwait.Add(1)
+	server.cmdChan <- cmd
+
+	elapsed := time.Now().Sub(begin)
 	if elapsed.Nanoseconds() > int64(time.Millisecond*time.Duration(slowexec)) {
 		slowlog.Printf("[%s] exec %0.2f ms [%s]\n", session.RemoteAddr(), elapsed.Seconds()*1000, cmd)
 	}
-	// see processCommandChan()
-	server.cmdChan <- cmd
+
 	return
+}
+
+// 挂起指令处理
+func (server *GoRedisServer) Suspend() {
+	server.rwlock.Lock() // 锁定On(...)入口
+	server.rwwait.Wait() // 等待队列清空
+}
+
+// 唤醒指令处理
+func (server *GoRedisServer) Resume() {
+	server.rwlock.Unlock() // 解锁
 }
 
 // 异步串行处理
@@ -152,6 +177,8 @@ func (server *GoRedisServer) processCommandChan() {
 		if server.monmgr.Count() > 0 {
 			server.monmgr.BroadcastCommand(cmd)
 		}
+
+		server.rwwait.Done()
 	}
 }
 
@@ -168,7 +195,6 @@ func (server *GoRedisServer) incrCommandCounter(cmdName string) {
 // OnGET(session *Session, cmd *Command) (reply *Reply)
 func (server *GoRedisServer) invokeCommandHandler(session *Session, cmd *Command) (reply *Reply) {
 	cmdName := strings.ToUpper(cmd.Name())
-	// 从Cache取出处理函数
 	method, exists := server.methodCache[cmdName]
 	if !exists {
 		method = reflect.ValueOf(server).MethodByName("On" + cmdName)
@@ -176,9 +202,6 @@ func (server *GoRedisServer) invokeCommandHandler(session *Session, cmd *Command
 	}
 
 	if method.IsValid() {
-		// 可以调用两种接口
-		// method = OnXXX(cmd *Command) (reply *Reply)
-		// method = OnXXX(session *Session, cmd *Command) (reply *Reply)
 		var in []reflect.Value
 		if method.Type().NumIn() == 1 {
 			in = []reflect.Value{reflect.ValueOf(cmd)}
