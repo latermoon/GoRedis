@@ -4,25 +4,23 @@ package goredis_server
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"
-	"GoRedis/libs/funcpool"
 	"GoRedis/libs/iotool"
 	"GoRedis/libs/rdb"
 	"GoRedis/libs/statlog"
 	"GoRedis/libs/stdlog"
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 )
 
 var slavelog = stdlog.Log("slaveof")
 
 type SlaveClient struct {
+	ISlaveClient
 	session  *Session
 	server   *GoRedisServer
 	buffer   chan *Command // 缓存实时指令
@@ -89,27 +87,14 @@ func (s *SlaveClient) rdbfilename() string {
 // 开始同步
 func (s *SlaveClient) Sync(uid string) (err error) {
 	s.status = "waiting"
-	isgoredis, version, e1 := s.masterInfo()
-	if e1 != nil {
-		return e1
-	}
-	if isgoredis {
-		slavelog.Printf("[M %s] slaveof %s GoRedis:%s\n", s.RemoteAddr(), s.RemoteAddr(), version)
-	} else {
-		slavelog.Printf("[M %s] slaveof %s Redis:%s\n", s.RemoteAddr(), s.RemoteAddr(), version)
-	}
 
 	args := [][]byte{[]byte("SYNC")}
-	if isgoredis && len(uid) > 0 {
+	if len(uid) > 0 {
 		args = append(args, []byte(uid))
 	}
 	s.session.WriteCommand(NewCommand(args...))
 
 	rdbsaved := false
-	// GoRedis不会发送rdb，所以直接调用recvCmd
-	if isgoredis {
-		go s.recvCmd()
-	}
 	for {
 		var c byte
 		c, err = s.session.PeekByte()
@@ -139,7 +124,6 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 
 func (s *SlaveClient) recvCmd() {
 	s.status = "online"
-	pool := funcpool.New(10)
 	for {
 		if s.broken {
 			break
@@ -151,19 +135,8 @@ func (s *SlaveClient) recvCmd() {
 		}
 		// slavelog.Printf("[M %s] cmd: %s\n", s.RemoteAddr(), cmd)
 		s.counters.Get("proc").Incr(1)
-		if cmd.StringAtIndex(0) == "RAW_SET_NOREPLY" || len(cmd.Args) == 1 {
-			func(c *Command) {
-				pool.Run(-1, func() {
-					s.server.On(s.session, cmd)
-				})
-			}(cmd)
-		} else {
-			pool.Wait()
-			s.server.On(s.session, cmd)
-		}
+		s.server.On(s.session, cmd)
 	}
-	pool.Wait()
-	pool.Close()
 }
 
 func (s *SlaveClient) recvRdb() (err error) {
@@ -221,60 +194,6 @@ func (s *SlaveClient) rdbFileWriter() (w *bufio.Writer, err error) {
 	var file *os.File
 	file, err = os.OpenFile(fmt.Sprintf("/tmp/%s.rdb", s.session.RemoteAddr()), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
 	w = bufio.NewWriter(file)
-	return
-}
-
-func (s *SlaveClient) MasterInfo() (isgoredis bool, version string, err error) {
-	return s.masterInfo()
-}
-
-func (s *SlaveClient) masterInfo() (isgoredis bool, version string, err error) {
-	cmdinfo := NewCommand([]byte("info"), []byte("server"))
-	s.session.WriteCommand(cmdinfo)
-	var reply *Reply
-	reply, err = s.session.ReadReply()
-	if err != nil {
-		return
-	}
-	if reply.Value == nil {
-		err = errors.New("reply nil")
-		return
-	}
-
-	var info string
-	switch reply.Value.(type) {
-	case string:
-		info = reply.Value.(string)
-	case []byte:
-		info = string(reply.Value.([]byte))
-	default:
-		info = reply.String()
-	}
-
-	// 切分info返回的数据，存放到map里
-	kv := make(map[string]string)
-	lines := strings.Split(info, "\n")
-	for _, line := range lines {
-		line = strings.TrimSuffix(line, "\r")
-		line = strings.TrimPrefix(line, " ")
-		if strings.HasPrefix(line, "#") {
-			continue
-		}
-		pairs := strings.Split(line, ":")
-		if len(pairs) != 2 {
-			continue
-		}
-		// done
-		kv[pairs[0]] = pairs[1]
-	}
-
-	_, isgoredis = kv["goredis_version"]
-	if isgoredis {
-		version = kv["goredis_version"]
-	} else {
-		version = kv["redis_version"]
-	}
-
 	return
 }
 

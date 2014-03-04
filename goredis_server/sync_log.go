@@ -1,7 +1,6 @@
 package goredis_server
 
 import (
-	// . "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
 	"bytes"
@@ -69,14 +68,6 @@ func (s *SyncLog) LastSeq() int64 {
 	return s.seq
 }
 
-func (s *SyncLog) SuspendWrite() {
-	s.mu.Lock()
-}
-
-func (s *SyncLog) ResumeWrite() {
-	s.mu.Unlock()
-}
-
 func (s *SyncLog) Write(val []byte) (seq int64, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -101,40 +92,4 @@ func (s *SyncLog) Trim(seq int64) (n int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return
-}
-
-// 仅用于传输快照
-type SnapList struct {
-	buffer chan [][]byte
-	quit   chan bool
-	closed bool
-}
-
-func NewSnapList() (s *SnapList) {
-	s = &SnapList{
-		buffer: make(chan [][]byte),
-	}
-	return
-}
-
-func (s *SnapList) Push(args ...[]byte) {
-	if s.closed {
-		return
-	}
-	s.buffer <- args
-}
-
-func (s *SnapList) Pop() (args [][]byte) {
-	if s.closed {
-		return
-	}
-	select {
-	case <-s.quit:
-	case args = <-s.buffer:
-	}
-	return
-}
-
-func (s *SnapList) Close() {
-	s.quit <- true
 }

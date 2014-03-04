@@ -12,11 +12,11 @@ import (
 // 从库的同步请求
 // SYNC [UID] [SEQ]
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
-	var uid string
+	// var uid string
 	var seq int64 = -1
-	if len(cmd.Args) >= 2 {
-		uid = cmd.StringAtIndex(1)
-	}
+	// if len(cmd.Args) >= 2 {
+	// 	uid = cmd.StringAtIndex(1)
+	// }
 	if len(cmd.Args) >= 3 {
 		var err error
 		seq, err = cmd.Int64AtIndex(2)
@@ -24,11 +24,11 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 			return ErrorReply("bad [SEQ]")
 		}
 	}
-	stdlog.Printf("[S %s] new slave uid %s, seq %d\n", session.RemoteAddr(), uid, seq)
+	stdlog.Printf("[S %s] slave %s\n", session.RemoteAddr(), cmd)
 
 	sc, err := NewSyncClient(session, server.directory)
 	if err != nil {
-		stdlog.Printf("[S %s] new slave error %s", session.RemoteAddr(), err)
+		stdlog.Printf("[S %s] slave error %s", session.RemoteAddr(), err)
 		return
 	}
 
@@ -38,7 +38,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 		server.synclog.Enable()
 	}
 
-	if seq == -1 {
+	if seq < 0 {
 		go server.sendSnapshot(sc)
 	} else {
 		go server.syncRunloop(sc, seq)
@@ -54,7 +54,7 @@ func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 	curseq := server.synclog.LastSeq()                 // 当前
 	server.Resume()                                    // WARN 唤醒，如果不调用Resume，整个服务器无法工作
 
-	stdlog.Printf("[S %s] new snapshot, cur seq %d\n", sc.session.RemoteAddr(), curseq)
+	stdlog.Printf("[S %s] snapshot, seq %d\n", sc.session.RemoteAddr(), curseq)
 
 	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_BEG"))); err != nil {
 		stdlog.Printf("[S %s] snapshot error\n", sc.session.RemoteAddr())
@@ -93,8 +93,10 @@ func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 
 // 每发送一个SYNC_SEQ再发送一个CMD
 func (server *GoRedisServer) syncRunloop(sc *SyncClient, lastseq int64) {
+	stdlog.Printf("[S %s] sync start seq %d\n", sc.session.RemoteAddr(), lastseq)
+
 	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_SEQ_BEG"))); err != nil {
-		stdlog.Printf("[S %s] sync ping error %s\n", sc.session.RemoteAddr(), err)
+		stdlog.Printf("[S %s] sync error %s\n", sc.session.RemoteAddr(), err)
 		return
 	}
 	seq := lastseq
