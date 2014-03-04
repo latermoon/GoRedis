@@ -62,7 +62,7 @@ func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 	}
 
 	// scan snapshot
-	server.levelRedis.SnapshotEnumerate([]byte{}, []byte{levelredis.MAXBYTE}, func(i int, key, value []byte, quit *bool) {
+	server.levelRedis.SnapshotEnumerate(snap, []byte{}, []byte{levelredis.MAXBYTE}, func(i int, key, value []byte, quit *bool) {
 		if bytes.HasPrefix(key, []byte(goredisPrefix)) {
 			return
 		}
