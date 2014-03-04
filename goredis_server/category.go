@@ -15,15 +15,15 @@ const (
 	CCateList        CCate = "list"
 	CCateSet         CCate = "set"
 	CCateSortedSet   CCate = "zset"
-	CCatePubSub      CCate = "pubsub"
-	CCateTransaction CCate = "trans"
-	CCateScript      CCate = "script"
+	CCatePubSub      CCate = "pubsub" // nouse
+	CCateTransaction CCate = "trans"  // nouse
+	CCateScript      CCate = "script" // nouse
 	CCateConnection  CCate = "conn"
 	CCateServer      CCate = "server"
 	CCateUnknown     CCate = "unknown"
 )
 
-var CommandCategoryList = []CCate{CCateKey, CCateString, CCateHash, CCateList, CCateSet, CCateSortedSet, CCatePubSub, CCateTransaction, CCateScript, CCateConnection, CCateServer, CCateUnknown}
+var CommandCategoryList = []CCate{CCateKey, CCateString, CCateHash, CCateList, CCateSet, CCateSortedSet, CCateConnection, CCateServer, CCateUnknown}
 
 // 指令集命令列表
 var ccatemaplist = map[CCate]string{

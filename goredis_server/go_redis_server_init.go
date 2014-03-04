@@ -139,6 +139,14 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 		c := server.counters.Get("connection")
 		return c.Count()
 	}, opt))
+	opt = &statlog.Opt{Padding: 16}
+	server.cmdMonitor.Add(statlog.Item("seq", func() interface{} {
+		if server.synclog.IsEnabled() {
+			return server.synclog.LastSeq()
+		} else {
+			return "-"
+		}
+	}, opt))
 	go server.cmdMonitor.Start()
 }
 
