@@ -62,6 +62,7 @@ func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 	}
 
 	// scan snapshot
+	broken := false
 	server.levelRedis.SnapshotEnumerate(snap, []byte{}, []byte{levelredis.MAXBYTE}, func(i int, key, value []byte, quit *bool) {
 		if bytes.HasPrefix(key, []byte(goredisPrefix)) {
 			return
@@ -70,24 +71,19 @@ func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 		err := sc.session.WriteCommand(cmd)
 		if err != nil {
 			stdlog.Printf("[S %s] snapshot error %s\n", sc.session.RemoteAddr(), cmd)
+			broken = true
 			*quit = true
 		}
 	})
 
-	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
-		stdlog.Printf("[S %s] snapshot error\n", sc.session.RemoteAddr())
+	if broken {
 		return
 	}
 
 	stdlog.Printf("[S %s] snapshot finish\n", sc.session.RemoteAddr())
 
-	// PING
-	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_SEQ"), []byte(strconv.FormatInt(curseq, 10)))); err != nil {
-		stdlog.Printf("[S %s] sync seq error %s\n", sc.session.RemoteAddr(), err)
-		return
-	}
-	if err := sc.session.WriteCommand(NewCommand([]byte("PING"))); err != nil {
-		stdlog.Printf("[S %s] sync ping error %s\n", sc.session.RemoteAddr(), err)
+	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
+		stdlog.Printf("[S %s] sync error %s\n", sc.session.RemoteAddr(), err)
 		return
 	}
 
@@ -95,9 +91,12 @@ func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 	go server.syncRunloop(sc, curseq)
 }
 
-// SEQ [SEQ]
-// [CMD]
+// 每发送一个SYNC_SEQ再发送一个CMD
 func (server *GoRedisServer) syncRunloop(sc *SyncClient, lastseq int64) {
+	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_SEQ_BEG"))); err != nil {
+		stdlog.Printf("[S %s] sync ping error %s\n", sc.session.RemoteAddr(), err)
+		return
+	}
 	seq := lastseq
 	for {
 		val, ok := server.synclog.Read(seq)

@@ -46,8 +46,8 @@ func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd *Command) (reply *R
 	if isgoredis {
 		seq := server.masterSeq(masterSession.RemoteAddr().String())
 		seqstr := strconv.FormatInt(seq, 10)
-		stdlog.Printf("[M %s] uid %s, seq %d\n", masterSession.RemoteAddr(), server.UID(), seq)
 		synccmd := NewCommand([]byte("SYNC"), []byte(server.UID()), []byte(seqstr))
+		stdlog.Printf("[M %s] %s\n", masterSession.RemoteAddr(), synccmd)
 		if err := masterSession.WriteCommand(synccmd); err != nil {
 			stdlog.Printf("[M %s] sync error %s", masterSession.RemoteAddr(), err)
 		}
@@ -91,10 +91,15 @@ func (server *GoRedisServer) OnSYNC_RAW(session *Session, cmd *Command) (reply *
 	return NOREPLY
 }
 
-// 收取快照完成后，开始收取实时数据
 func (server *GoRedisServer) OnSYNC_RAW_FIN(session *Session, cmd *Command) (reply *Reply) {
+	return NOREPLY
+}
+
+// 收取快照完成后，开始收取实时数据
+func (server *GoRedisServer) OnSYNC_CMD_BEG(session *Session, cmd *Command) (reply *Reply) {
 	stdlog.Printf("[M %s] SYNC_RAW_FIN\n", session.RemoteAddr())
 	for {
+		// SYNC_SEQ
 		cmd, err := session.ReadCommand()
 		if err != nil {
 			stdlog.Printf("[M %s] recv err %s\n", session.RemoteAddr(), err)

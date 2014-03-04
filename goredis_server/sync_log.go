@@ -36,8 +36,6 @@ func (s *SyncLog) initLastSeq() {
 	s.enabled = s.seq != -1
 	if s.enabled {
 		stdlog.Println("synclog enabled, seq", s.seq)
-	} else {
-		stdlog.Println("synclog disabled")
 	}
 }
 
