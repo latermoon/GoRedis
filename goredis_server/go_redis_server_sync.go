@@ -32,6 +32,12 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 		return
 	}
 
+	// 第一次出现从库时才开启写日志
+	if !server.synclog.IsEnabled() {
+		stdlog.Println("synclog enable")
+		server.synclog.Enable()
+	}
+
 	if seq == -1 {
 		go server.sendSnapshot(sc)
 	} else {
@@ -42,11 +48,16 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 }
 
 func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
-	curseq := server.synclog.LastSeq()
-	stdlog.Printf("[S %s] snapshot start, cur seq %d\n", sc.session.RemoteAddr(), curseq)
+	server.Suspend()                                   //挂起全部操作
+	snap := server.levelRedis.DB().NewSnapshot()       // 挂起更新后建立快照
+	defer server.levelRedis.DB().ReleaseSnapshot(snap) //
+	curseq := server.synclog.LastSeq()                 // 当前
+	server.Resume()                                    // WARN 唤醒，如果不调用Resume，整个服务器无法工作
+
+	stdlog.Printf("[S %s] new snapshot, cur seq %d\n", sc.session.RemoteAddr(), curseq)
 
 	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_BEG"))); err != nil {
-		stdlog.Printf("[%s] snapshot error\n", sc.session.RemoteAddr())
+		stdlog.Printf("[S %s] snapshot error\n", sc.session.RemoteAddr())
 		return
 	}
 
@@ -58,13 +69,13 @@ func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 		cmd := NewCommand([]byte("SYNC_RAW"), key, value)
 		err := sc.session.WriteCommand(cmd)
 		if err != nil {
-			stdlog.Printf("[%s] snapshot error %s\n", sc.session.RemoteAddr(), cmd)
+			stdlog.Printf("[S %s] snapshot error %s\n", sc.session.RemoteAddr(), cmd)
 			*quit = true
 		}
 	})
 
 	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
-		stdlog.Printf("[%s] snapshot error\n", sc.session.RemoteAddr())
+		stdlog.Printf("[S %s] snapshot error\n", sc.session.RemoteAddr())
 		return
 	}
 

@@ -10,10 +10,11 @@ import (
 
 // 同步日志，保存主库全部的更新操作
 type SyncLog struct {
-	db     *levelredis.LevelRedis
-	seq    int64 // 永远递增
-	prefix []byte
-	mu     sync.RWMutex
+	db      *levelredis.LevelRedis
+	seq     int64 // 永远递增
+	enabled bool  // 是否开启了日志写入
+	prefix  []byte
+	mu      sync.RWMutex
 }
 
 func NewSyncLog(db *levelredis.LevelRedis, prefix string) (s *SyncLog) {
@@ -32,7 +33,12 @@ func (s *SyncLog) initLastSeq() {
 		s.seq = s.splitSeqkey(key)
 		*quit = true
 	})
-	stdlog.Println("[synclog] last seq", s.seq)
+	s.enabled = s.seq != -1
+	if s.enabled {
+		stdlog.Println("synclog enabled, seq", s.seq)
+	} else {
+		stdlog.Println("synclog disabled")
+	}
 }
 
 // sync:id:[seq] = value
@@ -50,21 +56,27 @@ func (s *SyncLog) enablekey() []byte {
 }
 
 func (s *SyncLog) IsEnabled() bool {
-	return true
+	return s.enabled
 }
 
 func (s *SyncLog) Enable() {
-	// s.db.RawSet(append(, value)
+	s.enabled = true
 }
 
 func (s *SyncLog) Disable() {
-
+	s.enabled = false
 }
 
 func (s *SyncLog) LastSeq() int64 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 	return s.seq
+}
+
+func (s *SyncLog) SuspendWrite() {
+	s.mu.Lock()
+}
+
+func (s *SyncLog) ResumeWrite() {
+	s.mu.Unlock()
 }
 
 func (s *SyncLog) Write(val []byte) (seq int64, err error) {
