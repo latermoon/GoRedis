@@ -1,0 +1,22 @@
+### GoRedis主从复制
+
+GoRedis与GoRedis之间可以实现一主多从或一从多主，同时主从同步使用带版本号的AOF保障断线后增量同步。
+
+GoRedis可以作为一个或多个Redis的从库，但暂时不可以作为Redis的主库（计划中）。
+
+#### GoRedis与GoRedis
+
+##### 同步机制
+
+同步指令和Redis一致，从库输入SLAVEOF host port，主库收到来自从库的SYNC指令后先把本地的rocksdb快照发送给从库，之后把新增指令实时传送给从库。
+
+	S: SYNC [UID] [SEQ]			// 从库向主库发送自身的UID，以及希望同步的起始SEQ，如果之前没同步过，SEQ=-1
+	M: SYNC_RAW_BEG				// 主库告知开始传输快照数据
+	M: SYNC_RAW [KEY] [VALUE]	// 主库发送快照数据，这里会持续很长时间
+	M: ...
+	M: SYNC_SEQ_BEG				// 快照结束后，告知从库开始接收带版本号的实时数据
+	M: SYNC_SEQ [SEQ]			// 对于每个要发送的[CMD]，会先发送SEQ
+	M: [CMD]					// 每个实时同步的[CMD]前必定带有SEQ
+	M: ...						
+
+从库需要不断更新最后收到的SEQ，断线后向主库SYNC [UID] [Last SEQ]，此时不需要接收快照，会直接进入SYNC_SEQ_BEG。
