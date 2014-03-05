@@ -5,7 +5,7 @@ import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"
 	"GoRedis/libs/levelredis"
-	"GoRedis/libs/statlog"
+	"GoRedis/libs/stat"
 	"GoRedis/libs/stdlog"
 	"GoRedis/libs/uuid"
 	"errors"
@@ -45,8 +45,8 @@ type GoRedisServer struct {
 	cmdCounters     *counter.Counters
 	cmdCateCounters *counter.Counters // 指令集统计
 	// logger
-	cmdMonitor    *statlog.StatLogger
-	leveldbStatus *statlog.StatLogger
+	cmdMonitor    *stat.Writer
+	leveldbStatus *stat.Writer
 	// 从库
 	uid      string        // 实例id
 	syncmgr  *SyncManager  // as master
