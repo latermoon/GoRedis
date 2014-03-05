@@ -49,10 +49,10 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 
 func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 	server.Suspend()                                   //挂起全部操作
-	snap := server.levelRedis.DB().NewSnapshot()       // 挂起更新后建立快照
+	snap := server.levelRedis.DB().NewSnapshot()       // 挂起后建立快照
 	defer server.levelRedis.DB().ReleaseSnapshot(snap) //
-	curseq := server.synclog.LastSeq()                 // 当前
-	server.Resume()                                    // WARN 唤醒，如果不调用Resume，整个服务器无法工作
+	curseq := server.synclog.LastSeq()                 // 获取当前日志序号
+	server.Resume()                                    // 唤醒，如果不调用Resume，整个服务器无法继续工作
 
 	stdlog.Printf("[S %s] snapshot, seq %d\n", sc.session.RemoteAddr(), curseq)
 
