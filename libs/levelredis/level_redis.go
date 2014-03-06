@@ -1,7 +1,7 @@
 package levelredis
 
 import (
-	levigo "GoRedis/libs/gorocks"
+	"GoRedis/libs/gorocks"
 	lru "GoRedis/libs/lrucache"
 	"bytes"
 	"math"
@@ -84,8 +84,8 @@ const (
 )
 
 const (
-	NoCompression     = levigo.NoCompression
-	SnappyCompression = levigo.SnappyCompression
+	NoCompression     = gorocks.NoCompression
+	SnappyCompression = gorocks.SnappyCompression
 )
 
 var (
@@ -94,9 +94,9 @@ var (
 )
 
 type LevelRedis struct {
-	db       *levigo.DB
-	ro       *levigo.ReadOptions
-	wo       *levigo.WriteOptions
+	db       *gorocks.DB
+	ro       *gorocks.ReadOptions
+	wo       *gorocks.WriteOptions
 	lruCache *lru.LRUCache // LRU缓存，管理string以外的key
 	mus      []sync.Mutex  // Key Hash线程池
 	lstring  *LevelString
@@ -106,12 +106,12 @@ type LevelRedis struct {
 	counters map[string]int64
 }
 
-func NewLevelRedis(db *levigo.DB) (l *LevelRedis) {
+func NewLevelRedis(db *gorocks.DB) (l *LevelRedis) {
 	l = &LevelRedis{}
 	l.counters = map[string]int64{"get": 0, "set": 0, "batch": 0, "del": 0, "enum": 0, "lru_hit": 0, "lru_miss": 0}
 	l.db = db
-	l.ro = levigo.NewReadOptions()
-	l.wo = levigo.NewWriteOptions()
+	l.ro = gorocks.NewReadOptions()
+	l.wo = gorocks.NewWriteOptions()
 	l.lstring = NewLevelString(l)
 	l.g = newGlobal(l)
 	l.lruCache = lru.NewLRUCache(lruCacheSize)
@@ -123,7 +123,7 @@ func NewLevelRedis(db *levigo.DB) (l *LevelRedis) {
 	return
 }
 
-func (l *LevelRedis) DB() (db *levigo.DB) {
+func (l *LevelRedis) DB() (db *gorocks.DB) {
 	return l.db
 }
 
@@ -133,43 +133,43 @@ func (l *LevelRedis) Close() {
 	l.db.Close()
 }
 
-func NewOptions() *levigo.Options {
-	return levigo.NewOptions()
+func NewOptions() *gorocks.Options {
+	return gorocks.NewOptions()
 }
 
-func NewDefaultEnv() *levigo.Env {
-	return levigo.NewDefaultEnv()
+func NewDefaultEnv() *gorocks.Env {
+	return gorocks.NewDefaultEnv()
 }
 
-func NewWriteBatch() *levigo.WriteBatch {
-	return levigo.NewWriteBatch()
+func NewWriteBatch() *gorocks.WriteBatch {
+	return gorocks.NewWriteBatch()
 }
 
-func NewLRUCache(capacity int) *levigo.Cache {
-	return levigo.NewLRUCache(capacity)
+func NewLRUCache(capacity int) *gorocks.Cache {
+	return gorocks.NewLRUCache(capacity)
 }
 
-func Open(dbname string, o *levigo.Options) (*levigo.DB, error) {
-	return levigo.Open(dbname, o)
+func Open(dbname string, o *gorocks.Options) (*gorocks.DB, error) {
+	return gorocks.Open(dbname, o)
 }
 
 func Repair(dbname string) error {
-	opts := levigo.NewOptions()
+	opts := gorocks.NewOptions()
 	defer opts.Close()
-	opts.SetCache(levigo.NewLRUCache(128 * 1024 * 1024))
-	opts.SetCompression(levigo.SnappyCompression)
+	opts.SetCache(gorocks.NewLRUCache(128 * 1024 * 1024))
+	opts.SetCompression(gorocks.SnappyCompression)
 	opts.SetBlockSize(32 * 1024)
 	opts.SetMaxBackgroundCompactions(6)
 	opts.SetWriteBufferSize(128 * 1024 * 1024)
 	opts.SetMaxOpenFiles(100000)
 	opts.SetCreateIfMissing(true)
-	env := levigo.NewDefaultEnv()
+	env := gorocks.NewDefaultEnv()
 	defer env.Close()
 	env.SetBackgroundThreads(6)
 	env.SetHighPriorityBackgroundThreads(2)
 	opts.SetEnv(env)
 
-	return levigo.RepairDatabase(dbname, opts)
+	return gorocks.RepairDatabase(dbname, opts)
 }
 
 func (l *LevelRedis) Stats() string {
@@ -212,7 +212,7 @@ func (l *LevelRedis) RawDel(key []byte) error {
 	return l.db.Delete(l.wo, key)
 }
 
-func (l *LevelRedis) WriteBatch(w *levigo.WriteBatch) error {
+func (l *LevelRedis) WriteBatch(w *gorocks.WriteBatch) error {
 	l.incrCounter("batch")
 	return l.db.Write(l.wo, w)
 }
@@ -353,7 +353,7 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IterDirection, fn 
 // key顺序扫描，常用于数据导出、附近搜索
 // 返回的key是面向用户的key，而非内部结构的raw_key
 func (l *LevelRedis) KeyEnumerate(seek []byte, direction IterDirection, fn func(i int, key, keytype, value []byte, quit *bool)) {
-	ro := levigo.NewReadOptions()
+	ro := gorocks.NewReadOptions()
 	ro.SetFillCache(false)
 	defer ro.Close()
 
@@ -372,7 +372,7 @@ func (l *LevelRedis) KeyEnumerate(seek []byte, direction IterDirection, fn func(
 }
 
 func (l *LevelRedis) RangeEnumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
-	ro := levigo.NewReadOptions()
+	ro := gorocks.NewReadOptions()
 	ro.SetFillCache(false)
 	defer ro.Close()
 
@@ -382,10 +382,10 @@ func (l *LevelRedis) RangeEnumerate(min, max []byte, direction IterDirection, fn
 }
 
 // 快照枚举
-func (l *LevelRedis) SnapshotEnumerate(snap *levigo.Snapshot, min, max []byte, fn func(i int, key, value []byte, quit *bool)) {
+func (l *LevelRedis) SnapshotEnumerate(snap *gorocks.Snapshot, min, max []byte, fn func(i int, key, value []byte, quit *bool)) {
 	l.incrCounter("enum")
 
-	ro := levigo.NewReadOptions()
+	ro := gorocks.NewReadOptions()
 	ro.SetFillCache(false)
 	ro.SetSnapshot(snap)
 	defer ro.Close()
@@ -433,7 +433,7 @@ func (l *LevelRedis) SnapshotEnumerate(snap *levigo.Snapshot, min, max []byte, f
 }
 
 // 范围扫描
-func (l *LevelRedis) Enumerate(iter *levigo.Iterator, min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
+func (l *LevelRedis) Enumerate(iter *gorocks.Iterator, min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
 	l.incrCounter("enum")
 
 	found := false

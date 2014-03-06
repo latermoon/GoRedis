@@ -19,6 +19,8 @@ func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
 		reply = BulkReply(server.serverInfo())
 	case "command":
 		reply = BulkReply(server.commandInfo())
+	case "stats":
+		reply = BulkReply(server.statsInfo())
 	default:
 		buf := bytes.Buffer{}
 		buf.WriteString(server.serverInfo())
@@ -40,21 +42,21 @@ func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) serverInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Server\n")
-	buf.WriteString(fmt.Sprintf("goredis_version:%s\n", VERSION))
+	buf.WriteString(fmt.Sprintf("goredis_version:%s\n", server.info.Version()))
 	return buf.String()
 }
 
 func (server *GoRedisServer) clientInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Clients\n")
-	buf.WriteString(fmt.Sprintf("connected_clients:%d\n", server.counters.Get("connection").Count()))
+	buf.WriteString(fmt.Sprintf("connected_clients:%d\n", server.info.connected_clients()))
 	return buf.String()
 }
 
 func (server *GoRedisServer) commandInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Command\n")
-	names := server.cmdCounters.CounterNames()
+	names := server.cmdCounters.Names()
 	sort.Strings(names)
 	for _, name := range names {
 		counter := server.cmdCounters.Get(name)
@@ -110,38 +112,26 @@ func (server *GoRedisServer) persistenceInfo() string {
 func (server *GoRedisServer) statsInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Stats\n")
-	buf.WriteString(fmt.Sprintf("total_connections_received:%d\n", 0))
-	buf.WriteString(fmt.Sprintf("total_commands_processed:%d\n", 0))
-	buf.WriteString(fmt.Sprintf("instantaneous_ops_per_sec:%d\n", 0))
+	// buf.WriteString(fmt.Sprintf("total_connections_received:%d\n", 0))
+	buf.WriteString(fmt.Sprintf("total_commands_processed:%d\n", server.info.total_commands_processed()))
+	buf.WriteString(fmt.Sprintf("instantaneous_ops_per_sec:%d\n", server.info.instantaneous_ops_per_sec()))
 	buf.WriteString(fmt.Sprintf("rejected_connections:%d\n", 0))
-	buf.WriteString(fmt.Sprintf("keyspace_hits:%d\n", 0))
-	buf.WriteString(fmt.Sprintf("keyspace_misses:%d\n", 0))
+	// buf.WriteString(fmt.Sprintf("keyspace_hits:%d\n", 0))
+	// buf.WriteString(fmt.Sprintf("keyspace_misses:%d\n", 0))
 	return buf.String()
 }
 
 func (server *GoRedisServer) replicationInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Replication\n")
-	synccount := server.syncmgr.Count()
-	slavecount := server.slavemgr.Count()
-	role := "none"
-	if synccount > 0 && slavecount > 0 {
-		role = "both"
-	} else if synccount > 0 && slavecount == 0 {
-		role = "master"
-	} else if synccount == 0 && slavecount > 0 {
-		role = "slave"
-	} else {
-		role = "none"
-	}
-	buf.WriteString(fmt.Sprintf("role:%s\n", role))
-	buf.WriteString(fmt.Sprintf("connected_slaves:%d\n", synccount))
-	for i := 0; i < synccount; i++ {
+	buf.WriteString(fmt.Sprintf("role:%s\n", server.info.Role()))
+	buf.WriteString(fmt.Sprintf("connected_slaves:%d\n", server.info.connected_slaves()))
+	for i := 0; i < server.info.connected_slaves(); i++ {
 		c := server.syncmgr.Client(i)
 		buf.WriteString(fmt.Sprintf("slave%d:%s,%s\n", i, c.session.RemoteAddr(), c.Status()))
 	}
-	buf.WriteString(fmt.Sprintf("connected_masters:%d\n", slavecount))
-	for i := 0; i < slavecount; i++ {
+	buf.WriteString(fmt.Sprintf("connected_masters:%d\n", server.info.connected_masters()))
+	for i := 0; i < server.info.connected_masters(); i++ {
 		c := server.slavemgr.Client(i)
 		buf.WriteString(fmt.Sprintf("master%d:%s,%s\n", i, c.RemoteAddr(), c.Status()))
 	}
@@ -150,7 +140,7 @@ func (server *GoRedisServer) replicationInfo() string {
 
 func (server *GoRedisServer) cmdCateCounterInfo() string {
 	buf := bytes.Buffer{}
-	names := server.cmdCateCounters.CounterNames()
+	names := server.cmdCateCounters.Names()
 	sort.Strings(names)
 	for _, name := range names {
 		counter := server.cmdCateCounters.Get(name)

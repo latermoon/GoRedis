@@ -26,8 +26,7 @@ func (server *GoRedisServer) Init() (err error) {
 	if err != nil {
 		return
 	}
-	// __goredis:config:xxx
-	server.config = NewConfig(server.levelRedis, goredisPrefix+"config:")
+	server.config = NewConfig(server.levelRedis, PREFIX+"config:")
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initCommandCounterLog("string", []string{"GET", "SET", "MGET", "MSET", "INCR", "DECR", "INCRBY", "DECRBY"})
@@ -40,7 +39,6 @@ func (server *GoRedisServer) Init() (err error) {
 	server.initLeveldbStatsLog(server.directory + "/leveldb.stats.log")
 	server.initSlowlog(server.directory + "/slow.log")
 	stdlog.Printf("init uid %s\n", server.UID())
-	server.initConfig()
 	return
 }
 
@@ -58,11 +56,6 @@ func (server *GoRedisServer) initSignalNotify() {
 		stdlog.Println("db closed, bye")
 		os.Exit(0)
 	}()
-}
-
-func (server *GoRedisServer) initConfig() {
-	// slowlog-log-slower-than
-	// slst := server.config.IntForKey("slowlog-log-slower-than", 100*1000)
 }
 
 func (server *GoRedisServer) initLevelDB() (err error) {
@@ -88,8 +81,8 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 
 func (server *GoRedisServer) initSyncLog() error {
 	opts := levelredis.NewOptions()
-	opts.SetCache(levelredis.NewLRUCache(512 * 1024 * 1024))
-	opts.SetCompression(levelredis.NoCompression)
+	opts.SetCache(levelredis.NewLRUCache(32 * 1024 * 1024))
+	opts.SetCompression(levelredis.SnappyCompression)
 	opts.SetBlockSize(32 * 1024)
 	opts.SetMaxBackgroundCompactions(2)
 	opts.SetWriteBufferSize(128 * 1024 * 1024)
@@ -110,7 +103,7 @@ func (server *GoRedisServer) initSyncLog() error {
 
 // 命令执行监控
 func (server *GoRedisServer) initCommandMonitor(path string) {
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -136,7 +129,7 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 }
 
 func (server *GoRedisServer) initSeqLog(path string) {
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -167,7 +160,7 @@ func (server *GoRedisServer) initSeqLog(path string) {
 }
 
 func (server *GoRedisServer) initSlowlog(path string) {
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -176,7 +169,7 @@ func (server *GoRedisServer) initSlowlog(path string) {
 
 func (server *GoRedisServer) initLeveldbIOLog(path string) {
 	// leveldb.io
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -197,7 +190,7 @@ func (server *GoRedisServer) initLeveldbIOLog(path string) {
 
 func (server *GoRedisServer) initLeveldbStatsLog(path string) {
 	// leveldb.stats
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -215,7 +208,7 @@ func (server *GoRedisServer) initLeveldbStatsLog(path string) {
 
 func (server *GoRedisServer) initCommandCounterLog(cate string, cmds []string) {
 	path := fmt.Sprintf("%s/cmd.%s.log", server.directory, cate)
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}

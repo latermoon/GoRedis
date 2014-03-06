@@ -17,14 +17,13 @@ import (
 )
 
 // TODO 版本号，每次更新都需要升级一下
-const VERSION = "1.0.50"
+const VERSION = "1.0.51"
+const PREFIX = "__goredis:"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
 	WrongKindReply = ErrorReply(WrongKindError)
 )
-
-var goredisPrefix string = "__goredis:"
 
 var (
 	slowexec = 30 // ms
@@ -44,6 +43,8 @@ type GoRedisServer struct {
 	counters        *counter.Counters
 	cmdCounters     *counter.Counters
 	cmdCateCounters *counter.Counters // 指令集统计
+	// info
+	info *Info
 	// logger
 	cmdMonitor    *stat.Writer
 	leveldbStatus *stat.Writer
@@ -80,6 +81,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.syncmgr = NewSyncManager()
 	server.slavemgr = NewSlaveManager()
 	server.monmgr = NewMonManager()
+	server.info = NewInfo(server)
 	// default datasource
 	server.directory = directory
 	// counter

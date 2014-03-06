@@ -15,8 +15,6 @@ var mutexof func(key string) (mu *sync.Mutex)
 
 // implement
 func init() {
-	var mclock sync.Mutex
-	mutexCache := make(map[string]*sync.Mutex)
 
 	inthash = func(b []byte, max int) int {
 		hash := md5.Sum(b) // [248 229 249 44 202 203 55 18 71 32 236 237 242 81 90 179]
@@ -27,14 +25,20 @@ func init() {
 		return sum % max
 	}
 
+	var mclock sync.Mutex
+	mucaches := make(map[string]*sync.Mutex)
 	mutexof = func(key string) (mu *sync.Mutex) {
-		mclock.Lock()
 		var ok bool
-		if mu, ok = mutexCache[key]; !ok {
-			mu = &sync.Mutex{}
-			mutexCache[key] = mu
+		mu, ok = mucaches[key]
+		if !ok {
+			mclock.Lock()
+			mu, ok = mucaches[key]
+			if !ok {
+				mu = &sync.Mutex{}
+				mucaches[key] = mu
+			}
+			mclock.Unlock()
 		}
-		mclock.Unlock()
 		return
 	}
 }

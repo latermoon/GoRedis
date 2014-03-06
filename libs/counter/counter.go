@@ -1,55 +1,32 @@
 package counter
 
 import (
-	"sync"
+	"sync/atomic"
 )
 
-// 计数器
+// 安全计数器
 type Counter struct {
-	count     int64
-	prevCount int64
-	mutex     sync.Mutex
+	v int64
 }
 
-func NewCounter() (c *Counter) {
-	c = &Counter{}
-	c.count = 0
-	c.prevCount = 0
-	return
+func New(val int64) *Counter {
+	return &Counter{
+		v: val,
+	}
 }
 
-func (c *Counter) SetCount(i int64) {
-	c.mutex.Lock()
-	c.prevCount, c.count = c.count, i
-	c.mutex.Unlock()
+func (c *Counter) SetCount(val int64) {
+	atomic.StoreInt64(&c.v, val)
 }
 
 func (c *Counter) Count() int64 {
-	return c.count
+	return atomic.LoadInt64(&c.v)
 }
 
-func (c *Counter) Incr(i int64) {
-	c.mutex.Lock()
-	c.count += i
-	c.mutex.Unlock()
+func (c *Counter) Incr(delta int64) int64 {
+	return atomic.AddInt64(&c.v, delta)
 }
 
-func (c *Counter) Decr(i int64) {
-	c.mutex.Lock()
-	c.count -= i
-	c.mutex.Unlock()
-}
-
-func (c *Counter) Clear() {
-	c.mutex.Lock()
-	c.count = 0
-	c.prevCount = 0
-	c.mutex.Unlock()
-}
-
-func (c *Counter) ChangedCount() (chg int64) {
-	c.mutex.Lock()
-	chg, c.prevCount = c.count-c.prevCount, c.count
-	c.mutex.Unlock()
-	return
+func (c *Counter) Decr(delta int64) int64 {
+	return atomic.AddInt64(&c.v, delta*-1)
 }

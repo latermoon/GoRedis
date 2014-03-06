@@ -71,7 +71,7 @@ func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 	// scan snapshot
 	broken := false
 	server.levelRedis.SnapshotEnumerate(snap, []byte{}, []byte{levelredis.MAXBYTE}, func(i int, key, value []byte, quit *bool) {
-		if bytes.HasPrefix(key, []byte(goredisPrefix)) {
+		if bytes.HasPrefix(key, []byte(PREFIX)) {
 			return
 		}
 		cmd := NewCommand([]byte("SYNC_RAW"), key, value)

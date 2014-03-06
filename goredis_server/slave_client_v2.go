@@ -3,7 +3,7 @@ package goredis_server
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"
-	"GoRedis/libs/statlog"
+	"GoRedis/libs/stat"
 	"fmt"
 	"net"
 	"os"
@@ -17,7 +17,7 @@ type SlaveClientV2 struct {
 	status   string
 	lastseq  int64
 	counters *counter.Counters
-	synclog  *statlog.StatLogger
+	synclog  *stat.Writer
 }
 
 func NewSlaveClientV2(server *GoRedisServer, session *Session) (s *SlaveClientV2, err error) {
@@ -36,18 +36,13 @@ func (s *SlaveClientV2) initLog() error {
 	if err != nil {
 		return err
 	}
-	s.synclog = statlog.NewStatLogger(file)
-	s.synclog.Add(statlog.TimeItem("time"))
-	s.synclog.Add(statlog.Item("raw", func() interface{} {
-		return s.counters.Get("raw").ChangedCount()
-	}, &statlog.Opt{Padding: 8}))
-	s.synclog.Add(statlog.Item("cmd", func() interface{} {
-		return s.counters.Get("cmd").ChangedCount()
-	}, &statlog.Opt{Padding: 8}))
-	s.synclog.Add(statlog.Item("seq", func() interface{} {
-		return s.lastseq
-	}, &statlog.Opt{Padding: 16}))
-	go s.synclog.Start()
+	s.synclog = stat.New(file)
+	st := s.synclog
+	st.Add(stat.TextItem("time", 8, func() interface{} { return stat.TimeString() }))
+	st.Add(stat.IncrItem("raw", 8, func() int64 { return s.counters.Get("raw").Count() }))
+	st.Add(stat.IncrItem("cmd", 8, func() int64 { return s.counters.Get("cmd").Count() }))
+	st.Add(stat.TextItem("seq", 16, func() interface{} { return s.lastseq }))
+	go st.Start()
 
 	return nil
 }
@@ -67,7 +62,7 @@ func (s *SlaveClientV2) Status() string {
 func (s *SlaveClientV2) Destory() {
 	s.status = "broken"
 	s.broken = true
-	s.synclog.Stop()
+	s.synclog.Close()
 }
 
 func (s *SlaveClientV2) Sync(uid string) (err error) {

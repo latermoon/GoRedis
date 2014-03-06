@@ -11,8 +11,9 @@ type Counters struct {
 }
 
 func NewCounters() (c *Counters) {
-	c = &Counters{}
-	c.table = make(map[string]*Counter)
+	c = &Counters{
+		table: make(map[string]*Counter),
+	}
 	return
 }
 
@@ -22,19 +23,21 @@ func (c *Counters) Len() int {
 
 // 获取并自动创建
 func (c *Counters) Get(name string) (counter *Counter) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	var exist bool
-	counter, exist = c.table[name]
-	if !exist {
-		counter = NewCounter()
-		c.table[name] = counter
+	var ok bool
+	counter, ok = c.table[name]
+	if !ok {
+		c.mu.Lock()
+		counter, ok = c.table[name]
+		if !ok {
+			counter = New(0)
+			c.table[name] = counter
+		}
+		c.mu.Unlock()
 	}
-	return
+	return counter
 }
 
-func (c *Counters) CounterNames() (names []string) {
+func (c *Counters) Names() (names []string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

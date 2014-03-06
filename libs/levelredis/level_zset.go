@@ -3,7 +3,7 @@ package levelredis
 // 基于leveldb实现的zset，用于海量存储，节约内存
 
 import (
-	levigo "GoRedis/libs/gorocks"
+	"GoRedis/libs/gorocks"
 	"GoRedis/libs/stdlog"
 	"bytes"
 	"runtime/debug"
@@ -93,7 +93,7 @@ func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
 func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	count := len(scoreMembers)
 	for i := 0; i < count; i += 2 {
@@ -135,7 +135,7 @@ func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	score := l.score(member)
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	// stdlog.Println("zincrby", l.key, string(member), incr, BytesToInt64(score))
 	oldcount := l.totalCount
@@ -242,7 +242,7 @@ func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count i
 func (l *LevelZSet) Remove(members ...[]byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	for _, member := range members {
 		score := l.redis.RawGet(l.memberKey(member))
@@ -269,7 +269,7 @@ func (l *LevelZSet) Remove(members ...[]byte) (n int) {
 func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
 		if i < start {
@@ -301,7 +301,7 @@ func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
 	defer l.mu.Unlock()
 	min2 := joinBytes(l.scoreKeyPrefix(), min)
 	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	l.redis.RangeEnumerate(min2, max2, IterForward, func(i int, key, value []byte, quit *bool) {
 		score, member := l.splitScoreKey(key)
@@ -336,7 +336,7 @@ func (l *LevelZSet) Drop() (ok bool) {
 	if l.totalCount == 0 {
 		return true
 	}
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	prefix := joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT)
 	l.redis.PrefixEnumerate(prefix, IterForward, func(i int, key, value []byte, quit *bool) {
