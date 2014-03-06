@@ -1,7 +1,7 @@
 package levelredis
 
 import (
-	levigo "GoRedis/libs/gorocks"
+	"GoRedis/libs/gorocks"
 	"bytes"
 	"sync"
 )
@@ -88,7 +88,7 @@ func (l *LevelHash) Set(fieldVals ...[]byte) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	n = 0
 	for i := 0; i < len(fieldVals); i += 2 {
@@ -168,7 +168,7 @@ func (l *LevelHash) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	l.redis.PrefixEnumerate(l.fieldPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
 		batch.Delete(key)

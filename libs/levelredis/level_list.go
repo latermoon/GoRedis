@@ -4,7 +4,7 @@ package levelredis
 // 本页面命名注意，idx都表示大于l.start的那个索引序号，而不是0开始的数组序号
 
 import (
-	levigo "GoRedis/libs/gorocks"
+	"GoRedis/libs/gorocks"
 	"bytes"
 	"strconv"
 	"strings"
@@ -95,7 +95,7 @@ func (l *LevelList) LPush(values ...[]byte) (err error) {
 
 	// 左游标
 	oldstart := l.start
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	for _, value := range values {
 		l.start--
@@ -116,7 +116,7 @@ func (l *LevelList) RPush(values ...[]byte) (err error) {
 
 	// 右游标
 	oldend := l.end
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	for _, value := range values {
 		l.end++
@@ -152,7 +152,7 @@ func (l *LevelList) RPop() (e *Element, err error) {
 	// 只剩下一个元素时，删除infoKey(0)
 	shouldReset := l.len() == 1
 	// 删除数据, 更新左游标
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	batch.Delete(l.idxKey(idx))
 	if shouldReset {
@@ -191,7 +191,7 @@ func (l *LevelList) LPop() (e *Element, err error) {
 	// 只剩下一个元素时，删除infoKey(0)
 	shouldReset := l.len() == 1
 	// 删除数据, 更新左游标
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	batch.Delete(l.idxKey(idx))
 	if shouldReset {
@@ -220,7 +220,7 @@ func (l *LevelList) TrimLeft(count uint) (n int) {
 		return
 	}
 	oldstart, oldend := l.start, l.end
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 
 	for i := int64(count); i < oldlen; i++ {
@@ -281,7 +281,7 @@ func (l *LevelList) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	batch := levigo.NewWriteBatch()
+	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	l.redis.PrefixEnumerate(l.keyPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
 		batch.Delete(key)

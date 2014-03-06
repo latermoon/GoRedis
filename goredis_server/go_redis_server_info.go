@@ -124,26 +124,14 @@ func (server *GoRedisServer) statsInfo() string {
 func (server *GoRedisServer) replicationInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Replication\n")
-	synccount := server.syncmgr.Count()
-	slavecount := server.slavemgr.Count()
-	role := "none"
-	if synccount > 0 && slavecount > 0 {
-		role = "both"
-	} else if synccount > 0 && slavecount == 0 {
-		role = "master"
-	} else if synccount == 0 && slavecount > 0 {
-		role = "slave"
-	} else {
-		role = "none"
-	}
-	buf.WriteString(fmt.Sprintf("role:%s\n", role))
-	buf.WriteString(fmt.Sprintf("connected_slaves:%d\n", synccount))
-	for i := 0; i < synccount; i++ {
+	buf.WriteString(fmt.Sprintf("role:%s\n", server.info.Role()))
+	buf.WriteString(fmt.Sprintf("connected_slaves:%d\n", server.info.connected_slaves()))
+	for i := 0; i < server.info.connected_slaves(); i++ {
 		c := server.syncmgr.Client(i)
 		buf.WriteString(fmt.Sprintf("slave%d:%s,%s\n", i, c.session.RemoteAddr(), c.Status()))
 	}
-	buf.WriteString(fmt.Sprintf("connected_masters:%d\n", slavecount))
-	for i := 0; i < slavecount; i++ {
+	buf.WriteString(fmt.Sprintf("connected_masters:%d\n", server.info.connected_masters()))
+	for i := 0; i < server.info.connected_masters(); i++ {
 		c := server.slavemgr.Client(i)
 		buf.WriteString(fmt.Sprintf("master%d:%s,%s\n", i, c.RemoteAddr(), c.Status()))
 	}

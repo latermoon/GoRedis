@@ -81,8 +81,8 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 
 func (server *GoRedisServer) initSyncLog() error {
 	opts := levelredis.NewOptions()
-	opts.SetCache(levelredis.NewLRUCache(512 * 1024 * 1024))
-	opts.SetCompression(levelredis.NoCompression)
+	opts.SetCache(levelredis.NewLRUCache(32 * 1024 * 1024))
+	opts.SetCompression(levelredis.SnappyCompression)
 	opts.SetBlockSize(32 * 1024)
 	opts.SetMaxBackgroundCompactions(2)
 	opts.SetWriteBufferSize(128 * 1024 * 1024)
