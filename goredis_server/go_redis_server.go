@@ -17,7 +17,7 @@ import (
 )
 
 // TODO 版本号，每次更新都需要升级一下
-const VERSION = "1.0.49"
+const VERSION = "1.0.50"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")

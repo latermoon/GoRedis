@@ -35,6 +35,7 @@ func (server *GoRedisServer) Init() (err error) {
 	server.initCommandCounterLog("set", []string{"SADD", "SCARD", "SISMEMBER", "SMEMBERS", "SREM"})
 	server.initCommandCounterLog("list", []string{"LPUSH", "RPUSH", "LPOP", "RPOP", "LINDEX", "LLEN", "LRANGE", "LTRIM"})
 	server.initCommandCounterLog("zset", []string{"ZADD", "ZCARD", "ZSCORE", "ZINCRBY", "ZRANGE", "ZRANGEBYSCORE", "ZRANK", "ZREM", "ZREMRANGEBYRANK", "ZREMRANGEBYSCORE", "ZREVRANGE", "ZREVRANGEBYSCORE", "ZREVRANK"})
+	server.initSeqLog(server.directory + "/seq.log")
 	server.initLeveldbIOLog(server.directory + "/leveldb.io.log")
 	server.initLeveldbStatsLog(server.directory + "/leveldb.stats.log")
 	server.initSlowlog(server.directory + "/slow.log")
@@ -127,9 +128,34 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 	}
 
 	st.Add(stat.TextItem("connection", 11, func() interface{} { return server.counters.Get("connection").Count() }))
-	st.Add(stat.TextItem("seq", 16, func() interface{} {
+
+	go st.Start()
+}
+
+func (server *GoRedisServer) initSeqLog(path string) {
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	st := stat.New(file)
+	st.Add(stat.TextItem("time", 8, func() interface{} { return stat.TimeString() }))
+	st.Add(stat.TextItem("minseq", 16, func() interface{} {
 		if server.synclog.IsEnabled() {
-			return server.synclog.LastSeq()
+			return server.synclog.MinSeq()
+		} else {
+			return "-"
+		}
+	}))
+	st.Add(stat.TextItem("maxseq", 16, func() interface{} {
+		if server.synclog.IsEnabled() {
+			return server.synclog.MaxSeq()
+		} else {
+			return "-"
+		}
+	}))
+	st.Add(stat.TextItem("size", 16, func() interface{} {
+		if server.synclog.IsEnabled() {
+			return server.synclog.MaxSeq() - server.synclog.MinSeq()
 		} else {
 			return "-"
 		}
