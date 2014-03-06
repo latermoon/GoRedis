@@ -26,7 +26,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	}
 	stdlog.Printf("[S %s] slave %s\n", session.RemoteAddr(), cmd)
 
-	sc, err := NewSyncClient(session, server.directory)
+	sc, err := NewSyncClient(session)
 	if err != nil {
 		stdlog.Printf("[S %s] slave error %s", session.RemoteAddr(), err)
 		return
