@@ -4,6 +4,7 @@ import (
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
 	"bytes"
+	"errors"
 	"sync"
 	"time"
 )
@@ -15,6 +16,7 @@ type SyncLog struct {
 	seq     int64 // seq结束, 永远递增
 	maxlen  int64 // 最大长度
 	enabled bool  // 是否开启了日志写入
+	closed  bool  // 已关闭
 	prefix  []byte
 	mu      sync.RWMutex
 }
@@ -103,19 +105,31 @@ func (s *SyncLog) LastSeq() int64 {
 func (s *SyncLog) Write(val []byte) (seq int64, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closed {
+		return -1, errors.New("db closed")
+	}
 	seq = s.seq + 1
 	err = s.db.RawSet(s.seqkey(seq), val)
 	if err == nil {
 		s.seq = seq
 	}
-	// stdlog.Printf("[synclog] %d, %s\n", s.seq, string(val))
 	return
 }
 
 func (s *SyncLog) Read(seq int64) (val []byte, ok bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if s.closed {
+		return nil, false
+	}
 	val = s.db.RawGet(s.seqkey(seq))
 	ok = val != nil
 	return
+}
+
+func (s *SyncLog) Close() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.closed = true
+	s.db.Close()
 }

@@ -51,7 +51,10 @@ func (server *GoRedisServer) initSignalNotify() {
 	go func() {
 		sig := <-server.sigs
 		stdlog.Println("recv signal:", sig)
+		server.Suspend()                   // 挂起全部传入数据
+		time.Sleep(time.Millisecond * 500) // 休息一下，Suspend瞬间可能还有数据库写入
 		server.levelRedis.Close()
+		server.synclog.Close()
 		stdlog.Println("db closed, bye")
 		os.Exit(0)
 	}()
