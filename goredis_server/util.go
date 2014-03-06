@@ -3,6 +3,7 @@ package goredis_server
 import (
 	"encoding/binary"
 	"fmt"
+	"os"
 	"strconv"
 )
 
@@ -19,6 +20,10 @@ func BytesToInt64(buf []byte) int64 {
 func ParseInt64(b []byte) (i int64, err error) {
 	i, err = strconv.ParseInt(string(b), 10, 64)
 	return
+}
+
+func openfile(filename string) (*os.File, error) {
+	return os.OpenFile(filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
 }
 
 // 将各种对象，转换为字符串形式，再转为[]byte数组

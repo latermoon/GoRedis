@@ -110,7 +110,7 @@ func (server *GoRedisServer) initSyncLog() error {
 
 // 命令执行监控
 func (server *GoRedisServer) initCommandMonitor(path string) {
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -136,7 +136,7 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 }
 
 func (server *GoRedisServer) initSeqLog(path string) {
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -167,7 +167,7 @@ func (server *GoRedisServer) initSeqLog(path string) {
 }
 
 func (server *GoRedisServer) initSlowlog(path string) {
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -176,7 +176,7 @@ func (server *GoRedisServer) initSlowlog(path string) {
 
 func (server *GoRedisServer) initLeveldbIOLog(path string) {
 	// leveldb.io
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -197,7 +197,7 @@ func (server *GoRedisServer) initLeveldbIOLog(path string) {
 
 func (server *GoRedisServer) initLeveldbStatsLog(path string) {
 	// leveldb.stats
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -215,7 +215,7 @@ func (server *GoRedisServer) initLeveldbStatsLog(path string) {
 
 func (server *GoRedisServer) initCommandCounterLog(cate string, cmds []string) {
 	path := fmt.Sprintf("%s/cmd.%s.log", server.directory, cate)
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	file, err := openfile(path)
 	if err != nil {
 		panic(err)
 	}
