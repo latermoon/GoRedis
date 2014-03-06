@@ -6,7 +6,7 @@ import (
 	"GoRedis/libs/counter"
 	"GoRedis/libs/iotool"
 	"GoRedis/libs/rdb"
-	"GoRedis/libs/statlog"
+	"GoRedis/libs/stat"
 	"GoRedis/libs/stdlog"
 	"bufio"
 	"fmt"
@@ -28,7 +28,7 @@ type SlaveClient struct {
 	wg       sync.WaitGroup
 	broken   bool // 无效连接
 	counters *counter.Counters
-	synclog  *statlog.StatLogger
+	synclog  *stat.Writer
 	status   string
 }
 
@@ -50,21 +50,14 @@ func (s *SlaveClient) initLog() error {
 	if err != nil {
 		return err
 	}
-	s.synclog = statlog.NewStatLogger(file)
-	s.synclog.Add(statlog.TimeItem("time"))
-	s.synclog.Add(statlog.Item("rdb", func() interface{} {
-		return s.counters.Get("rdb").ChangedCount()
-	}, &statlog.Opt{Padding: 8}))
-	s.synclog.Add(statlog.Item("recv", func() interface{} {
-		return s.counters.Get("recv").ChangedCount()
-	}, &statlog.Opt{Padding: 8}))
-	s.synclog.Add(statlog.Item("proc", func() interface{} {
-		return s.counters.Get("proc").ChangedCount()
-	}, &statlog.Opt{Padding: 8}))
-	s.synclog.Add(statlog.Item("buffer", func() interface{} {
-		return len(s.buffer)
-	}, &statlog.Opt{Padding: 10}))
-	go s.synclog.Start()
+	s.synclog = stat.New(file)
+	st := s.synclog
+	st.Add(stat.TextItem("time", 8, func() interface{} { return stat.TimeString() }))
+	st.Add(stat.IncrItem("rdb", 8, func() int64 { return s.counters.Get("rdb").Count() }))
+	st.Add(stat.IncrItem("recv", 8, func() int64 { return s.counters.Get("recv").Count() }))
+	st.Add(stat.IncrItem("proc", 8, func() int64 { return s.counters.Get("proc").Count() }))
+	st.Add(stat.IncrItem("buffer", 10, func() int64 { return s.counters.Get("buffer").Count() }))
+	go st.Start()
 	return nil
 }
 
@@ -186,7 +179,7 @@ func (s *SlaveClient) Broken() bool {
 func (s *SlaveClient) Destory() (err error) {
 	s.status = "broken"
 	s.broken = true
-	s.synclog.Stop()
+	s.synclog.Close()
 	return
 }
 

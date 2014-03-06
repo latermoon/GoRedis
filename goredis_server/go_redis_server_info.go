@@ -54,7 +54,7 @@ func (server *GoRedisServer) clientInfo() string {
 func (server *GoRedisServer) commandInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Command\n")
-	names := server.cmdCounters.CounterNames()
+	names := server.cmdCounters.Names()
 	sort.Strings(names)
 	for _, name := range names {
 		counter := server.cmdCounters.Get(name)
@@ -150,7 +150,7 @@ func (server *GoRedisServer) replicationInfo() string {
 
 func (server *GoRedisServer) cmdCateCounterInfo() string {
 	buf := bytes.Buffer{}
-	names := server.cmdCateCounters.CounterNames()
+	names := server.cmdCateCounters.Names()
 	sort.Strings(names)
 	for _, name := range names {
 		counter := server.cmdCateCounters.Get(name)
