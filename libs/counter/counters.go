@@ -22,12 +22,13 @@ func (c *Counters) Len() int {
 }
 
 // 获取并自动创建
-func (c *Counters) Get(name string) *Counter {
-	counter, exist := c.table[name]
-	if !exist {
+func (c *Counters) Get(name string) (counter *Counter) {
+	var ok bool
+	counter, ok = c.table[name]
+	if !ok {
 		c.mu.Lock()
-		counter, exist = c.table[name]
-		if !exist {
+		counter, ok = c.table[name]
+		if !ok {
 			counter = New(0)
 			c.table[name] = counter
 		}

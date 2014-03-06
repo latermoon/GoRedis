@@ -44,6 +44,8 @@ type GoRedisServer struct {
 	counters        *counter.Counters
 	cmdCounters     *counter.Counters
 	cmdCateCounters *counter.Counters // 指令集统计
+	// info
+	info *Info
 	// logger
 	cmdMonitor    *stat.Writer
 	leveldbStatus *stat.Writer
@@ -80,6 +82,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.syncmgr = NewSyncManager()
 	server.slavemgr = NewSlaveManager()
 	server.monmgr = NewMonManager()
+	server.info = NewInfo(server)
 	// default datasource
 	server.directory = directory
 	// counter

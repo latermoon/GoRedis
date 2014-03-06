@@ -50,6 +50,7 @@ func TextItem(title string, padding int, value interface{}) Item {
 	}
 }
 
+// 对于fn返回的数值，每次展示增量，用于显示计数器每秒增量
 func IncrItem(title string, padding int, fn func() int64) Item {
 	return &incrItem{
 		title:   title,

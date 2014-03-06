@@ -19,6 +19,8 @@ func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
 		reply = BulkReply(server.serverInfo())
 	case "command":
 		reply = BulkReply(server.commandInfo())
+	case "stats":
+		reply = BulkReply(server.statsInfo())
 	default:
 		buf := bytes.Buffer{}
 		buf.WriteString(server.serverInfo())
@@ -40,14 +42,14 @@ func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) serverInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Server\n")
-	buf.WriteString(fmt.Sprintf("goredis_version:%s\n", VERSION))
+	buf.WriteString(fmt.Sprintf("goredis_version:%s\n", server.info.Version()))
 	return buf.String()
 }
 
 func (server *GoRedisServer) clientInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Clients\n")
-	buf.WriteString(fmt.Sprintf("connected_clients:%d\n", server.counters.Get("connection").Count()))
+	buf.WriteString(fmt.Sprintf("connected_clients:%d\n", server.info.connected_clients()))
 	return buf.String()
 }
 
@@ -110,12 +112,12 @@ func (server *GoRedisServer) persistenceInfo() string {
 func (server *GoRedisServer) statsInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Stats\n")
-	buf.WriteString(fmt.Sprintf("total_connections_received:%d\n", 0))
-	buf.WriteString(fmt.Sprintf("total_commands_processed:%d\n", 0))
-	buf.WriteString(fmt.Sprintf("instantaneous_ops_per_sec:%d\n", 0))
+	// buf.WriteString(fmt.Sprintf("total_connections_received:%d\n", 0))
+	buf.WriteString(fmt.Sprintf("total_commands_processed:%d\n", server.info.total_commands_processed()))
+	buf.WriteString(fmt.Sprintf("instantaneous_ops_per_sec:%d\n", server.info.instantaneous_ops_per_sec()))
 	buf.WriteString(fmt.Sprintf("rejected_connections:%d\n", 0))
-	buf.WriteString(fmt.Sprintf("keyspace_hits:%d\n", 0))
-	buf.WriteString(fmt.Sprintf("keyspace_misses:%d\n", 0))
+	// buf.WriteString(fmt.Sprintf("keyspace_hits:%d\n", 0))
+	// buf.WriteString(fmt.Sprintf("keyspace_misses:%d\n", 0))
 	return buf.String()
 }
 
