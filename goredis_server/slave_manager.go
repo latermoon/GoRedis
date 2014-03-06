@@ -32,6 +32,19 @@ func NewSlaveManager() (s *SlaveManager) {
 	return
 }
 
+// 判断是否已存在目标连接
+func (s *SlaveManager) Contains(host string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for e := s.clients.Front(); e != nil; e = e.Next() {
+		c := e.Value.(ISlaveClient)
+		if host == c.RemoteAddr().String() {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *SlaveManager) checkRunloop() {
 	ticker := time.NewTicker(time.Second * 1)
 	for _ = range ticker.C {
