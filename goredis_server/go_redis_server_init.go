@@ -26,8 +26,7 @@ func (server *GoRedisServer) Init() (err error) {
 	if err != nil {
 		return
 	}
-	// __goredis:config:xxx
-	server.config = NewConfig(server.levelRedis, goredisPrefix+"config:")
+	server.config = NewConfig(server.levelRedis, PREFIX+"config:")
 	// monitor
 	server.initCommandMonitor(server.directory + "/cmd.log")
 	server.initCommandCounterLog("string", []string{"GET", "SET", "MGET", "MSET", "INCR", "DECR", "INCRBY", "DECRBY"})
@@ -40,7 +39,6 @@ func (server *GoRedisServer) Init() (err error) {
 	server.initLeveldbStatsLog(server.directory + "/leveldb.stats.log")
 	server.initSlowlog(server.directory + "/slow.log")
 	stdlog.Printf("init uid %s\n", server.UID())
-	server.initConfig()
 	return
 }
 
@@ -58,11 +56,6 @@ func (server *GoRedisServer) initSignalNotify() {
 		stdlog.Println("db closed, bye")
 		os.Exit(0)
 	}()
-}
-
-func (server *GoRedisServer) initConfig() {
-	// slowlog-log-slower-than
-	// slst := server.config.IntForKey("slowlog-log-slower-than", 100*1000)
 }
 
 func (server *GoRedisServer) initLevelDB() (err error) {
