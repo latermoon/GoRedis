@@ -13,6 +13,7 @@ go install "GoRedis/libs/redis_tool"
 go install "GoRedis/libs/rdb"
 go install "GoRedis/libs/rdb/crc64"
 go install "GoRedis/libs/statlog"
+go install "GoRedis/libs/stat"
 go install "GoRedis/libs/stdlog"
 go install "GoRedis/libs/uuid"
 

@@ -26,7 +26,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	}
 	stdlog.Printf("[S %s] slave %s\n", session.RemoteAddr(), cmd)
 
-	sc, err := NewSyncClient(session, server.directory)
+	sc, err := NewSyncClient(session)
 	if err != nil {
 		stdlog.Printf("[S %s] slave error %s", session.RemoteAddr(), err)
 		return
@@ -38,13 +38,20 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 		server.synclog.Enable()
 	}
 
+	reply = NOREPLY
+
 	if seq < 0 {
 		go server.sendSnapshot(sc)
 	} else {
-		go server.syncRunloop(sc, seq)
+		if seq >= server.synclog.MinSeq() && seq <= server.synclog.MaxSeq() {
+			go server.syncRunloop(sc, seq)
+		} else {
+			stdlog.Printf("[S %s] seq %d not in (%d, %d), closed\n", sc.session.RemoteAddr(), seq, server.synclog.MinSeq(), server.synclog.MaxSeq())
+			sc.session.Close()
+		}
 	}
 
-	return NOREPLY
+	return
 }
 
 func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {

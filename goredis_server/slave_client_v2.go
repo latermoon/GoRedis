@@ -38,19 +38,17 @@ func (s *SlaveClientV2) initLog() error {
 	}
 	s.synclog = statlog.NewStatLogger(file)
 	s.synclog.Add(statlog.TimeItem("time"))
-
 	s.synclog.Add(statlog.Item("raw", func() interface{} {
 		return s.counters.Get("raw").ChangedCount()
 	}, &statlog.Opt{Padding: 8}))
-
 	s.synclog.Add(statlog.Item("cmd", func() interface{} {
 		return s.counters.Get("cmd").ChangedCount()
 	}, &statlog.Opt{Padding: 8}))
-
 	s.synclog.Add(statlog.Item("seq", func() interface{} {
 		return s.lastseq
 	}, &statlog.Opt{Padding: 16}))
 	go s.synclog.Start()
+
 	return nil
 }
 

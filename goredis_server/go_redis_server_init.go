@@ -2,7 +2,7 @@ package goredis_server
 
 import (
 	"GoRedis/libs/levelredis"
-	"GoRedis/libs/statlog"
+	"GoRedis/libs/stat"
 	"GoRedis/libs/stdlog"
 	"fmt"
 	"os"
@@ -35,13 +35,12 @@ func (server *GoRedisServer) Init() (err error) {
 	server.initCommandCounterLog("set", []string{"SADD", "SCARD", "SISMEMBER", "SMEMBERS", "SREM"})
 	server.initCommandCounterLog("list", []string{"LPUSH", "RPUSH", "LPOP", "RPOP", "LINDEX", "LLEN", "LRANGE", "LTRIM"})
 	server.initCommandCounterLog("zset", []string{"ZADD", "ZCARD", "ZSCORE", "ZINCRBY", "ZRANGE", "ZRANGEBYSCORE", "ZRANK", "ZREM", "ZREMRANGEBYRANK", "ZREMRANGEBYSCORE", "ZREVRANGE", "ZREVRANGEBYSCORE", "ZREVRANK"})
+	server.initSeqLog(server.directory + "/seq.log")
 	server.initLeveldbIOLog(server.directory + "/leveldb.io.log")
 	server.initLeveldbStatsLog(server.directory + "/leveldb.stats.log")
 	server.initSlowlog(server.directory + "/slow.log")
 	stdlog.Printf("init uid %s\n", server.UID())
 	server.initConfig()
-	// slave
-	server.initSlaveSessions()
 	return
 }
 
@@ -52,7 +51,10 @@ func (server *GoRedisServer) initSignalNotify() {
 	go func() {
 		sig := <-server.sigs
 		stdlog.Println("recv signal:", sig)
+		server.Suspend()                   // 挂起全部传入数据
+		time.Sleep(time.Millisecond * 500) // 休息一下，Suspend瞬间可能还有数据库写入
 		server.levelRedis.Close()
+		server.synclog.Close()
 		stdlog.Println("db closed, bye")
 		os.Exit(0)
 	}()
@@ -112,42 +114,56 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 	if err != nil {
 		panic(err)
 	}
-	server.cmdMonitor = statlog.NewStatLogger(file)
-	server.cmdMonitor.Add(statlog.TimeItem("time"))
-	opt := &statlog.Opt{Padding: 7}
-	server.cmdMonitor.Add(statlog.Item("total", func() interface{} {
-		c := server.cmdCateCounters.Get("total")
-		return c.ChangedCount()
-	}, opt))
+
+	server.cmdMonitor = stat.New(file)
+	st := server.cmdMonitor
+	st.Add(stat.TextItem("time", 8, func() interface{} { return stat.TimeString() }))
+	st.Add(stat.IncrItem("total", 7, func() int64 { return server.cmdCateCounters.Get("total").Count() }))
 	// key, string, hash, list, ...
 	for _, cate := range CommandCategoryList {
-		cateName := string(cate)
-		padding := len(cateName) + 1
-		if padding < 7 {
-			padding = 7
-		}
-		func(name string, padding int) {
-			opt := &statlog.Opt{Padding: padding}
-			server.cmdMonitor.Add(statlog.Item(name, func() interface{} {
-				c := server.cmdCateCounters.Get(cateName)
-				return c.ChangedCount()
-			}, opt))
-		}(cateName, padding)
+		func(name string) {
+			var padding int
+			if padding = len(name) + 1; padding < 7 {
+				padding = 7
+			}
+			st.Add(stat.IncrItem(name, padding, func() int64 { return server.cmdCateCounters.Get(name).Count() }))
+		}(string(cate))
 	}
-	opt = &statlog.Opt{Padding: 11}
-	server.cmdMonitor.Add(statlog.Item("connection", func() interface{} {
-		c := server.counters.Get("connection")
-		return c.Count()
-	}, opt))
-	opt = &statlog.Opt{Padding: 16}
-	server.cmdMonitor.Add(statlog.Item("seq", func() interface{} {
+
+	st.Add(stat.TextItem("connection", 11, func() interface{} { return server.counters.Get("connection").Count() }))
+
+	go st.Start()
+}
+
+func (server *GoRedisServer) initSeqLog(path string) {
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	st := stat.New(file)
+	st.Add(stat.TextItem("time", 8, func() interface{} { return stat.TimeString() }))
+	st.Add(stat.TextItem("minseq", 16, func() interface{} {
 		if server.synclog.IsEnabled() {
-			return server.synclog.LastSeq()
+			return server.synclog.MinSeq()
 		} else {
 			return "-"
 		}
-	}, opt))
-	go server.cmdMonitor.Start()
+	}))
+	st.Add(stat.TextItem("maxseq", 16, func() interface{} {
+		if server.synclog.IsEnabled() {
+			return server.synclog.MaxSeq()
+		} else {
+			return "-"
+		}
+	}))
+	st.Add(stat.TextItem("size", 16, func() interface{} {
+		if server.synclog.IsEnabled() {
+			return server.synclog.MaxSeq() - server.synclog.MinSeq()
+		} else {
+			return "-"
+		}
+	}))
+	go st.Start()
 }
 
 func (server *GoRedisServer) initSlowlog(path string) {
@@ -164,22 +180,19 @@ func (server *GoRedisServer) initLeveldbIOLog(path string) {
 	if err != nil {
 		panic(err)
 	}
-	server.leveldbStatus = statlog.NewStatLogger(file)
-	server.leveldbStatus.Add(statlog.TimeItem("time"))
+	server.leveldbStatus = stat.New(file)
+	st := server.leveldbStatus
+	st.Add(stat.TextItem("time", 8, func() interface{} { return stat.TimeString() }))
+
 	// leveldb io 操作数
 	ldbkeys := []string{"get", "set", "batch", "enum", "del", "lru_hit", "lru_miss"}
-	opt := &statlog.Opt{Padding: 10}
 	for _, k := range ldbkeys {
 		// pass local var to inner func()
 		func(name string) {
-			server.leveldbStatus.Add(statlog.Item(name, func() interface{} {
-				c := server.counters.Get("leveldb_io_" + name)
-				c.SetCount(server.levelRedis.Counter(name))
-				return c.ChangedCount()
-			}, opt))
+			st.Add(stat.IncrItem(name, 10, func() int64 { return server.levelRedis.Counter(name) }))
 		}(k)
 	}
-	go server.leveldbStatus.Start()
+	go st.Start()
 }
 
 func (server *GoRedisServer) initLeveldbStatsLog(path string) {
@@ -206,32 +219,17 @@ func (server *GoRedisServer) initCommandCounterLog(cate string, cmds []string) {
 	if err != nil {
 		panic(err)
 	}
-	slog := statlog.NewStatLogger(file)
-	slog.Add(statlog.TimeItem("time"))
+
+	st := stat.New(file)
+	st.Add(stat.TextItem("time", 8, func() interface{} { return stat.TimeString() }))
 	for _, k := range cmds {
-		// pass local var to inner func()
 		func(cmd string) {
-			padding := len(cmd) + 1
-			if padding < 8 {
+			var padding int
+			if padding = len(cmd) + 1; padding < 8 {
 				padding = 8
 			}
-			opt := &statlog.Opt{Padding: padding}
-			slog.Add(statlog.Item(cmd, func() interface{} {
-				c := server.cmdCounters.Get(cmd)
-				return c.ChangedCount()
-			}, opt))
+			st.Add(stat.IncrItem(cmd, padding, func() int64 { return server.cmdCounters.Get(cmd).Count() }))
 		}(k)
 	}
-	go slog.Start()
-}
-
-// 初始化从库
-func (server *GoRedisServer) initSlaveSessions() {
-	// m := server.slaveIdMap()
-	// server.stdlog.Info("init slaves: %s", m)
-	// for uid, _ := range m {
-	// 	slaveSession := NewSlaveSession(server, nil, uid)
-	// 	server.slavelist.PushBack(slaveSession)
-	// 	slaveSession.ContinueAof()
-	// }
+	go st.Start()
 }

@@ -18,6 +18,10 @@ func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd *Command) (reply *R
 		return ErrorReply(err)
 	}
 
+	if server.slavemgr.Contains(conn.RemoteAddr().String()) {
+		return ErrorReply("master exist")
+	}
+
 	// 异步处理
 	masterSession := NewSession(conn)
 	isgoredis, version, err := redisInfo(masterSession)

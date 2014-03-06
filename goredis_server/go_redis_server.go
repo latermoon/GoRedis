@@ -5,7 +5,7 @@ import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"
 	"GoRedis/libs/levelredis"
-	"GoRedis/libs/statlog"
+	"GoRedis/libs/stat"
 	"GoRedis/libs/stdlog"
 	"GoRedis/libs/uuid"
 	"errors"
@@ -17,7 +17,7 @@ import (
 )
 
 // TODO 版本号，每次更新都需要升级一下
-const VERSION = "1.0.49"
+const VERSION = "1.0.50"
 
 var (
 	WrongKindError = errors.New("Wrong kind opration")
@@ -45,8 +45,8 @@ type GoRedisServer struct {
 	cmdCounters     *counter.Counters
 	cmdCateCounters *counter.Counters // 指令集统计
 	// logger
-	cmdMonitor    *statlog.StatLogger
-	leveldbStatus *statlog.StatLogger
+	cmdMonitor    *stat.Writer
+	leveldbStatus *stat.Writer
 	// 从库
 	uid      string        // 实例id
 	syncmgr  *SyncManager  // as master

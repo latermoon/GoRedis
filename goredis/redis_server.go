@@ -43,10 +43,8 @@ func (server *RedisServer) SetHandler(handler ServerHandler) {
 	server.handler = handler
 }
 
-/**
- * 开始监听主机端口
- * @param host "localhost:6379"
- */
+// 开始监听主机端口
+// @host "localhost:6379"
 func (server *RedisServer) Listen(host string) error {
 	listener, err := net.Listen("tcp", host)
 	if err != nil {
@@ -84,6 +82,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 			}
 			session.Close()
 		}
+		// 连接终止
 		server.handler.SessionClosed(session, lastErr)
 	}()
 
