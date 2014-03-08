@@ -196,9 +196,9 @@ func (l *LevelRedis) Strings() (s *LevelString) {
 }
 
 // 获取原始key的内容
-func (l *LevelRedis) RawGet(key []byte) (value []byte) {
+func (l *LevelRedis) RawGet(key []byte) (value []byte, err error) {
 	l.incrCounter("get")
-	value, _ = l.db.Get(l.ro, key)
+	value, err = l.db.Get(l.ro, key)
 	return
 }
 

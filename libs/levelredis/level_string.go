@@ -15,7 +15,7 @@ func (l *LevelString) stringKey(key []byte) []byte {
 }
 
 func (l *LevelString) Get(key []byte) (value []byte) {
-	value = l.redis.RawGet(l.stringKey(key))
+	value, _ = l.redis.RawGet(l.stringKey(key))
 	return
 }
 

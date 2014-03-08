@@ -37,8 +37,8 @@ func (l *LevelDocument) initOnce() {
 		return
 	}
 
-	in := l.redis.RawGet(l.docKey())
-	if in != nil {
+	in, err := l.redis.RawGet(l.docKey())
+	if err == nil && in != nil {
 		dec := codec.NewDecoderBytes(in, &l.mh)
 		m := make(map[string]interface{})
 		err := dec.Decode(&m)
@@ -84,7 +84,7 @@ func (l *LevelDocument) Get(fields ...string) (result map[string]interface{}) {
 func (l *LevelDocument) Drop() (ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	in := l.redis.RawGet(l.docKey())
+	in, _ := l.redis.RawGet(l.docKey())
 	if in != nil {
 		l.redis.RawDel(l.docKey())
 	}

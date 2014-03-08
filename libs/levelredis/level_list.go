@@ -38,7 +38,7 @@ func NewLevelList(redis *LevelRedis, entryKey string) (l *LevelList) {
 }
 
 func (l *LevelList) initCount() {
-	val := l.redis.RawGet(l.infoKey())
+	val, _ := l.redis.RawGet(l.infoKey())
 	if val == nil || len(val) == 0 {
 		return
 	}
@@ -144,8 +144,8 @@ func (l *LevelList) RPop() (e *Element, err error) {
 	// get
 	idx := l.end
 	e = &Element{}
-	e.Value = l.redis.RawGet(l.idxKey(idx))
-	if e.Value == nil {
+	e.Value, err = l.redis.RawGet(l.idxKey(idx))
+	if err != nil || e.Value == nil {
 		return
 	}
 
@@ -184,8 +184,8 @@ func (l *LevelList) LPop() (e *Element, err error) {
 	// get
 	idx := l.start
 	e = &Element{}
-	e.Value = l.redis.RawGet(l.idxKey(idx))
-	if e.Value == nil {
+	e.Value, err = l.redis.RawGet(l.idxKey(idx))
+	if err != nil || e.Value == nil {
 		return
 	}
 	// 只剩下一个元素时，删除infoKey(0)
@@ -259,8 +259,8 @@ func (l *LevelList) Index(i int64) (e *Element, err error) {
 	}
 	idx := l.start + i
 	e = &Element{}
-	e.Value = l.redis.RawGet(l.idxKey(idx))
-	if e.Value == nil {
+	e.Value, err = l.redis.RawGet(l.idxKey(idx))
+	if err != nil || e.Value == nil {
 		return
 	}
 	return

@@ -37,7 +37,8 @@ func (c *Config) Set(key string, value []byte) {
 }
 
 func (c *Config) Get(key string) []byte {
-	return c.redis.RawGet(c.fieldKey(key))
+	val, _ := c.redis.RawGet(c.fieldKey(key))
+	return val
 }
 
 func (c *Config) StringForKey(key string) string {

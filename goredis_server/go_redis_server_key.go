@@ -149,13 +149,15 @@ func (server *GoRedisServer) OnRAW_KEYSEARCH(cmd *Command) (reply *Reply) {
 // 操作原始内容
 func (server *GoRedisServer) OnRAW_GET(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
-	value := server.levelRedis.RawGet(key)
-	if value == nil {
-		reply = BulkReply(nil)
-	} else {
-		reply = BulkReply(value)
+	value, err := server.levelRedis.RawGet(key)
+	if err != nil {
+		return ErrorReply(err)
 	}
-	return
+	if value == nil {
+		return BulkReply(nil)
+	} else {
+		return BulkReply(value)
+	}
 }
 
 // 操作原始内容 RAW_SET +[hash]name latermoon

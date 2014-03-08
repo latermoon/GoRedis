@@ -116,14 +116,13 @@ func (s *SyncLog) Write(val []byte) (seq int64, err error) {
 	return
 }
 
-func (s *SyncLog) Read(seq int64) (val []byte, ok bool) {
+func (s *SyncLog) Read(seq int64) (val []byte, err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.closed {
-		return nil, false
+		return nil, errors.New("synclog closed")
 	}
-	val = s.db.RawGet(s.seqkey(seq))
-	ok = val != nil
+	val, err = s.db.RawGet(s.seqkey(seq))
 	return
 }
 

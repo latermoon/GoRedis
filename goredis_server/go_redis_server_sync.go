@@ -108,8 +108,12 @@ func (server *GoRedisServer) syncRunloop(sc *SyncClient, lastseq int64) {
 	}
 	seq := lastseq
 	for {
-		val, ok := server.synclog.Read(seq)
-		if !ok {
+		val, err := server.synclog.Read(seq)
+		if err != nil {
+			stdlog.Printf("[S %s] synclog read error %s\n", sc.session.RemoteAddr(), err)
+			break
+		}
+		if val == nil {
 			time.Sleep(time.Millisecond * time.Duration(10))
 			continue
 		}
@@ -126,4 +130,7 @@ func (server *GoRedisServer) syncRunloop(sc *SyncClient, lastseq int64) {
 		}
 		seq++
 	}
+	// close
+	stdlog.Printf("[S %s] sync closed", sc.session.RemoteAddr())
+	sc.session.Close()
 }

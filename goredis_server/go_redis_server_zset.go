@@ -205,7 +205,10 @@ func (server *GoRedisServer) OnZSCORE(cmd *Command) (reply *Reply) {
 	member, _ := cmd.ArgAtIndex(2)
 	// zset := server.levelRedis.GetSortedSet(key)
 	// score := zset.Score(member)
-	score := server.levelRedis.Global().ZScore(key, member)
+	score, err := server.levelRedis.Global().ZScore(key, member)
+	if err != nil {
+		return ErrorReply(err)
+	}
 	if score == nil {
 		return BulkReply(nil)
 	}
