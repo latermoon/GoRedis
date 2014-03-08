@@ -89,8 +89,8 @@ const (
 )
 
 var (
-	lruCacheSize         = uint64(100000) // cache size
-	objCacheCreateThread = 100            // obj create threads
+	lruCacheSize         = uint64(10000) // cache size
+	objCacheCreateThread = 100           // obj create threads
 )
 
 type LevelRedis struct {
