@@ -37,6 +37,7 @@ func (server *GoRedisServer) Init() (err error) {
 	server.initSeqLog(server.directory + "/seq.log")
 	server.initLeveldbIOLog(server.directory + "/leveldb.io.log")
 	server.initLeveldbStatsLog(server.directory + "/leveldb.stats.log")
+	server.initExecLog(server.directory + "/exec.time.log")
 	server.initSlowlog(server.directory + "/slow.log")
 	stdlog.Printf("init uid %s\n", server.UID())
 	return
@@ -125,6 +126,21 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 
 	st.Add(stat.TextItem("connection", 11, func() interface{} { return server.counters.Get("connection").Count() }))
 
+	go st.Start()
+}
+
+func (server *GoRedisServer) initExecLog(path string) {
+	file, err := openfile(path)
+	if err != nil {
+		panic(err)
+	}
+	st := stat.New(file)
+	st.Add(stat.TextItem("time", 8, func() interface{} { return stat.TimeString() }))
+	for _, name := range []string{"<1ms", "1-5ms", "6-10ms", "11-30ms", ">30ms"} {
+		func(n string) {
+			st.Add(stat.IncrItem(n, 8, func() int64 { return server.execCounters.Get(n).Count() }))
+		}(name)
+	}
 	go st.Start()
 }
 
