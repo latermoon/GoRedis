@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"sync"
 )
 
 // ==============================
@@ -23,6 +24,8 @@ type Session struct {
 	*bufio.ReadWriter // 实现了Read和Write方法即可
 	conn              net.Conn
 	rw                *bufio.ReadWriter
+	mu                sync.RWMutex
+	attributes        map[string]interface{}
 }
 
 func NewSession(conn net.Conn) (s *Session) {
@@ -32,12 +35,22 @@ func NewSession(conn net.Conn) (s *Session) {
 	return
 }
 
-func (s *Session) LocalAddr() net.Addr {
-	return s.conn.LocalAddr()
+func (s *Session) SetAttribute(name string, v interface{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.attributes == nil {
+		s.attributes = make(map[string]interface{})
+	}
+	s.attributes[name] = v
 }
 
-func (s *Session) RemoteAddr() net.Addr {
-	return s.conn.RemoteAddr()
+func (s *Session) GetAttribute(name string) interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.attributes == nil {
+		return nil
+	}
+	return s.attributes[name]
 }
 
 // 返回数据到客户端
@@ -450,6 +463,14 @@ func (s *Session) ReadRDB(w io.Writer) (err error) {
 		w.Write([]byte{c})
 	}
 	return
+}
+
+func (s *Session) LocalAddr() net.Addr {
+	return s.conn.LocalAddr()
+}
+
+func (s *Session) RemoteAddr() net.Addr {
+	return s.conn.RemoteAddr()
 }
 
 func (s *Session) String() string {

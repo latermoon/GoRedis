@@ -17,7 +17,7 @@ import (
 )
 
 // TODO 版本号，每次更新都需要升级一下
-const VERSION = "1.0.53"
+const VERSION = "1.0.54"
 const PREFIX = "__goredis:"
 
 var (
@@ -55,7 +55,8 @@ type GoRedisServer struct {
 	slavemgr *SlaveManager // as slave
 	synclog  *SyncLog
 	// monitor
-	monmgr *MonManager
+	clientmgr *ClientManager // client connections
+	monmgr    *MonManager
 	// 缓存处理函数，减少relect次数
 	methodCache map[string]reflect.Value
 	// 指令队列，异步处理统计、从库、monitor输出
@@ -82,6 +83,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.syncmgr = NewSyncManager()
 	server.slavemgr = NewSlaveManager()
 	server.monmgr = NewMonManager()
+	server.clientmgr = NewClientManager()
 	server.info = NewInfo(server)
 	// default datasource
 	server.directory = directory
@@ -113,12 +115,14 @@ func (server *GoRedisServer) UID() (uid string) {
 // ServerHandler.SessionOpened()
 func (server *GoRedisServer) SessionOpened(session *Session) {
 	server.counters.Get("connection").Incr(1)
+	server.clientmgr.Put(session.RemoteAddr().String(), session)
 	stdlog.Println("connection accepted from", session.RemoteAddr())
 }
 
 // ServerHandler.SessionClosed()
 func (server *GoRedisServer) SessionClosed(session *Session, err error) {
 	server.counters.Get("connection").Incr(-1)
+	server.clientmgr.Remove(session.RemoteAddr().String())
 	stdlog.Println("end connection", session.RemoteAddr(), err)
 }
 
@@ -169,6 +173,9 @@ func (server *GoRedisServer) processCommandChan() {
 	for {
 		cmdex := <-server.cmdChan
 		cmdName := cmdex.UpperName()
+
+		// last cmd
+		cmdex.Session().SetAttribute("cmd", cmdName)
 
 		server.incrCommandCounter(cmdName)
 
