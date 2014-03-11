@@ -1,30 +1,29 @@
 package goredis_server
 
 import (
-	. "GoRedis/goredis"
 	"sync"
 )
 
-// 管理当前连入的客户端
+// 管理一堆连接，其实只是一个安全的map
 type SessionManager struct {
-	clients map[string]*Session
+	clients map[string]interface{}
 	mu      sync.RWMutex
 }
 
 func NewSessionManager() (s *SessionManager) {
 	s = &SessionManager{
-		clients: map[string]*Session{},
+		clients: map[string]interface{}{},
 	}
 	return
 }
 
-func (s *SessionManager) Put(key string, session *Session) {
+func (s *SessionManager) Put(key string, v interface{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.clients[key] = session
+	s.clients[key] = v
 }
 
-func (s *SessionManager) Get(key string) *Session {
+func (s *SessionManager) Get(key string) interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.clients[key]
@@ -47,11 +46,17 @@ func (s *SessionManager) Len() int {
 	return len(s.clients)
 }
 
-func (s *SessionManager) Enumerate(fn func(i int, key string, session *Session)) {
+func (s *SessionManager) Enumerate(fn func(i int, key string, val interface{})) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-	i := 0
+	// copy
+	m := make(map[string]interface{})
 	for k, v := range s.clients {
+		m[k] = v
+	}
+	s.mu.RUnlock()
+
+	i := 0
+	for k, v := range m {
 		fn(i, k, v)
 		i++
 	}

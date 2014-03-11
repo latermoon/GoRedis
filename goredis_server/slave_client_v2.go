@@ -9,6 +9,13 @@ import (
 	"os"
 )
 
+type ISlaveClient interface {
+	Sync(uid string) (err error)
+	Broken() bool
+	RemoteAddr() net.Addr
+	Status() string
+}
+
 type SlaveClientV2 struct {
 	ISlaveClient
 	session  *Session

@@ -65,5 +65,5 @@ func (i *Info) connected_slaves() int {
 }
 
 func (i *Info) connected_masters() int {
-	return i.server.slavemgr.Count()
+	return i.server.slavemgr.Len()
 }
