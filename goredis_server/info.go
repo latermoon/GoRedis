@@ -19,7 +19,7 @@ func NewInfo(server *GoRedisServer) *Info {
 	return v
 }
 
-// 每秒计算
+// 某些计数器需要计算每秒增量
 func (i *Info) secondTicker() {
 	ticker := time.NewTicker(time.Second * 1)
 	for _ = range ticker.C {

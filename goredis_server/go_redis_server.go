@@ -57,7 +57,7 @@ type GoRedisServer struct {
 	synclog  *SyncLog
 	// monitor
 	sessmgr *SessionManager // all sessions
-	monmgr  *MonManager
+	monmgr  *SessionManager
 	// 缓存处理函数，减少relect次数
 	methodCache map[string]reflect.Value
 	// 指令队列，异步处理统计、从库、monitor输出
@@ -81,7 +81,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.methodCache = make(map[string]reflect.Value)
 	server.cmdChan = make(chan *CommandEx, 1000)
 	go server.processCommandChan()
-	server.monmgr = NewMonManager()
+	server.monmgr = NewSessionManager()
 	server.syncmgr = NewSessionManager()
 	server.slavemgr = NewSessionManager()
 	server.sessmgr = NewSessionManager()
@@ -192,8 +192,8 @@ func (server *GoRedisServer) processCommandChan() {
 		}
 
 		// monitor
-		if server.monmgr.Count() > 0 {
-			server.monmgr.BroadcastCommand(cmdex.Command)
+		if server.monmgr.Len() > 0 {
+			server.broadcastMonitor(cmdex)
 		}
 
 		// slowlog
@@ -211,6 +211,15 @@ func (server *GoRedisServer) incrCommandCounter(cmdName string) {
 	server.cmdCateCounters.Get("total").Incr(1)
 }
 
+// 向monitor clients广播
+func (server *GoRedisServer) broadcastMonitor(cmdex *CommandEx) {
+	server.monmgr.Enumerate(func(i int, key string, val interface{}) {
+		c := val.(*MonClient)
+		c.Send(cmdex)
+	})
+}
+
+// 统计指令耗时
 func (server *GoRedisServer) calcExecTime(cmdex *CommandEx) {
 	msec := cmdex.ExecTime().Seconds() * 1000
 	switch {
