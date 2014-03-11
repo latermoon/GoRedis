@@ -20,7 +20,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 			return ErrorReply("bad [SEQ]")
 		}
 	}
-	stdlog.Printf("[S %s] slave %s\n", session.RemoteAddr(), cmd)
+	stdlog.Printf("[S %s] recv %s\n", session.RemoteAddr(), cmd)
 
 	// 第一次出现从库时才开启写日志
 	if !server.synclog.IsEnabled() {

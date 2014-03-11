@@ -5,23 +5,19 @@ import (
 	"GoRedis/libs/counter"
 	"GoRedis/libs/stat"
 	"fmt"
-	"net"
 	"os"
 )
 
 type ISlaveClient interface {
-	Sync(uid string) (err error)
-	Broken() bool
-	RemoteAddr() net.Addr
-	Status() string
+	Sync() (err error)
+	Session() *Session
+	Close()
 }
 
 type SlaveClientV2 struct {
 	ISlaveClient
 	session  *Session
 	server   *GoRedisServer
-	broken   bool
-	status   string
 	lastseq  int64
 	counters *counter.Counters
 	synclog  *stat.Writer
@@ -54,45 +50,53 @@ func (s *SlaveClientV2) initLog() error {
 	return nil
 }
 
-func (s *SlaveClientV2) Sync(uid string) (err error) {
-	s.status = "recv"
+func (s *SlaveClientV2) Session() *Session {
+	return s.session
+}
 
+func (s *SlaveClientV2) Sync() (err error) {
+	uid := s.server.UID()
 	s.lastseq = s.masterSeq(s.session.RemoteAddr().String())
-	seq := s.lastseq + 1 // 向服务器下一个数据
+	// 向服务器下一个数据
+	seq := s.lastseq + 1
 	synccmd := NewCommand(formatByteSlice("SYNC", uid, seq)...)
 	slavelog.Printf("[M %s] %s\n", s.session.RemoteAddr(), synccmd)
 
 	if err = s.session.WriteCommand(synccmd); err != nil {
-		slavelog.Printf("[M %s] sync error %s", s.session.RemoteAddr(), err)
-		s.Destory()
 		return
 	}
 
 	for {
-		cmd, err := s.session.ReadCommand()
+		var cmd *Command
+		cmd, err = s.session.ReadCommand()
 		if err != nil {
-			slavelog.Printf("[M %s] master closed %s\n", s.session.RemoteAddr(), err)
 			break
 		}
 		cmdName := cmd.Name()
 		switch cmdName {
 		case "SYNC_RAW_BEG":
-			slavelog.Printf("[M %s] sync raw start\n", s.session.RemoteAddr())
+			s.Session().SetAttribute(S_STATUS, REPL_RECV_BULK)
+			slavelog.Printf("[M %s] recv bulk start\n", s.session.RemoteAddr())
 		case "SYNC_RAW":
 			s.counters.Get("raw").Incr(1)
 			s.server.OnRAW_SET(cmd)
 		case "SYNC_RAW_FIN":
-			slavelog.Printf("[M %s] sync raw finish\n", s.session.RemoteAddr())
+			slavelog.Printf("[M %s] recv bulk finish\n", s.session.RemoteAddr())
 		case "SYNC_SEQ_BEG":
-			s.status = "online"
-			slavelog.Printf("[M %s] sync cmd ...\n", s.session.RemoteAddr())
+			s.Session().SetAttribute(S_STATUS, REPL_ONLINE)
+			slavelog.Printf("[M %s] sync online ...\n", s.session.RemoteAddr())
 			s.recvCommandSeq(cmd) // 进入后只有出错才退出
 			break
 		default:
 			s.server.On(s.session, cmd)
 		}
 	}
-	s.Destory()
+	return
+}
+
+func (s *SlaveClientV2) Close() {
+	s.session.Close()
+	s.synclog.Close()
 	return
 }
 
@@ -132,22 +136,4 @@ func (s *SlaveClientV2) masterSeq(host string) (seq int64) {
 func (s *SlaveClientV2) updateMasterSeq(host string, seq int64) {
 	key := "master:" + host + ":seq"
 	s.server.config.SetInt(key, seq)
-}
-
-func (s *SlaveClientV2) RemoteAddr() net.Addr {
-	return s.session.RemoteAddr()
-}
-
-func (s *SlaveClientV2) Broken() bool {
-	return s.broken
-}
-
-func (s *SlaveClientV2) Status() string {
-	return s.status
-}
-
-func (s *SlaveClientV2) Destory() {
-	s.status = "broken"
-	s.broken = true
-	s.synclog.Close()
 }

@@ -11,7 +11,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"strconv"
 	"sync"
@@ -61,12 +60,8 @@ func (s *SlaveClient) initLog() error {
 	return nil
 }
 
-func (s *SlaveClient) Status() string {
-	return s.status
-}
-
-func (s *SlaveClient) RemoteAddr() net.Addr {
-	return s.session.RemoteAddr()
+func (s *SlaveClient) Session() *Session {
+	return s.session
 }
 
 func (s *SlaveClient) directory() string {
@@ -78,10 +73,11 @@ func (s *SlaveClient) rdbfilename() string {
 }
 
 // 开始同步
-func (s *SlaveClient) Sync(uid string) (err error) {
+func (s *SlaveClient) Sync() (err error) {
 	s.status = "waiting"
 
 	args := [][]byte{[]byte("SYNC")}
+	uid := s.server.UID()
 	if len(uid) > 0 {
 		args = append(args, []byte(uid))
 	}
@@ -94,7 +90,7 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 		if !rdbsaved && c == '$' {
 			err = s.recvRdb()
 			if err != nil {
-				slavelog.Printf("[M %s] recv rdb error:%s\n", s.RemoteAddr(), err)
+				slavelog.Printf("[M %s] recv rdb error:%s\n", s.session.RemoteAddr(), err)
 				break
 			}
 			rdbsaved = true
@@ -112,6 +108,10 @@ func (s *SlaveClient) Sync(uid string) (err error) {
 	}
 	// 跳出循环必定有错误
 	s.Destory()
+	return
+}
+
+func (s *SlaveClient) Close() {
 	return
 }
 
@@ -139,7 +139,7 @@ func (s *SlaveClient) recvRdb() (err error) {
 	if err != nil {
 		return
 	}
-	slavelog.Printf("[M %s] create rdb:%s\n", s.RemoteAddr(), s.rdbfilename())
+	slavelog.Printf("[M %s] create rdb:%s\n", s.session.RemoteAddr(), s.rdbfilename())
 
 	s.session.ReadByte()
 	var size int64
@@ -191,17 +191,17 @@ func (s *SlaveClient) rdbFileWriter() (w *bufio.Writer, err error) {
 }
 
 func (s *SlaveClient) RdbSizeCallback(totalsize int64) {
-	slavelog.Printf("[M %s] rdb size: %d\n", s.RemoteAddr(), totalsize)
+	slavelog.Printf("[M %s] rdb size: %d\n", s.session.RemoteAddr(), totalsize)
 }
 
 func (s *SlaveClient) RdbRecvFinishCallback(r *bufio.Reader) {
-	slavelog.Printf("[M %s] rdb recv finish, start decoding... \n", s.RemoteAddr())
+	slavelog.Printf("[M %s] rdb recv finish, start decoding... \n", s.session.RemoteAddr())
 	// decode
 	dec := newRdbDecoder(s)
 	err := rdb.Decode(r, dec)
 	if err != nil {
 		// must cancel
-		slavelog.Printf("[M %s] decode error %s\n", s.RemoteAddr(), err)
+		slavelog.Printf("[M %s] decode error %s\n", s.session.RemoteAddr(), err)
 		s.Destory()
 	}
 	return
@@ -220,21 +220,21 @@ func (s *SlaveClient) rdbDecodeCommand(cmd *Command) {
 }
 
 func (s *SlaveClient) rdbDecodeFinish(n int64) {
-	slavelog.Printf("[M %s] rdb decode finish, items: %d\n", s.RemoteAddr(), n)
+	slavelog.Printf("[M %s] rdb decode finish, items: %d\n", s.session.RemoteAddr(), n)
 	s.wg.Wait()
 	go s.recvCmd() // 开始消化command
 }
 
 func (s *SlaveClient) RdbRecvProcessCallback(size int64, rate int) {
-	slavelog.Printf("[M %s] rdb recv: %d, rate:%d\n", s.RemoteAddr(), size, rate)
+	slavelog.Printf("[M %s] rdb recv: %d, rate:%d\n", s.session.RemoteAddr(), size, rate)
 }
 
 func (s *SlaveClient) IdleCallback() {
-	slavelog.Printf("[M %s] slaveof waiting\n", s.RemoteAddr())
+	slavelog.Printf("[M %s] slaveof waiting\n", s.session.RemoteAddr())
 }
 
 func (s *SlaveClient) CommandRecvCallback(cmd *Command) {
-	// slavelog.Printf("[M %s] recv: %s\n", s.RemoteAddr(), cmd)
+	// slavelog.Printf("[M %s] recv: %s\n", s.session.RemoteAddr(), cmd)
 	s.counters.Get("recv").Incr(1)
 	s.buffer <- cmd
 }
