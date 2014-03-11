@@ -11,6 +11,7 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -124,6 +125,12 @@ func (server *GoRedisServer) SessionClosed(session *Session, err error) {
 	server.counters.Get("connection").Incr(-1)
 	server.sessmgr.Remove(session.RemoteAddr().String())
 	stdlog.Println("end connection", session.RemoteAddr(), err)
+}
+
+func (server *GoRedisServer) ExceptionCaught(err error) {
+	stdlog.Printf("exception %s\n", err)
+	errlog.Printf("exception %s\n", err)
+	errlog.Println(debug.Stack())
 }
 
 // ServerHandler.On()

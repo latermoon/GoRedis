@@ -41,18 +41,18 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	server.syncmgr.Put(remoteHost, session)
 	defer server.syncmgr.Remove(remoteHost)
 
-	lastseq := seq // 最后要发送的seq
+	nextseq := seq // 最后要发送的seq
 	// 全新同步，先发送快照
 	if seq < 0 {
 		var err error
-		if lastseq, err = server.sendSnapshot(session); err != nil {
+		if nextseq, err = server.sendSnapshot(session); err != nil {
 			stdlog.Printf("[S %s] snapshot runloop broken %s\n", remoteHost, err)
 			return
 		}
 	}
 
 	// 发送日志数据
-	err := server.syncRunloop(session, lastseq)
+	err := server.syncRunloop(session, nextseq)
 	if err != nil {
 		stdlog.Printf("[S %s] sync runloop broken %s\n", remoteHost, err)
 	}
@@ -87,6 +87,9 @@ func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err 
 			stdlog.Printf("[S %s] snapshot error %s\n", session.RemoteAddr(), cmd)
 			broken = true
 			*quit = true
+		}
+		if i%100000 == 0 {
+			stdlog.Printf("[S %s] snapshot send %d keys\n", session.RemoteAddr(), i)
 		}
 	})
 
