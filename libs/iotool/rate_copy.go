@@ -3,7 +3,6 @@ package iotool
 import (
 	"container/list"
 	"errors"
-	// "github.com/latermoon/GoRedis/libs/stdlog"
 	"io"
 	"time"
 )

@@ -134,8 +134,9 @@ func (server *GoRedisServer) replicationInfo() string {
 
 	buf.WriteString(fmt.Sprintf("connected_masters:%d\n", server.info.connected_masters()))
 	server.slavemgr.Enumerate(func(i int, key string, val interface{}) {
-		sess := val.(ISlaveClient)
-		buf.WriteString(fmt.Sprintf("master%d:%s,%s\n", i, sess.RemoteAddr(), sess.Status()))
+		client := val.(ISlaveClient)
+		sess := client.Session()
+		buf.WriteString(fmt.Sprintf("master%d:%s,%s\n", i, sess.RemoteAddr(), sess.GetAttribute(S_STATUS)))
 	})
 
 	return buf.String()

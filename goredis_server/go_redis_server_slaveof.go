@@ -2,28 +2,32 @@ package goredis_server
 
 import (
 	. "GoRedis/goredis"
+	"fmt"
 	"net"
+	"strings"
 )
 
 // 从主库获取数据
-// 对应 go_redis_server_sync.go
 func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd *Command) (reply *Reply) {
-	// connect to master
-	host := cmd.StringAtIndex(1)
-	port := cmd.StringAtIndex(2)
-	hostPort := host + ":" + port
+	arg1, arg2 := cmd.StringAtIndex(1), cmd.StringAtIndex(2)
+	// SLAVEOF NO ONE
+	if strings.ToUpper(arg1) == "NO" && strings.ToUpper(arg2) == "ONE" {
+		return server.onSlaveOfNoOne(session, cmd)
+	}
 
+	// connect to master
+	hostPort := arg1 + ":" + arg2
 	conn, err := net.Dial("tcp", hostPort)
 	if err != nil {
 		return ErrorReply(err)
 	}
 
+	// check exists
 	remoteHost := conn.RemoteAddr().String()
 	if server.slavemgr.Contains(remoteHost) {
-		return ErrorReply("master exist")
+		return ErrorReply("connection exists")
 	}
 
-	// 异步处理
 	masterSession := NewSession(conn)
 	isgoredis, version, err := redisInfo(masterSession)
 	if err != nil {
@@ -42,8 +46,28 @@ func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd *Command) (reply *R
 			return ErrorReply(err)
 		}
 	}
-	server.slavemgr.Put(remoteHost, client)
-	go client.Sync(server.UID())
+
+	// async
+	go func() {
+		client.Session().SetAttribute(S_STATUS, REPL_WAIT)
+		server.slavemgr.Put(remoteHost, client)
+		client.Sync()
+		client.Close()
+		server.slavemgr.Remove(remoteHost)
+	}()
 
 	return StatusReply("OK")
+}
+
+// SLAVEOF NO ONE will stop replication
+func (server *GoRedisServer) onSlaveOfNoOne(session *Session, cmd *Command) (reply *Reply) {
+	slavelog.Printf("SLAVEOF NO ONE, will disconnect %d connection(s)\n", server.slavemgr.Len())
+	reply = StatusReply(fmt.Sprintf("disconnect %d connections(s)", server.slavemgr.Len()))
+
+	server.slavemgr.Enumerate(func(i int, key string, val interface{}) {
+		client := val.(ISlaveClient)
+		client.Close()
+		server.slavemgr.Remove(key)
+	})
+	return
 }
