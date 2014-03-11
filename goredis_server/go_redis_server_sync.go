@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// 从库的同步请求
+// 从库的同步请求，一旦进入OnSYNC，直到主从断开才会结束当前函数
 // SYNC [UID] [SEQ]
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
 	var seq int64 = -1
@@ -34,48 +34,45 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	if seq < server.synclog.MinSeq() || seq > server.synclog.MaxSeq() {
 		stdlog.Printf("[S %s] seq %d not in (%d, %d), closed\n", session.RemoteAddr(), seq, server.synclog.MinSeq(), server.synclog.MaxSeq())
 		session.Close()
+		return
 	}
 
 	remoteHost := session.RemoteAddr().String() // 真正的IP与端口地址
 	server.syncmgr.Put(remoteHost, session)
+	defer server.syncmgr.Remove(remoteHost)
 
+	lastseq := seq // 最后要发送的seq
+	// 全新同步，先发送快照
 	if seq < 0 {
-		// 全新的一次同步
-		go func() {
-			if err := server.sendSnapshot(session); err != nil {
-				stdlog.Printf("[S %s] snapshot runloop broken %s\n", remoteHost, err)
-			}
-			server.syncmgr.Remove(remoteHost)
-		}()
-	} else {
-		// 继续上次同步
-		go func() {
-			if err := server.syncRunloop(session, seq); err != nil {
-				stdlog.Printf("[S %s] sync runloop broken %s\n", remoteHost, err)
-			}
-			server.syncmgr.Remove(remoteHost)
-		}()
+		var err error
+		if lastseq, err = server.sendSnapshot(session); err != nil {
+			stdlog.Printf("[S %s] snapshot runloop broken %s\n", remoteHost, err)
+			return
+		}
 	}
+
+	// 发送日志数据
+	err := server.syncRunloop(session, lastseq)
+	if err != nil {
+		stdlog.Printf("[S %s] sync runloop broken %s\n", remoteHost, err)
+	}
+
 	return
 }
 
-func (server *GoRedisServer) sendSnapshot(session *Session) error {
-	server.Suspend()                             //挂起全部操作
-	snap := server.levelRedis.DB().NewSnapshot() // 挂起后建立快照
-	snaprelease := false
-	defer func() {
-		if !snaprelease {
-			server.levelRedis.DB().ReleaseSnapshot(snap)
-		}
-	}()
-	curseq := server.synclog.LastSeq() // 获取当前日志序号
-	server.Resume()                    // 唤醒，如果不调用Resume，整个服务器无法继续工作
+// nextseq，返回快照的下一条seq位置
+func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err error) {
+	server.Suspend()                                   //挂起全部操作
+	snap := server.levelRedis.DB().NewSnapshot()       // 挂起后建立快照
+	defer server.levelRedis.DB().ReleaseSnapshot(snap) //
+	lastseq := server.synclog.LastSeq()                // 获取当前日志序号
+	server.Resume()                                    // 唤醒，如果不调用Resume，整个服务器无法继续工作
 
-	stdlog.Printf("[S %s] snapshot, seq %d\n", session.RemoteAddr(), curseq)
+	stdlog.Printf("[S %s] snapshot, last seq %d\n", session.RemoteAddr(), lastseq)
 
 	if err := session.WriteCommand(NewCommand([]byte("SYNC_RAW_BEG"))); err != nil {
 		stdlog.Printf("[S %s] snapshot error\n", session.RemoteAddr())
-		return err
+		return -1, err
 	}
 
 	// scan snapshot
@@ -94,23 +91,18 @@ func (server *GoRedisServer) sendSnapshot(session *Session) error {
 	})
 
 	if broken {
-		return errors.New("broken")
+		return -1, errors.New("broken")
 	}
 
 	stdlog.Printf("[S %s] snapshot finish\n", session.RemoteAddr())
 
 	if err := session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
 		stdlog.Printf("[S %s] sync error %s\n", session.RemoteAddr(), err)
-		return err
+		return -1, err
 	}
 
-	// 主动释放，为了下面进入长时间的syncRunloop
-	server.levelRedis.DB().ReleaseSnapshot(snap)
-	snaprelease = true
-
-	curseq++
-	err := server.syncRunloop(session, curseq)
-	return err
+	nextseq = lastseq + 1
+	return nextseq, nil
 }
 
 // 每发送一个SYNC_SEQ再发送一个CMD
