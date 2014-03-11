@@ -3,7 +3,6 @@ package goredis_server
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
-	"GoRedis/libs/stdlog"
 	"strings"
 )
 
@@ -69,7 +68,7 @@ func (server *GoRedisServer) keyEnumerate(cmd *Command, direction levelredis.Ite
 	}
 	bulks := make([]interface{}, 0, bufferSize)
 	server.levelRedis.KeyEnumerate(seek, direction, func(i int, key, keytype, value []byte, quit *bool) {
-		stdlog.Println(i, string(key), string(keytype), string(value))
+		// stdlog.Println(i, string(key), string(keytype), string(value))
 		bulks = append(bulks, key)
 		if withtype {
 			bulks = append(bulks, keytype)
@@ -111,7 +110,6 @@ func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 	bulks := make([]interface{}, 0, count)
 	server.levelRedis.Keys(seekkey, func(i int, key, keytype []byte, quit *bool) {
 		if i >= count {
-			bulks = append(bulks, "...")
 			*quit = true
 			return
 		}

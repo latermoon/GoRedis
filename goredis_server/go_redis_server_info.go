@@ -128,7 +128,7 @@ func (server *GoRedisServer) replicationInfo() string {
 
 	buf.WriteString(fmt.Sprintf("connected_slaves:%d\n", server.info.connected_slaves()))
 	server.syncmgr.Enumerate(func(i int, host string, sess *Session) {
-		buf.WriteString(fmt.Sprintf("slave%d:%s,%s\n", i, host, "..."))
+		buf.WriteString(fmt.Sprintf("slave%d:%s,%s\n", i, host, sess.GetAttribute(S_STATUS)))
 	})
 
 	buf.WriteString(fmt.Sprintf("connected_masters:%d\n", server.info.connected_masters()))

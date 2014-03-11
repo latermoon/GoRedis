@@ -18,30 +18,36 @@ func NewSessionManager() (s *SessionManager) {
 	return
 }
 
-func (s *SessionManager) Put(host string, session *Session) {
+func (s *SessionManager) Put(key string, session *Session) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.clients[host] = session
+	s.clients[key] = session
 }
 
-func (s *SessionManager) Contains(host string) (ok bool) {
+func (s *SessionManager) Get(key string) *Session {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	_, ok = s.clients[host]
+	return s.clients[key]
+}
+
+func (s *SessionManager) Contains(key string) (ok bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok = s.clients[key]
 	return
 }
 
-func (s *SessionManager) Remove(host string) {
+func (s *SessionManager) Remove(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.clients, host)
+	delete(s.clients, key)
 }
 
 func (s *SessionManager) Len() int {
 	return len(s.clients)
 }
 
-func (s *SessionManager) Enumerate(fn func(i int, host string, session *Session)) {
+func (s *SessionManager) Enumerate(fn func(i int, key string, session *Session)) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	i := 0

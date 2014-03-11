@@ -51,9 +51,9 @@ type GoRedisServer struct {
 	cmdMonitor    *stat.Writer
 	leveldbStatus *stat.Writer
 	// 从库
-	uid      string        // 实例id
-	syncmgr  *SyncManager  // as master
-	slavemgr *SlaveManager // as slave
+	uid      string          // 实例id
+	syncmgr  *SessionManager // as master
+	slavemgr *SlaveManager   // as slave
 	synclog  *SyncLog
 	// monitor
 	sessmgr *SessionManager // all sessions
@@ -81,7 +81,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.methodCache = make(map[string]reflect.Value)
 	server.cmdChan = make(chan *CommandEx, 1000)
 	go server.processCommandChan()
-	server.syncmgr = NewSyncManager()
+	server.syncmgr = NewSessionManager()
 	server.slavemgr = NewSlaveManager()
 	server.monmgr = NewMonManager()
 	server.sessmgr = NewSessionManager()
