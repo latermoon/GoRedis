@@ -125,11 +125,12 @@ func (server *GoRedisServer) replicationInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Replication\n")
 	buf.WriteString(fmt.Sprintf("role:%s\n", server.info.Role()))
+
 	buf.WriteString(fmt.Sprintf("connected_slaves:%d\n", server.info.connected_slaves()))
-	for i := 0; i < server.info.connected_slaves(); i++ {
-		c := server.syncmgr.Client(i)
-		buf.WriteString(fmt.Sprintf("slave%d:%s,%s\n", i, c.session.RemoteAddr(), c.Status()))
-	}
+	server.syncmgr.Enumerate(func(i int, host string, sess *Session) {
+		buf.WriteString(fmt.Sprintf("slave%d:%s,%s\n", i, host, "..."))
+	})
+
 	buf.WriteString(fmt.Sprintf("connected_masters:%d\n", server.info.connected_masters()))
 	for i := 0; i < server.info.connected_masters(); i++ {
 		c := server.slavemgr.Client(i)

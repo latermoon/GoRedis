@@ -5,6 +5,7 @@ import (
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
 	"bytes"
+	"errors"
 	"strconv"
 	"time"
 )
@@ -12,11 +13,7 @@ import (
 // 从库的同步请求
 // SYNC [UID] [SEQ]
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
-	// var uid string
 	var seq int64 = -1
-	// if len(cmd.Args) >= 2 {
-	// 	uid = cmd.StringAtIndex(1)
-	// }
 	if len(cmd.Args) >= 3 {
 		var err error
 		seq, err = cmd.Int64AtIndex(2)
@@ -26,12 +23,6 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	}
 	stdlog.Printf("[S %s] slave %s\n", session.RemoteAddr(), cmd)
 
-	sc, err := NewSyncClient(session)
-	if err != nil {
-		stdlog.Printf("[S %s] slave error %s", session.RemoteAddr(), err)
-		return
-	}
-
 	// 第一次出现从库时才开启写日志
 	if !server.synclog.IsEnabled() {
 		stdlog.Println("synclog enable")
@@ -40,32 +31,51 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 
 	reply = NOREPLY
 
-	if seq < 0 {
-		go server.sendSnapshot(sc)
-	} else {
-		if seq >= server.synclog.MinSeq() && seq <= server.synclog.MaxSeq() {
-			go server.syncRunloop(sc, seq)
-		} else {
-			stdlog.Printf("[S %s] seq %d not in (%d, %d), closed\n", sc.session.RemoteAddr(), seq, server.synclog.MinSeq(), server.synclog.MaxSeq())
-			sc.session.Close()
-		}
+	if seq < server.synclog.MinSeq() || seq > server.synclog.MaxSeq() {
+		stdlog.Printf("[S %s] seq %d not in (%d, %d), closed\n", session.RemoteAddr(), seq, server.synclog.MinSeq(), server.synclog.MaxSeq())
+		session.Close()
 	}
 
+	remoteHost := session.RemoteAddr().String() // 真正的IP与端口地址
+	server.syncmgr.Put(remoteHost, session)
+
+	if seq < 0 {
+		// 全新的一次同步
+		go func() {
+			if err := server.sendSnapshot(session); err != nil {
+				stdlog.Printf("[S %s] snapshot runloop broken %s\n", remoteHost, err)
+			}
+			server.syncmgr.Remove(remoteHost)
+		}()
+	} else {
+		// 继续上次同步
+		go func() {
+			if err := server.syncRunloop(session, seq); err != nil {
+				stdlog.Printf("[S %s] sync runloop broken %s\n", remoteHost, err)
+			}
+			server.syncmgr.Remove(remoteHost)
+		}()
+	}
 	return
 }
 
-func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
-	server.Suspend()                                   //挂起全部操作
-	snap := server.levelRedis.DB().NewSnapshot()       // 挂起后建立快照
-	defer server.levelRedis.DB().ReleaseSnapshot(snap) //
-	curseq := server.synclog.LastSeq()                 // 获取当前日志序号
-	server.Resume()                                    // 唤醒，如果不调用Resume，整个服务器无法继续工作
+func (server *GoRedisServer) sendSnapshot(session *Session) error {
+	server.Suspend()                             //挂起全部操作
+	snap := server.levelRedis.DB().NewSnapshot() // 挂起后建立快照
+	snaprelease := false
+	defer func() {
+		if !snaprelease {
+			server.levelRedis.DB().ReleaseSnapshot(snap)
+		}
+	}()
+	curseq := server.synclog.LastSeq() // 获取当前日志序号
+	server.Resume()                    // 唤醒，如果不调用Resume，整个服务器无法继续工作
 
-	stdlog.Printf("[S %s] snapshot, seq %d\n", sc.session.RemoteAddr(), curseq)
+	stdlog.Printf("[S %s] snapshot, seq %d\n", session.RemoteAddr(), curseq)
 
-	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_BEG"))); err != nil {
-		stdlog.Printf("[S %s] snapshot error\n", sc.session.RemoteAddr())
-		return
+	if err := session.WriteCommand(NewCommand([]byte("SYNC_RAW_BEG"))); err != nil {
+		stdlog.Printf("[S %s] snapshot error\n", session.RemoteAddr())
+		return err
 	}
 
 	// scan snapshot
@@ -75,42 +85,48 @@ func (server *GoRedisServer) sendSnapshot(sc *SyncClient) {
 			return
 		}
 		cmd := NewCommand([]byte("SYNC_RAW"), key, value)
-		err := sc.session.WriteCommand(cmd)
+		err := session.WriteCommand(cmd)
 		if err != nil {
-			stdlog.Printf("[S %s] snapshot error %s\n", sc.session.RemoteAddr(), cmd)
+			stdlog.Printf("[S %s] snapshot error %s\n", session.RemoteAddr(), cmd)
 			broken = true
 			*quit = true
 		}
 	})
 
 	if broken {
-		return
+		return errors.New("broken")
 	}
 
-	stdlog.Printf("[S %s] snapshot finish\n", sc.session.RemoteAddr())
+	stdlog.Printf("[S %s] snapshot finish\n", session.RemoteAddr())
 
-	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
-		stdlog.Printf("[S %s] sync error %s\n", sc.session.RemoteAddr(), err)
-		return
+	if err := session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
+		stdlog.Printf("[S %s] sync error %s\n", session.RemoteAddr(), err)
+		return err
 	}
+
+	// 主动释放，为了下面进入长时间的syncRunloop
+	server.levelRedis.DB().ReleaseSnapshot(snap)
+	snaprelease = true
 
 	curseq++
-	go server.syncRunloop(sc, curseq)
+	err := server.syncRunloop(session, curseq)
+	return err
 }
 
 // 每发送一个SYNC_SEQ再发送一个CMD
-func (server *GoRedisServer) syncRunloop(sc *SyncClient, lastseq int64) {
-	stdlog.Printf("[S %s] sync start seq %d\n", sc.session.RemoteAddr(), lastseq)
+func (server *GoRedisServer) syncRunloop(session *Session, lastseq int64) (err error) {
+	stdlog.Printf("[S %s] sync start seq %d\n", session.RemoteAddr(), lastseq)
 
-	if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_SEQ_BEG"))); err != nil {
-		stdlog.Printf("[S %s] sync error %s\n", sc.session.RemoteAddr(), err)
+	if err = session.WriteCommand(NewCommand([]byte("SYNC_SEQ_BEG"))); err != nil {
+		stdlog.Printf("[S %s] sync error %s\n", session.RemoteAddr(), err)
 		return
 	}
 	seq := lastseq
 	for {
-		val, err := server.synclog.Read(seq)
+		var val []byte
+		val, err = server.synclog.Read(seq)
 		if err != nil {
-			stdlog.Printf("[S %s] synclog read error %s\n", sc.session.RemoteAddr(), err)
+			stdlog.Printf("[S %s] synclog read error %s\n", session.RemoteAddr(), err)
 			break
 		}
 		if val == nil {
@@ -119,18 +135,19 @@ func (server *GoRedisServer) syncRunloop(sc *SyncClient, lastseq int64) {
 		}
 
 		seqstr := strconv.FormatInt(seq, 10)
-		if err := sc.session.WriteCommand(NewCommand([]byte("SYNC_SEQ"), []byte(seqstr))); err != nil {
-			stdlog.Printf("[S %s] sync seq error %s\n", sc.session.RemoteAddr(), err)
+		if err = session.WriteCommand(NewCommand([]byte("SYNC_SEQ"), []byte(seqstr))); err != nil {
+			stdlog.Printf("[S %s] sync seq error %s\n", session.RemoteAddr(), err)
 			break
 		}
 
-		if _, err := sc.session.Write(val); err != nil {
-			stdlog.Printf("[S %s] sync cmd error %s\n", sc.session.RemoteAddr(), err)
+		if _, err = session.Write(val); err != nil {
+			stdlog.Printf("[S %s] sync cmd error %s\n", session.RemoteAddr(), err)
 			break
 		}
 		seq++
 	}
 	// close
-	stdlog.Printf("[S %s] sync closed", sc.session.RemoteAddr())
-	sc.session.Close()
+	stdlog.Printf("[S %s] sync closed", session.RemoteAddr())
+	session.Close()
+	return
 }

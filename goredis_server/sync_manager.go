@@ -2,81 +2,51 @@ package goredis_server
 
 // 管理多个从库SyncClient对象
 import (
-	"container/list"
+	. "GoRedis/goredis"
 	"sync"
-	"time"
 )
 
 type SyncManager struct {
-	clients *list.List
-	mu      sync.Mutex
+	clients map[string]*Session
+	mu      sync.RWMutex
 }
 
 func NewSyncManager() (s *SyncManager) {
 	s = &SyncManager{
-		clients: list.New(),
-	}
-	go s.pingRunloop()
-	return
-}
-
-func (s *SyncManager) pingRunloop() {
-	ticker := time.NewTicker(time.Second * 1)
-	go func() {
-		for _ = range ticker.C {
-			// s.BroadcastCommand(NewCommand([]byte("PING")))
-		}
-	}()
-}
-
-func (s *SyncManager) Count() int {
-	return s.clients.Len()
-}
-
-func (s *SyncManager) Client(i int) (c *SyncClient) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	cur := 0
-	for e := s.clients.Front(); e != nil; e = e.Next() {
-		c := e.Value.(*SyncClient)
-		if i == cur {
-			return c
-		}
-		cur++
+		clients: map[string]*Session{},
 	}
 	return
 }
 
-func (s *SyncManager) Add(c *SyncClient) {
+func (s *SyncManager) Put(host string, sess *Session) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, exist := s.exist(c)
-	if exist {
-		return
-	}
-	s.clients.PushBack(c)
+	s.clients[host] = sess
 }
 
-func (s *SyncManager) Remove(c *SyncClient) {
+func (s *SyncManager) Contains(host string) (ok bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok = s.clients[host]
+	return
+}
+
+func (s *SyncManager) Enumerate(fn func(i int, host string, sess *Session)) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	i := 0
+	for k, v := range s.clients {
+		fn(i, k, v)
+		i++
+	}
+}
+
+func (s *SyncManager) Remove(host string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	e, exist := s.exist(c)
-	if exist {
-		s.clients.Remove(e)
-	}
+	delete(s.clients, host)
 }
 
-func (s *SyncManager) Exist(c *SyncClient) (*list.Element, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.exist(c)
-}
-
-func (s *SyncManager) exist(c *SyncClient) (*list.Element, bool) {
-	for e := s.clients.Front(); e != nil; e = e.Next() {
-		if e.Value.(*SyncClient) == c {
-			return e, true
-		}
-	}
-	return nil, false
+func (s *SyncManager) Len() int {
+	return len(s.clients)
 }

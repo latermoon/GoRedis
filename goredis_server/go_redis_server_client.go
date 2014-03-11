@@ -20,7 +20,7 @@ func (server *GoRedisServer) OnCLIENT(session *Session, cmd *Command) (reply *Re
 // Get the list of client connections
 func (server *GoRedisServer) onClientList(session *Session, cmd *Command) (reply *Reply) {
 	buf := bytes.Buffer{}
-	server.clientmgr.Enumerate(func(i int, host string, sess *Session) {
+	server.sessmgr.Enumerate(func(i int, host string, sess *Session) {
 		lastcmd := sess.GetAttribute("cmd")
 		if lastcmd == nil {
 			lastcmd = ""
