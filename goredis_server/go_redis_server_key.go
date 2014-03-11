@@ -3,7 +3,6 @@ package goredis_server
 import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
-	"GoRedis/libs/stdlog"
 	"strings"
 )
 
@@ -12,11 +11,12 @@ func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
 	return
 }
 
-// 命名上使用keys来提供keysearch的扫描功能比较合理，
-// 但是为了防止开发人员错误把适用与GoRedis的keys处理代码误用到官方redis上造成卡死
-// 这里还是把keys禁用
-func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
-	return ErrorReply("keys is not supported by GoRedis, use 'keysearch [prefix] [count] [withtype]' instead")
+func (server *GoRedisServer) OnDBSIZE(cmd *Command) (reply *Reply) {
+	return
+}
+
+func (server *GoRedisServer) OnRAMDOMKEY(cmd *Command) (reply *Reply) {
+	return
 }
 
 // keyprev [seek] [count] [withtype] [withvalue]
@@ -68,7 +68,7 @@ func (server *GoRedisServer) keyEnumerate(cmd *Command, direction levelredis.Ite
 	}
 	bulks := make([]interface{}, 0, bufferSize)
 	server.levelRedis.KeyEnumerate(seek, direction, func(i int, key, keytype, value []byte, quit *bool) {
-		stdlog.Println(i, string(key), string(keytype), string(value))
+		// stdlog.Println(i, string(key), string(keytype), string(value))
 		bulks = append(bulks, key)
 		if withtype {
 			bulks = append(bulks, keytype)
@@ -84,59 +84,65 @@ func (server *GoRedisServer) keyEnumerate(cmd *Command, direction levelredis.Ite
 }
 
 // 找出下一个key
-func (server *GoRedisServer) OnKEYSEARCH(cmd *Command) (reply *Reply) {
-	seekkey, err := cmd.ArgAtIndex(1)
-	if err != nil {
-		return ErrorReply(err)
+func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
+	seekkey := []byte("")
+	if cmd.Len() > 1 {
+		seekkey = cmd.Args[1]
 	}
-	count := 1
-	if len(cmd.Args) > 2 {
-		count, err = cmd.IntAtIndex(2)
-		if err != nil {
+
+	count := 10
+	if cmd.Len() > 2 {
+		var err error
+		if count, err = cmd.IntAtIndex(2); err != nil {
 			return ErrorReply(err)
 		}
 		if count < 1 || count > 10000 {
 			return ErrorReply("count range: 1 < count < 10000")
 		}
 	}
+
 	withtype := false
-	if len(cmd.Args) > 3 {
+	if cmd.Len() > 3 {
 		withtype = strings.ToUpper(cmd.StringAtIndex(3)) == "WITHTYPE"
 	}
+
 	// search
-	bulks := make([]interface{}, 0, 10)
+	bulks := make([]interface{}, 0, count)
 	server.levelRedis.Keys(seekkey, func(i int, key, keytype []byte, quit *bool) {
+		if i >= count {
+			*quit = true
+			return
+		}
 		bulks = append(bulks, key)
 		if withtype {
 			bulks = append(bulks, keytype)
-		}
-		if i >= count-1 {
-			*quit = true
 		}
 	})
 	return MultiBulksReply(bulks)
 }
 
 // 扫描内部key
-func (server *GoRedisServer) OnRAW_KEYSEARCH(cmd *Command) (reply *Reply) {
-	seekkey, err := cmd.ArgAtIndex(1)
-	if err != nil {
-		return ErrorReply(err)
+func (server *GoRedisServer) OnRAW_KEYS(cmd *Command) (reply *Reply) {
+	seekkey := []byte("")
+	if cmd.Len() > 1 {
+		seekkey = cmd.Args[1]
 	}
-	count := 1
-	if len(cmd.Args) > 2 {
-		count, err = cmd.IntAtIndex(2)
-		if err != nil {
+
+	count := 10
+	if cmd.Len() > 2 {
+		var err error
+		if count, err = cmd.IntAtIndex(2); err != nil {
 			return ErrorReply(err)
 		}
 		if count < 1 || count > 10000 {
 			return ErrorReply("count range: 1 < count < 10000")
 		}
 	}
+
 	// search
-	bulks := make([]interface{}, 0, 10)
+	bulks := make([]interface{}, 0, count)
 	min := seekkey
-	max := append(seekkey, 254)
+	max := append(seekkey, levelredis.MAXBYTE)
 	server.levelRedis.RangeEnumerate(min, max, levelredis.IterForward, func(i int, key, value []byte, quit *bool) {
 		bulks = append(bulks, key)
 		if i >= count-1 {
@@ -149,13 +155,15 @@ func (server *GoRedisServer) OnRAW_KEYSEARCH(cmd *Command) (reply *Reply) {
 // 操作原始内容
 func (server *GoRedisServer) OnRAW_GET(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
-	value := server.levelRedis.RawGet(key)
-	if value == nil {
-		reply = BulkReply(nil)
-	} else {
-		reply = BulkReply(value)
+	value, err := server.levelRedis.RawGet(key)
+	if err != nil {
+		return ErrorReply(err)
 	}
-	return
+	if value == nil {
+		return BulkReply(nil)
+	} else {
+		return BulkReply(value)
+	}
 }
 
 // 操作原始内容 RAW_SET +[hash]name latermoon

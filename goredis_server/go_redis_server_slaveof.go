@@ -18,7 +18,8 @@ func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd *Command) (reply *R
 		return ErrorReply(err)
 	}
 
-	if server.slavemgr.Contains(conn.RemoteAddr().String()) {
+	remoteHost := conn.RemoteAddr().String()
+	if server.slavemgr.Contains(remoteHost) {
 		return ErrorReply("master exist")
 	}
 
@@ -31,17 +32,17 @@ func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd *Command) (reply *R
 
 	var client ISlaveClient
 	if isgoredis {
-		slavelog.Printf("[M %s] SLAVEOF %s GoRedis:%s\n", masterSession.RemoteAddr(), masterSession.RemoteAddr(), version)
+		slavelog.Printf("[M %s] SLAVEOF %s GoRedis:%s\n", remoteHost, remoteHost, version)
 		if client, err = NewSlaveClientV2(server, masterSession); err != nil {
 			return ErrorReply(err)
 		}
 	} else {
-		slavelog.Printf("[M %s] SLAVEOF %s Redis:%s\n", masterSession.RemoteAddr(), masterSession.RemoteAddr(), version)
+		slavelog.Printf("[M %s] SLAVEOF %s Redis:%s\n", remoteHost, remoteHost, version)
 		if client, err = NewSlaveClient(server, masterSession); err != nil {
 			return ErrorReply(err)
 		}
 	}
-	server.slavemgr.Add(client)
+	server.slavemgr.Put(remoteHost, client)
 	go client.Sync(server.UID())
 
 	return StatusReply("OK")

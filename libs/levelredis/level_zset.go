@@ -33,7 +33,7 @@ func (l *LevelZSet) Size() int {
 
 func (l *LevelZSet) initOnce() {
 	if l.totalCount == -1 {
-		value := l.redis.RawGet(l.zsetKey())
+		value, _ := l.redis.RawGet(l.zsetKey())
 		if value != nil {
 			l.totalCount, _ = strconv.Atoi(string(value))
 		} else {
@@ -100,7 +100,7 @@ func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 		score := scoreMembers[i]
 		member, memberkey := scoreMembers[i+1], l.memberKey(scoreMembers[i+1])
 		// remove old score
-		oldscore := l.redis.RawGet(memberkey)
+		oldscore, _ := l.redis.RawGet(memberkey)
 		if oldscore != nil {
 			batch.Delete(l.scoreKey(member, oldscore))
 		} else {
@@ -127,7 +127,7 @@ func (l *LevelZSet) Score(member []byte) (score []byte) {
 }
 
 func (l *LevelZSet) score(member []byte) (score []byte) {
-	score = l.redis.RawGet(l.memberKey(member))
+	score, _ = l.redis.RawGet(l.memberKey(member))
 	return
 }
 
@@ -245,7 +245,7 @@ func (l *LevelZSet) Remove(members ...[]byte) (n int) {
 	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	for _, member := range members {
-		score := l.redis.RawGet(l.memberKey(member))
+		score, _ := l.redis.RawGet(l.memberKey(member))
 		if score == nil {
 			continue
 		}

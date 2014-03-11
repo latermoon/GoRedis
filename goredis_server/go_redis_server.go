@@ -11,13 +11,14 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
 )
 
 // TODO 版本号，每次更新都需要升级一下
-const VERSION = "1.0.51"
+const VERSION = "1.0.55"
 const PREFIX = "__goredis:"
 
 var (
@@ -26,7 +27,7 @@ var (
 )
 
 var (
-	slowexec = 30 // ms
+	slowexec = float64(30) // ms
 	slowlog  = stdlog.Log("slow")
 	errlog   = stdlog.Log("err")
 )
@@ -43,22 +44,24 @@ type GoRedisServer struct {
 	counters        *counter.Counters
 	cmdCounters     *counter.Counters
 	cmdCateCounters *counter.Counters // 指令集统计
+	execCounters    *counter.Counters //指令执行时间计数器
 	// info
 	info *Info
 	// logger
 	cmdMonitor    *stat.Writer
 	leveldbStatus *stat.Writer
 	// 从库
-	uid      string        // 实例id
-	syncmgr  *SyncManager  // as master
-	slavemgr *SlaveManager // as slave
+	uid      string          // 实例id
+	syncmgr  *SessionManager // as master
+	slavemgr *SessionManager // as slave
 	synclog  *SyncLog
 	// monitor
-	monmgr *MonManager
+	sessmgr *SessionManager // all sessions
+	monmgr  *SessionManager
 	// 缓存处理函数，减少relect次数
 	methodCache map[string]reflect.Value
 	// 指令队列，异步处理统计、从库、monitor输出
-	cmdChan chan *Command
+	cmdChan chan *CommandEx
 	rwlock  sync.RWMutex
 	rwwait  sync.WaitGroup
 	// exit
@@ -76,11 +79,12 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	// set as itself
 	server.SetHandler(server)
 	server.methodCache = make(map[string]reflect.Value)
-	server.cmdChan = make(chan *Command, 1000)
+	server.cmdChan = make(chan *CommandEx, 1000)
 	go server.processCommandChan()
-	server.syncmgr = NewSyncManager()
-	server.slavemgr = NewSlaveManager()
-	server.monmgr = NewMonManager()
+	server.monmgr = NewSessionManager()
+	server.syncmgr = NewSessionManager()
+	server.slavemgr = NewSessionManager()
+	server.sessmgr = NewSessionManager()
 	server.info = NewInfo(server)
 	// default datasource
 	server.directory = directory
@@ -88,6 +92,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.counters = counter.NewCounters()
 	server.cmdCounters = counter.NewCounters()
 	server.cmdCateCounters = counter.NewCounters()
+	server.execCounters = counter.NewCounters()
 	return
 }
 
@@ -111,13 +116,21 @@ func (server *GoRedisServer) UID() (uid string) {
 // ServerHandler.SessionOpened()
 func (server *GoRedisServer) SessionOpened(session *Session) {
 	server.counters.Get("connection").Incr(1)
+	server.sessmgr.Put(session.RemoteAddr().String(), session)
 	stdlog.Println("connection accepted from", session.RemoteAddr())
 }
 
 // ServerHandler.SessionClosed()
 func (server *GoRedisServer) SessionClosed(session *Session, err error) {
 	server.counters.Get("connection").Incr(-1)
+	server.sessmgr.Remove(session.RemoteAddr().String())
 	stdlog.Println("end connection", session.RemoteAddr(), err)
+}
+
+func (server *GoRedisServer) ExceptionCaught(err error) {
+	stdlog.Printf("exception %s\n", err)
+	errlog.Printf("exception %s\n", err)
+	errlog.Println(debug.Stack())
 }
 
 // ServerHandler.On()
@@ -130,8 +143,10 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 	server.rwlock.Lock()
 	server.rwlock.Unlock()
 
+	cmdex := NewCommandEx(session, cmd)
+
 	// varify command
-	if err := verifyCommand(cmd); err != nil {
+	if err := cmdex.Verify(); err != nil {
 		errlog.Printf("[%s] bad command %s\n", session.RemoteAddr(), cmd)
 		return ErrorReply(err)
 	}
@@ -139,14 +154,12 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 	// invoke
 	reply = server.invokeCommandHandler(session, cmd)
 
+	elapsed := time.Now().Sub(begin)
+	cmdex.SetExecTime(elapsed)
+
 	// async: counter/sync/monitor
 	server.rwwait.Add(1)
-	server.cmdChan <- cmd
-
-	elapsed := time.Now().Sub(begin)
-	if elapsed.Nanoseconds() > int64(time.Millisecond*time.Duration(slowexec)) {
-		slowlog.Printf("[%s] exec %0.2f ms [%s]\n", session.RemoteAddr(), elapsed.Seconds()*1000, cmd)
-	}
+	server.cmdChan <- cmdex
 
 	return
 }
@@ -165,20 +178,26 @@ func (server *GoRedisServer) Resume() {
 // 异步串行处理
 func (server *GoRedisServer) processCommandChan() {
 	for {
-		cmd := <-server.cmdChan
-		cmdName := strings.ToUpper(cmd.Name())
+		cmdex := <-server.cmdChan
+		cmdName := cmdex.UpperName()
+
+		// last cmd
+		cmdex.Session().SetAttribute("cmd", cmdName)
 
 		server.incrCommandCounter(cmdName)
 
 		// 从库
-		if server.synclog.IsEnabled() && needSync(cmdName) {
-			server.synclog.Write(cmd.Bytes())
+		if server.synclog.IsEnabled() && cmdex.NeedSync() {
+			server.synclog.Write(cmdex.Bytes())
 		}
 
 		// monitor
-		if server.monmgr.Count() > 0 {
-			server.monmgr.BroadcastCommand(cmd)
+		if server.monmgr.Len() > 0 {
+			server.broadcastMonitor(cmdex)
 		}
+
+		// slowlog
+		server.calcExecTime(cmdex)
 
 		server.rwwait.Done()
 	}
@@ -190,6 +209,34 @@ func (server *GoRedisServer) incrCommandCounter(cmdName string) {
 	cate := commandCategory(cmdName)
 	server.cmdCateCounters.Get(string(cate)).Incr(1)
 	server.cmdCateCounters.Get("total").Incr(1)
+}
+
+// 向monitor clients广播
+func (server *GoRedisServer) broadcastMonitor(cmdex *CommandEx) {
+	server.monmgr.Enumerate(func(i int, key string, val interface{}) {
+		c := val.(*MonClient)
+		c.Send(cmdex)
+	})
+}
+
+// 统计指令耗时
+func (server *GoRedisServer) calcExecTime(cmdex *CommandEx) {
+	msec := cmdex.ExecTime().Seconds() * 1000
+	switch {
+	case msec < 1:
+		server.execCounters.Get("<1ms").Incr(1)
+	case msec >= 1 && msec <= 5:
+		server.execCounters.Get("1-5ms").Incr(1)
+	case msec > 5 && msec <= 10:
+		server.execCounters.Get("6-10ms").Incr(1)
+	case msec > 10 && msec <= 30:
+		server.execCounters.Get("11-30ms").Incr(1)
+	case msec > 30:
+		server.execCounters.Get(">30ms").Incr(1)
+	}
+	if msec > slowexec {
+		slowlog.Printf("[%s] exec %0.2f ms [%s]\n", cmdex.Session().RemoteAddr(), msec, cmdex)
+	}
 }
 
 // 首先搜索"On+大写NAME"格式的函数，存在则调用，不存在则调用OnUndefined

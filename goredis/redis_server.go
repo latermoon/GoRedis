@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
-	"runtime/debug"
 )
 
 const (
@@ -22,6 +20,7 @@ type ServerHandler interface {
 	SessionOpened(session *Session)
 	SessionClosed(session *Session, err error)
 	On(session *Session, cmd *Command) (reply *Reply)
+	ExceptionCaught(err error)
 }
 
 // ==============================
@@ -59,7 +58,7 @@ func (server *RedisServer) Listen(host string) error {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			os.Stderr.WriteString(fmt.Sprint("[goredis] accepted error", err, "\n"))
+			go server.handler.ExceptionCaught(err)
 			continue
 		}
 		// go
@@ -75,12 +74,12 @@ func (server *RedisServer) handleConnection(session *Session) {
 	defer func() {
 		// 异常处理
 		if v := recover(); v != nil {
-			os.Stderr.WriteString(fmt.Sprintf("[goredis] fatal %s %s\n%s\n", session.RemoteAddr(), v, string(debug.Stack())))
 			var ok bool
 			if lastErr, ok = v.(error); !ok {
 				lastErr = errors.New(fmt.Sprint(v))
 			}
 			session.Close()
+			server.handler.ExceptionCaught(lastErr)
 		}
 		// 连接终止
 		server.handler.SessionClosed(session, lastErr)

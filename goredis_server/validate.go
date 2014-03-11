@@ -72,6 +72,8 @@ var cmdrules = map[string][]interface{}{
 	"ZREMRANGEBYSCORE": []interface{}{4, 4},
 	"ZINCRBY":          []interface{}{4, 4},
 	"ZSCORE":           []interface{}{3, 3},
+	// server
+	"CLIENT": []interface{}{2, 2},
 }
 
 // 验证指令参数数量、非法字符等

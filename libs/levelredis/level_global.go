@@ -11,7 +11,7 @@ func newGlobal(redis *LevelRedis) (g *global) {
 	return
 }
 
-func (g *global) ZScore(key, member []byte) (score []byte) {
-	score = g.redis.RawGet(zmemberKey(key, member))
+func (g *global) ZScore(key, member []byte) (score []byte, err error) {
+	score, err = g.redis.RawGet(zmemberKey(key, member))
 	return
 }

@@ -78,9 +78,10 @@ func (l *LevelHash) Get(field []byte) (val []byte) {
 	defer l.mu.Unlock()
 	return l.get(field)
 }
+
 func (l *LevelHash) get(field []byte) (val []byte) {
 	fieldkey := l.fieldKey(field)
-	val = l.redis.RawGet(fieldkey)
+	val, _ = l.redis.RawGet(fieldkey)
 	return
 }
 

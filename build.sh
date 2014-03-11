@@ -8,4 +8,6 @@ echo "ok"
 
 echo "version:"
 chmod +x $target
-$target -v
+ver=`$target -v | awk '{print $2}'`
+cp $target $target'-'$ver
+echo 'goredis-server' $ver
