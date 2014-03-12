@@ -1,6 +1,10 @@
 GoRedis release notes
 =====================
 
+**GoRedis 1.0.56** @2014.3.12
+
+* [Feature] 增加参数启动作为从库
+
 **GoRedis 1.0.55** @2014.3.11
 
 * [Feature] 增加exec.time.log记录指令性能
