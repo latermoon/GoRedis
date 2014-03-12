@@ -5,6 +5,7 @@ GoRedis release notes
 
 * [Feature] 增加exec.time.log记录指令性能
 * [FIX] 主从连接管理
+* [FIX] 大量代码简化
 
 **GoRedis 1.0.49** @2014.3.4
 
