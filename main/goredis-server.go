@@ -7,11 +7,14 @@ import (
 	"../goredis_server"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -19,8 +22,6 @@ import (
 // go run goredis-server.go -procs 8 -p 17600
 // go run goredis-server.go -slaveof localhost:1603
 func main() {
-	opt := goredis_server.NewOptions()
-
 	version := flag.Bool("v", false, "print goredis-server version")
 	host := flag.String("h", "", "server host")
 	port := flag.Int("p", 1602, "server port")
@@ -35,9 +36,17 @@ func main() {
 	}
 
 	runtime.GOMAXPROCS(*procs)
+
+	opt := goredis_server.NewOptions()
 	opt.SetBind(fmt.Sprintf("%s:%d", *host, *port))
 	opt.SetDirectory(dbHome(*port))
-	opt.SetSlaveOf(*slaveof)
+	if len(*slaveof) > 0 {
+		h, p, e := splitHostPort(*slaveof)
+		if e != nil {
+			panic(e)
+		}
+		opt.SetSlaveOf(h, p)
+	}
 
 	// 重定向日志输出位置
 	redirectLogOutput(opt.Directory())
@@ -102,4 +111,15 @@ func redirectLogOutput(directory string) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func splitHostPort(addr string) (host string, port int, err error) {
+	tmp := strings.Split(addr, ":")
+	if len(tmp) != 2 {
+		err = errors.New("bad addr:" + addr)
+		return
+	}
+	host = tmp[0]
+	port, err = strconv.Atoi(tmp[1])
+	return
 }

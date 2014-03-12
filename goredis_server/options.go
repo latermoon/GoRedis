@@ -1,9 +1,11 @@
 package goredis_server
 
+// 运行配置
 type Options struct {
-	bind      string
-	slaveof   string
-	directory string
+	bind        string
+	slaveofHost string
+	slaveofPort int
+	directory   string
 }
 
 func NewOptions() (o *Options) {
@@ -19,12 +21,12 @@ func (o *Options) Bind() string {
 	return o.bind
 }
 
-func (o *Options) SetSlaveOf(host string) {
-	o.slaveof = host
+func (o *Options) SetSlaveOf(host string, port int) {
+	o.slaveofHost, o.slaveofPort = host, port
 }
 
-func (o *Options) SlaveOf() string {
-	return o.slaveof
+func (o *Options) SlaveOf() (host string, port int) {
+	return o.slaveofHost, o.slaveofPort
 }
 
 func (o *Options) SetDirectory(path string) {

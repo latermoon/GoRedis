@@ -1,6 +1,7 @@
 package goredis_server
 
 import (
+	. "GoRedis/goredis"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stat"
 	"GoRedis/libs/stdlog"
@@ -40,7 +41,20 @@ func (server *GoRedisServer) Init() (err error) {
 	server.initExecLog(server.directory + "/exec.time.log")
 	server.initSlowlog(server.directory + "/slow.log")
 	stdlog.Printf("init uid %s\n", server.UID())
+	server.initSlaveOf()
 	return
+}
+
+// 发起主从同步请求
+func (server *GoRedisServer) initSlaveOf() {
+	host, port := server.opt.SlaveOf()
+	if len(host) > 0 && port != 0 {
+		stdlog.Printf("init slaveof %s:%d\n", host, port)
+		// 模拟外部, session=nil
+		simulatedCmd := NewCommand(formatByteSlice("SLAVEOF", host, port)...)
+		reply := server.OnSLAVEOF(nil, simulatedCmd)
+		stdlog.Printf("slaveof: %s:%d, %s\n", host, port, reply)
+	}
 }
 
 // 处理退出事件
@@ -50,8 +64,8 @@ func (server *GoRedisServer) initSignalNotify() {
 	go func() {
 		sig := <-server.sigs
 		stdlog.Println("recv signal:", sig)
-		server.Suspend()                   // 挂起全部传入数据
-		time.Sleep(time.Millisecond * 500) // 休息一下，Suspend瞬间可能还有数据库写入
+		server.Suspend()                    // 挂起全部传入数据
+		time.Sleep(time.Millisecond * 1000) // 休息一下，Suspend瞬间可能还有数据库写入
 		server.levelRedis.Close()
 		server.synclog.Close()
 		stdlog.Println("db closed, bye")
@@ -59,6 +73,7 @@ func (server *GoRedisServer) initSignalNotify() {
 	}()
 }
 
+// 初始化leveldb
 func (server *GoRedisServer) initLevelDB() (err error) {
 	opts := levelredis.NewOptions()
 	opts.SetCache(levelredis.NewLRUCache(512 * 1024 * 1024))
@@ -80,6 +95,7 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 	return
 }
 
+// 初始化主从日志
 func (server *GoRedisServer) initSyncLog() error {
 	opts := levelredis.NewOptions()
 	opts.SetCache(levelredis.NewLRUCache(32 * 1024 * 1024))

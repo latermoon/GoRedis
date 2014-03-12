@@ -51,7 +51,10 @@ func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd *Command) (reply *R
 	go func() {
 		client.Session().SetAttribute(S_STATUS, REPL_WAIT)
 		server.slavemgr.Put(remoteHost, client)
-		client.Sync()
+		err := client.Sync()
+		if err != nil {
+			slavelog.Printf("[M %s] sync broken %s\n", remoteHost, err)
+		}
 		client.Close()
 		server.slavemgr.Remove(remoteHost)
 	}()
