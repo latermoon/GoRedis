@@ -57,7 +57,6 @@ func (s *SlaveClientV2) Session() *Session {
 func (s *SlaveClientV2) Sync() (err error) {
 	uid := s.server.UID()
 	s.lastseq = s.masterSeq(s.session.RemoteAddr().String())
-	// 向服务器下一个数据
 	seq := s.lastseq + 1
 	synccmd := NewCommand(formatByteSlice("SYNC", uid, seq)...)
 	slavelog.Printf("[M %s] %s\n", s.session.RemoteAddr(), synccmd)

@@ -18,7 +18,7 @@ import (
 )
 
 // TODO 版本号，每次更新都需要升级一下
-const VERSION = "1.0.55"
+const VERSION = "1.0.56"
 const PREFIX = "__goredis:"
 
 var (
@@ -37,6 +37,7 @@ type GoRedisServer struct {
 	ServerHandler
 	RedisServer
 	// 数据源
+	opt        *Options // 选项
 	directory  string
 	levelRedis *levelredis.LevelRedis
 	config     *Config
@@ -70,12 +71,13 @@ type GoRedisServer struct {
 }
 
 /*
-	server := NewGoRedisServer(directory)
+	server := NewGoRedisServer(opt)
 	server.Init()
 	server.Listen(host)
 */
-func NewGoRedisServer(directory string) (server *GoRedisServer) {
+func NewGoRedisServer(opt *Options) (server *GoRedisServer) {
 	server = &GoRedisServer{}
+	server.opt = opt
 	// set as itself
 	server.SetHandler(server)
 	server.methodCache = make(map[string]reflect.Value)
@@ -87,7 +89,7 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	server.sessmgr = NewSessionManager()
 	server.info = NewInfo(server)
 	// default datasource
-	server.directory = directory
+	server.directory = opt.Directory()
 	// counter
 	server.counters = counter.NewCounters()
 	server.cmdCounters = counter.NewCounters()
@@ -96,9 +98,9 @@ func NewGoRedisServer(directory string) (server *GoRedisServer) {
 	return
 }
 
-func (server *GoRedisServer) Listen(host string) error {
-	stdlog.Printf("listen %s\n", host)
-	return server.RedisServer.Listen(host)
+func (server *GoRedisServer) Listen() error {
+	stdlog.Printf("listen %s\n", server.opt.Bind())
+	return server.RedisServer.Listen(server.opt.Bind())
 }
 
 func (server *GoRedisServer) UID() (uid string) {

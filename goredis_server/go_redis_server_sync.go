@@ -69,7 +69,7 @@ func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err 
 	server.Suspend()                                   //挂起全部操作
 	snap := server.levelRedis.DB().NewSnapshot()       // 挂起后建立快照
 	defer server.levelRedis.DB().ReleaseSnapshot(snap) //
-	lastseq := server.synclog.LastSeq()                // 获取当前日志序号
+	lastseq := server.synclog.MaxSeq()                 // 获取当前日志序号
 	server.Resume()                                    // 唤醒，如果不调用Resume，整个服务器无法继续工作
 
 	if err = session.WriteCommand(NewCommand([]byte("SYNC_RAW_BEG"))); err != nil {

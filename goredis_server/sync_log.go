@@ -97,11 +97,6 @@ func (s *SyncLog) MaxSeq() int64 {
 	return s.seq
 }
 
-// duplicate
-func (s *SyncLog) LastSeq() int64 {
-	return s.seq
-}
-
 func (s *SyncLog) Write(val []byte) (seq int64, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -109,6 +104,9 @@ func (s *SyncLog) Write(val []byte) (seq int64, err error) {
 		return -1, errors.New("db closed")
 	}
 	seq = s.seq + 1
+	if s.seq == 0 { // 第一次写入同时初始化minseq
+		s.minseq = s.seq
+	}
 	err = s.db.RawSet(s.seqkey(seq), val)
 	if err == nil {
 		s.seq = seq
