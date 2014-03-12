@@ -51,7 +51,7 @@ func (server *RedisServer) Listen(host string) error {
 	}
 
 	if server.handler == nil {
-		return errors.New("[goredis] must call SetHandler(...) before Listen")
+		return errors.New("handler undefined")
 	}
 
 	// run loop
@@ -69,39 +69,39 @@ func (server *RedisServer) Listen(host string) error {
 
 // 处理一个客户端连接
 func (server *RedisServer) handleConnection(session *Session) {
-	var lastErr error
+	var err error
 
 	defer func() {
 		// 异常处理
 		if v := recover(); v != nil {
 			var ok bool
-			if lastErr, ok = v.(error); !ok {
-				lastErr = errors.New(fmt.Sprint(v))
+			if err, ok = v.(error); !ok {
+				err = errors.New(fmt.Sprint(v))
 			}
 			session.Close()
-			server.handler.ExceptionCaught(lastErr)
+			server.handler.ExceptionCaught(err)
 		}
 		// 连接终止
-		server.handler.SessionClosed(session, lastErr)
+		server.handler.SessionClosed(session, err)
 	}()
 
 	server.handler.SessionOpened(session)
 
 	for {
 		var cmd *Command
-		cmd, lastErr = session.ReadCommand()
+		cmd, err = session.ReadCommand()
 		// 常见的error是:
 		// 1) io.EOF
 		// 2) read tcp 127.0.0.1:51863: connection reset by peer
-		if lastErr != nil {
+		if err != nil {
 			session.Close()
 			break
 		}
 		// 处理
 		reply := server.handler.On(session, cmd)
 		if reply != nil {
-			lastErr = session.Reply(reply)
-			if lastErr != nil {
+			err = session.Reply(reply)
+			if err != nil {
 				session.Close()
 				break
 			}
