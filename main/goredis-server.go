@@ -5,6 +5,7 @@ package main
 
 import (
 	"../goredis_server"
+	// "GoRedis/libs/jsonconf"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
 	"flag"
@@ -30,6 +31,7 @@ func main() {
 	hostPtr := flag.String("h", "", "server host")
 	portPtr := flag.Int("p", 1602, "server port")
 	procsPtr := flag.Int("procs", 8, "GOMAXPROCS")
+	// confPtr := flag.String("conf", "goredis.conf", "server host")
 	repair := flag.Bool("repair", false, "repaire rocksdb")
 	flag.Parse()
 
@@ -45,6 +47,7 @@ func main() {
 	// 重定向日志输出位置
 	redirectLogOutput(directory)
 
+	// repair
 	if *repair {
 		dbhome := directory + "db0"
 		finfo, e1 := os.Stat(dbhome)
@@ -58,6 +61,17 @@ func main() {
 		}
 		return
 	}
+
+	// if len(*confPtr) > 0 {
+	// 	conf := jsonconf.New()
+	// 	f, e := os.OpenFile(*confPtr, os.O_RDONLY, os.ModePerm)
+	// 	if e != nil {
+	// 		panic(e)
+	// 	}
+	// 	conf.Load(f)
+	// 	n := conf.StringForKey("host", "localhost")
+	// 	stdlog.Println("n", n)
+	// }
 
 	host := fmt.Sprintf("%s:%d", *hostPtr, *portPtr)
 
