@@ -88,7 +88,7 @@ func (i *Info) uptime_in_seconds() int64 {
 
 func (i *Info) db_size() int64 {
 	if time.Now().Sub(i.dbsizeTime).Seconds() > 15 {
-		i.dbsize = directoryTotalSize(i.server.directory)
+		i.dbsize = directoryTotalSize(i.server.directory + "db0")
 		i.dbsizeTime = time.Now()
 	}
 	return i.dbsize
