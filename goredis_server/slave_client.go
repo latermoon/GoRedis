@@ -28,7 +28,6 @@ type SlaveClient struct {
 	broken   bool // 无效连接
 	counters *counter.Counters
 	synclog  *stat.Writer
-	status   string
 }
 
 func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient, err error) {
@@ -74,20 +73,15 @@ func (s *SlaveClient) rdbfilename() string {
 
 // 开始同步
 func (s *SlaveClient) Sync() (err error) {
-	s.status = "waiting"
 
-	args := [][]byte{[]byte("SYNC")}
-	uid := s.server.UID()
-	if len(uid) > 0 {
-		args = append(args, []byte(uid))
-	}
-	s.session.WriteCommand(NewCommand(args...))
+	s.session.WriteCommand(NewCommand([]byte("SYNC")))
 
 	rdbsaved := false
 	for {
 		var c byte
 		c, err = s.session.PeekByte()
 		if !rdbsaved && c == '$' {
+			s.session.SetAttribute(S_STATUS, REPL_RECV_BULK)
 			err = s.recvRdb()
 			if err != nil {
 				slavelog.Printf("[M %s] recv rdb error:%s\n", s.session.RemoteAddr(), err)
@@ -116,7 +110,6 @@ func (s *SlaveClient) Close() {
 }
 
 func (s *SlaveClient) recvCmd() {
-	s.status = "online"
 	for {
 		if s.broken {
 			break
@@ -133,7 +126,6 @@ func (s *SlaveClient) recvCmd() {
 }
 
 func (s *SlaveClient) recvRdb() (err error) {
-	s.status = "recvrdb"
 	var f *os.File
 	f, err = os.OpenFile(s.rdbfilename(), os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
@@ -177,7 +169,6 @@ func (s *SlaveClient) Broken() bool {
 
 // 清空本地的同步状态
 func (s *SlaveClient) Destory() (err error) {
-	s.status = "broken"
 	s.broken = true
 	s.synclog.Close()
 	return
@@ -221,6 +212,7 @@ func (s *SlaveClient) rdbDecodeCommand(cmd *Command) {
 
 func (s *SlaveClient) rdbDecodeFinish(n int64) {
 	slavelog.Printf("[M %s] rdb decode finish, items: %d\n", s.session.RemoteAddr(), n)
+	s.session.SetAttribute(S_STATUS, REPL_ONLINE)
 	s.wg.Wait()
 	go s.recvCmd() // 开始消化command
 }

@@ -18,7 +18,7 @@ import (
 )
 
 // TODO 版本号，每次更新都需要升级一下
-const VERSION = "1.0.56"
+const VERSION = "1.0.57"
 const PREFIX = "__goredis:"
 
 var (
@@ -132,7 +132,7 @@ func (server *GoRedisServer) SessionClosed(session *Session, err error) {
 func (server *GoRedisServer) ExceptionCaught(err error) {
 	stdlog.Printf("exception %s\n", err)
 	errlog.Printf("exception %s\n", err)
-	errlog.Println(debug.Stack())
+	errlog.Println(string(debug.Stack()))
 }
 
 // ServerHandler.On()

@@ -36,7 +36,7 @@ func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
 	if len(keyvals)%2 != 0 {
 		return ErrorReply(WrongArgumentCount)
 	}
-	for i, count := 0, cmd.Len(); i < count; i += 2 {
+	for i, count := 0, len(keyvals); i < count; i += 2 {
 		key := keyvals[i]
 		val := keyvals[i+1]
 		server.levelRedis.Strings().Set(key, val)
