@@ -16,8 +16,8 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	// 保障不会奔溃
 	defer func() {
 		if v := recover(); v != nil {
-			errlog.Printf("[%s] sync panic %s\n", session.RemoteAddr(), cmd)
-			errlog.Println(string(debug.Stack()))
+			stdlog.Printf("[%s] sync panic %s\n", session.RemoteAddr(), cmd)
+			stdlog.Println(string(debug.Stack()))
 		}
 	}()
 	var seq int64 = -1
@@ -62,6 +62,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 		}
 	}
 
+	stdlog.Println("sync online ...")
 	session.SetAttribute(S_STATUS, REPL_ONLINE)
 	// 发送日志数据
 	err := server.syncRunloop(session, nextseq)
@@ -128,7 +129,6 @@ func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err 
 	if err = session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
 		return
 	}
-
 	nextseq = lastseq + 1
 	return nextseq, nil
 }

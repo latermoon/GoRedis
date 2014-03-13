@@ -145,7 +145,9 @@ func (l *LevelRedis) DB() (db *gorocks.DB) {
 
 func (l *LevelRedis) Close() {
 	l.ro.Close()
-	l.wo.Close()
+	if l.wo != nil {
+		l.wo.Close()
+	}
 	// 处于snap模式的话，db不属于自己，只关闭其他变量
 	if l.snap != nil {
 		l.db.ReleaseSnapshot(l.snap)
@@ -263,6 +265,23 @@ func (l *LevelRedis) objFromCache(key string, fn func() interface{}) (obj interf
 	return
 }
 
+func (l *LevelRedis) GetElem(key string, typ string) (e LevelElem) {
+	switch typ {
+	case STRING_SUFFIX:
+	case LIST_SUFFIX:
+		return l.GetList(key)
+	case HASH_SUFFIX:
+		return l.GetHash(key)
+	case SET_SUFFIX:
+		return l.GetSet(key)
+	case ZSET_SUFFIX:
+		return l.GetSortedSet(key)
+	default:
+		e = nil
+	}
+	return
+}
+
 func (l *LevelRedis) GetList(key string) (lst *LevelList) {
 	obj := l.objFromCache(key, func() interface{} {
 		return NewLevelList(l, key)
@@ -324,28 +343,8 @@ func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
 			mu.Lock()
 			defer mu.Unlock()
 
-			switch t {
-			case "hash":
-				if ok := l.GetHash(key).Drop(); ok {
-					n++
-				}
-			case "set":
-				if ok := l.GetSet(key).Drop(); ok {
-					n++
-				}
-			case "list":
-				if ok := l.GetList(key).Drop(); ok {
-					n++
-				}
-			case "zset":
-				if ok := l.GetSortedSet(key).Drop(); ok {
-					n++
-				}
-			case "doc":
-				if ok := l.GetDoc(key).Drop(); ok {
-					n++
-				}
-			default:
+			if ok := l.GetElem(key, t).Drop(); ok {
+				n++
 			}
 			l.lruCache.Delete(key)
 		}

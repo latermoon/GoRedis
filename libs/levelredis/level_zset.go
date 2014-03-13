@@ -12,6 +12,7 @@ import (
 )
 
 type LevelZSet struct {
+	LevelElem
 	redis      *LevelRedis
 	key        string
 	mu         sync.Mutex
@@ -328,6 +329,10 @@ func (l *LevelZSet) len() (n int) {
 
 func (l *LevelZSet) Len() (n int) {
 	return l.len()
+}
+
+func (l *LevelZSet) Type() string {
+	return ZSET_SUFFIX
 }
 
 func (l *LevelZSet) Drop() (ok bool) {

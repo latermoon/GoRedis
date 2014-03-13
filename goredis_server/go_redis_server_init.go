@@ -13,8 +13,6 @@ import (
 )
 
 func (server *GoRedisServer) Init() (err error) {
-	// init errlog
-	errlog.SetOutput(os.Stderr)
 
 	server.initSignalNotify()
 

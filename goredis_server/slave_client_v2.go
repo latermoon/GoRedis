@@ -82,8 +82,8 @@ func (s *SlaveClientV2) Sync() (err error) {
 		case "SYNC_RAW_FIN":
 			slavelog.Printf("[M %s] recv bulk finish\n", s.session.RemoteAddr())
 		case "SYNC_SEQ_BEG":
-			s.Session().SetAttribute(S_STATUS, REPL_ONLINE)
 			slavelog.Printf("[M %s] sync online ...\n", s.session.RemoteAddr())
+			s.Session().SetAttribute(S_STATUS, REPL_ONLINE)
 			s.recvCommandSeq(cmd) // 进入后只有出错才退出
 			break
 		default:
