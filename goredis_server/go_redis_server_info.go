@@ -19,6 +19,8 @@ func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
 		reply = BulkReply(server.serverInfo())
 	case "command":
 		reply = BulkReply(server.commandInfo())
+	case "memstats":
+		reply = BulkReply(server.memstatInfo())
 	case "stats":
 		reply = BulkReply(server.statsInfo())
 	default:
@@ -43,6 +45,7 @@ func (server *GoRedisServer) serverInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Server\n")
 	buf.WriteString(fmt.Sprintf("goredis_version:%s\n", server.info.Version()))
+	buf.WriteString(fmt.Sprintf("uptime_in_seconds:%d\n", server.info.uptime_in_seconds()))
 	return buf.String()
 }
 
@@ -74,6 +77,12 @@ func (server *GoRedisServer) memoryInfo() string {
 	buf.WriteString("# Memory\n")
 	buf.WriteString(fmt.Sprintf("used_memory_peak:%d\n", 0))
 	buf.WriteString(fmt.Sprintf("used_memory_peak_human:%d\n", 0))
+	return buf.String()
+}
+
+func (server *GoRedisServer) memstatInfo() string {
+	buf := bytes.Buffer{}
+	buf.WriteString("# Memory Stats\n")
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	// General statistics.
@@ -106,6 +115,8 @@ func (server *GoRedisServer) memoryInfo() string {
 func (server *GoRedisServer) persistenceInfo() string {
 	buf := bytes.Buffer{}
 	buf.WriteString("# Persistence\n")
+	buf.WriteString(fmt.Sprintf("db_size:%d\n", server.info.db_size()))
+	buf.WriteString(fmt.Sprintf("db_size_human:%s\n", bytesInHuman(server.info.db_size())))
 	return buf.String()
 }
 
@@ -115,7 +126,7 @@ func (server *GoRedisServer) statsInfo() string {
 	// buf.WriteString(fmt.Sprintf("total_connections_received:%d\n", 0))
 	buf.WriteString(fmt.Sprintf("total_commands_processed:%d\n", server.info.total_commands_processed()))
 	buf.WriteString(fmt.Sprintf("instantaneous_ops_per_sec:%d\n", server.info.instantaneous_ops_per_sec()))
-	buf.WriteString(fmt.Sprintf("rejected_connections:%d\n", 0))
+	buf.WriteString(fmt.Sprintf("slow_ops_per_sec:%d\n", server.info.slow_ops_per_sec()))
 	// buf.WriteString(fmt.Sprintf("keyspace_hits:%d\n", 0))
 	// buf.WriteString(fmt.Sprintf("keyspace_misses:%d\n", 0))
 	return buf.String()
@@ -129,14 +140,17 @@ func (server *GoRedisServer) replicationInfo() string {
 	buf.WriteString(fmt.Sprintf("connected_slaves:%d\n", server.info.connected_slaves()))
 	server.syncmgr.Enumerate(func(i int, key string, val interface{}) {
 		sess := val.(*Session)
-		buf.WriteString(fmt.Sprintf("slave%d:%s,%s\n", i, key, sess.GetAttribute(S_STATUS)))
+		host, _ := splitHostPort(sess.RemoteAddr().String())
+		port := fmt.Sprint(sess.GetAttribute(S_SLAVE_PORT))
+		buf.WriteString(fmt.Sprintf("slave%d:%s,%s,%s\n", i, host, port, sess.GetAttribute(S_STATUS)))
 	})
 
 	buf.WriteString(fmt.Sprintf("connected_masters:%d\n", server.info.connected_masters()))
 	server.slavemgr.Enumerate(func(i int, key string, val interface{}) {
 		client := val.(ISlaveClient)
 		sess := client.Session()
-		buf.WriteString(fmt.Sprintf("master%d:%s,%s\n", i, sess.RemoteAddr(), sess.GetAttribute(S_STATUS)))
+		host, port := splitHostPort(sess.RemoteAddr().String())
+		buf.WriteString(fmt.Sprintf("master%d:%s,%d,%s\n", i, host, port, sess.GetAttribute(S_STATUS)))
 	})
 
 	return buf.String()

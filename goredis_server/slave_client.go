@@ -54,7 +54,7 @@ func (s *SlaveClient) initLog() error {
 	st.Add(stat.IncrItem("rdb", 8, func() int64 { return s.counters.Get("rdb").Count() }))
 	st.Add(stat.IncrItem("recv", 8, func() int64 { return s.counters.Get("recv").Count() }))
 	st.Add(stat.IncrItem("proc", 8, func() int64 { return s.counters.Get("proc").Count() }))
-	st.Add(stat.IncrItem("buffer", 10, func() int64 { return s.counters.Get("buffer").Count() }))
+	st.Add(stat.TextItem("buffer", 10, func() interface{} { return len(s.buffer) }))
 	go st.Start()
 	return nil
 }
@@ -74,12 +74,18 @@ func (s *SlaveClient) rdbfilename() string {
 // 开始同步
 func (s *SlaveClient) Sync() (err error) {
 
-	s.session.WriteCommand(NewCommand([]byte("SYNC")))
+	err = s.session.WriteCommand(NewCommand([]byte("SYNC")))
+	if err != nil {
+		return
+	}
 
 	rdbsaved := false
 	for {
 		var c byte
 		c, err = s.session.PeekByte()
+		if err != nil {
+			break
+		}
 		if !rdbsaved && c == '$' {
 			s.session.SetAttribute(S_STATUS, REPL_RECV_BULK)
 			err = s.recvRdb()
@@ -89,7 +95,10 @@ func (s *SlaveClient) Sync() (err error) {
 			}
 			rdbsaved = true
 		} else if c == '\n' {
-			s.session.ReadByte()
+			_, err = s.session.ReadByte()
+			if err != nil {
+				break
+			}
 			s.IdleCallback()
 		} else {
 			var cmd *Command

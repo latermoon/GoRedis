@@ -13,6 +13,7 @@ type HashElem struct {
 
 // 使用userForSet控制实现set还是hash
 type LevelHash struct {
+	LevelElem
 	redis *LevelRedis
 	// key
 	entryKey string
@@ -163,6 +164,14 @@ func (l *LevelHash) Count() (n int) {
 		}
 	})
 	return
+}
+
+func (l *LevelHash) Type() string {
+	if l.userForSet {
+		return SET_SUFFIX
+	} else {
+		return HASH_SUFFIX
+	}
 }
 
 func (l *LevelHash) Drop() (ok bool) {

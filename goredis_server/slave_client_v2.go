@@ -58,7 +58,8 @@ func (s *SlaveClientV2) Sync() (err error) {
 	uid := s.server.UID()
 	s.lastseq = s.masterSeq(s.session.RemoteAddr().String())
 	seq := s.lastseq + 1
-	synccmd := NewCommand(formatByteSlice("SYNC", uid, seq)...)
+	_, port := splitHostPort(s.server.opt.Bind())
+	synccmd := NewCommand(formatByteSlice("SYNC", uid, seq, "PORT", port)...)
 	slavelog.Printf("[M %s] %s\n", s.session.RemoteAddr(), synccmd)
 
 	if err = s.session.WriteCommand(synccmd); err != nil {
@@ -82,8 +83,8 @@ func (s *SlaveClientV2) Sync() (err error) {
 		case "SYNC_RAW_FIN":
 			slavelog.Printf("[M %s] recv bulk finish\n", s.session.RemoteAddr())
 		case "SYNC_SEQ_BEG":
-			s.Session().SetAttribute(S_STATUS, REPL_ONLINE)
 			slavelog.Printf("[M %s] sync online ...\n", s.session.RemoteAddr())
+			s.Session().SetAttribute(S_STATUS, REPL_ONLINE)
 			s.recvCommandSeq(cmd) // 进入后只有出错才退出
 			break
 		default:

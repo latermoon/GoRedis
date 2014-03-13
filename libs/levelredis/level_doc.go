@@ -15,6 +15,7 @@ func init() {
 }
 
 type LevelDoc struct {
+	LevelElem
 	redis *LevelRedis
 	key   string
 	mu    sync.RWMutex
@@ -78,6 +79,10 @@ func (l *LevelDoc) Get(fields ...string) (result map[string]interface{}) {
 
 	result = l.doc.Get(fields...)
 	return
+}
+
+func (l *LevelDoc) Type() string {
+	return DOC_SUFFIX
 }
 
 func (l *LevelDoc) Drop() (ok bool) {

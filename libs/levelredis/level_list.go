@@ -19,6 +19,7 @@ type Element struct {
 // 类似双向链表，右进左出，可以通过索引查找
 // 海量存储，占用内存小
 type LevelList struct {
+	LevelElem
 	redis    *LevelRedis
 	entryKey string
 	// 游标控制
@@ -275,6 +276,10 @@ func (l *LevelList) len() int64 {
 
 func (l *LevelList) Len() int64 {
 	return l.len()
+}
+
+func (l *LevelList) Type() string {
+	return LIST_SUFFIX
 }
 
 func (l *LevelList) Drop() (ok bool) {

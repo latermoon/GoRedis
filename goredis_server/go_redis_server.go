@@ -18,7 +18,7 @@ import (
 )
 
 // TODO 版本号，每次更新都需要升级一下
-const VERSION = "1.0.57"
+const VERSION = "1.0.58"
 const PREFIX = "__goredis:"
 
 var (
@@ -29,7 +29,6 @@ var (
 var (
 	slowexec = float64(30) // ms
 	slowlog  = stdlog.Log("slow")
-	errlog   = stdlog.Log("err")
 )
 
 // GoRedisServer
@@ -131,8 +130,7 @@ func (server *GoRedisServer) SessionClosed(session *Session, err error) {
 
 func (server *GoRedisServer) ExceptionCaught(err error) {
 	stdlog.Printf("exception %s\n", err)
-	errlog.Printf("exception %s\n", err)
-	errlog.Println(string(debug.Stack()))
+	stdlog.Println(string(debug.Stack()))
 }
 
 // ServerHandler.On()
@@ -149,7 +147,7 @@ func (server *GoRedisServer) On(session *Session, cmd *Command) (reply *Reply) {
 
 	// varify command
 	if err := cmdex.Verify(); err != nil {
-		errlog.Printf("[%s] bad command %s\n", session.RemoteAddr(), cmd)
+		stdlog.Printf("[%s] bad command %s\n", session.RemoteAddr(), cmd)
 		return ErrorReply(err)
 	}
 

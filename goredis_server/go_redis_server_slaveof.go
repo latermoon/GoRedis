@@ -2,6 +2,7 @@ package goredis_server
 
 import (
 	. "GoRedis/goredis"
+	"GoRedis/libs/stdlog"
 	"fmt"
 	"net"
 	"runtime/debug"
@@ -13,8 +14,8 @@ func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd *Command) (reply *R
 	// 保障不会奔溃
 	defer func() {
 		if v := recover(); v != nil {
-			errlog.Printf("[%s] slaveof panic %s\n", session.RemoteAddr(), cmd)
-			errlog.Println(string(debug.Stack()))
+			stdlog.Printf("[%s] slaveof panic %s\n", session.RemoteAddr(), cmd)
+			stdlog.Println(string(debug.Stack()))
 		}
 	}()
 	arg1, arg2 := cmd.StringAtIndex(1), cmd.StringAtIndex(2)

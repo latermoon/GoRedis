@@ -11,12 +11,9 @@ func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
 	return
 }
 
+// 官方redis的dbsize输出key数量，这里输出数据库大小
 func (server *GoRedisServer) OnDBSIZE(cmd *Command) (reply *Reply) {
-	return
-}
-
-func (server *GoRedisServer) OnRAMDOMKEY(cmd *Command) (reply *Reply) {
-	return
+	return StatusReply(bytesInHuman(server.info.db_size()))
 }
 
 // keyprev [seek] [count] [withtype] [withvalue]
@@ -84,7 +81,7 @@ func (server *GoRedisServer) keyEnumerate(cmd *Command, direction levelredis.Ite
 }
 
 // 找出下一个key
-func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnKEYSEARCH(cmd *Command) (reply *Reply) {
 	seekkey := []byte("")
 	if cmd.Len() > 1 {
 		seekkey = cmd.Args[1]
@@ -122,7 +119,7 @@ func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 }
 
 // 扫描内部key
-func (server *GoRedisServer) OnRAW_KEYS(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnRAW_KEYSEARCH(cmd *Command) (reply *Reply) {
 	seekkey := []byte("")
 	if cmd.Len() > 1 {
 		seekkey = cmd.Args[1]

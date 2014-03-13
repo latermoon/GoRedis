@@ -15,8 +15,14 @@ func (server *GoRedisServer) OnMONITOR(session *Session, cmd *Command) (reply *R
 		switch strings.ToUpper(cmd.StringAtIndex(1)) {
 		case "KEYS":
 			server.monitorKeys(session, cmd)
-			return
+		default:
+			reply = ErrorReply("bad monitor command")
+			go func() {
+				time.Sleep(time.Millisecond * 100)
+				session.Close()
+			}()
 		}
+		return
 	}
 
 	session.WriteReply(StatusReply("OK"))

@@ -11,21 +11,25 @@ import (
 )
 
 // 从库的同步请求，一旦进入OnSYNC，直到主从断开才会结束当前函数
-// SYNC [UID] [SEQ]
+// SYNC [UID] [SEQ] [SlavePort]
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
 	// 保障不会奔溃
 	defer func() {
 		if v := recover(); v != nil {
-			errlog.Printf("[%s] sync panic %s\n", session.RemoteAddr(), cmd)
-			errlog.Println(string(debug.Stack()))
+			stdlog.Printf("[%s] sync panic %s\n", session.RemoteAddr(), cmd)
+			stdlog.Println(string(debug.Stack()))
 		}
 	}()
 	var seq int64 = -1
-	if len(cmd.Args) >= 3 {
+	if cmd.Len() >= 3 {
 		var err error
 		seq, err = cmd.Int64AtIndex(2)
 		if err != nil {
 			return ErrorReply("bad [SEQ]")
+		}
+		// 如果从库提供了自己的端口，记录之
+		if cmd.Len() >= 5 && cmd.StringAtIndex(3) == "PORT" {
+			session.SetAttribute(S_SLAVE_PORT, cmd.StringAtIndex(4))
 		}
 	}
 	stdlog.Printf("[S %s] recv %s\n", session.RemoteAddr(), cmd)
@@ -62,6 +66,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 		}
 	}
 
+	stdlog.Println("sync online ...")
 	session.SetAttribute(S_STATUS, REPL_ONLINE)
 	// 发送日志数据
 	err := server.syncRunloop(session, nextseq)
@@ -74,11 +79,11 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 
 // nextseq，返回快照的下一条seq位置
 func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err error) {
-	server.Suspend()                                   //挂起全部操作
-	snap := server.levelRedis.DB().NewSnapshot()       // 挂起后建立快照
-	defer server.levelRedis.DB().ReleaseSnapshot(snap) //
-	lastseq := server.synclog.MaxSeq()                 // 获取当前日志序号
-	server.Resume()                                    // 唤醒，如果不调用Resume，整个服务器无法继续工作
+	server.Suspend()                     //挂起全部操作
+	snap := server.levelRedis.Snapshot() // 挂起后建立只读快照
+	defer snap.Close()                   // 必须释放
+	lastseq := server.synclog.MaxSeq()   // 获取当前日志序号
+	server.Resume()                      // 唤醒，如果不调用Resume，整个服务器无法继续工作
 
 	if err = session.WriteCommand(NewCommand([]byte("SYNC_RAW_BEG"))); err != nil {
 		return
@@ -106,7 +111,7 @@ func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err 
 	}()
 
 	// gogogo
-	server.levelRedis.SnapshotEnumerate(snap, []byte{}, []byte{levelredis.MAXBYTE}, func(i int, key, value []byte, quit *bool) {
+	snap.RangeEnumerate([]byte{}, []byte{levelredis.MAXBYTE}, levelredis.IterForward, func(i int, key, value []byte, quit *bool) {
 		if bytes.HasPrefix(key, []byte(PREFIX)) {
 			return
 		}
@@ -128,7 +133,6 @@ func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err 
 	if err = session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
 		return
 	}
-
 	nextseq = lastseq + 1
 	return nextseq, nil
 }
