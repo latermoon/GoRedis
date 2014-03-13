@@ -1,6 +1,10 @@
 GoRedis release notes
 =====================
 
+**GoRedis 1.0.57** @2014.3.13
+
+* [FIX] MSET的bug，线上业务需要更新
+
 **GoRedis 1.0.56** @2014.3.12
 
 * [Feature] 增加参数启动作为从库

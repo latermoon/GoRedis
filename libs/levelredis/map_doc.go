@@ -3,6 +3,7 @@ package levelredis
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -21,13 +22,16 @@ const (
 )
 
 // 提供面向document操作的map
-type MapDocument struct {
+// doc := New()
+// doc.Set(jsonObj)
+// doc.Get(fields)
+type MapDoc struct {
 	data map[string]interface{}
-	mu   sync.Mutex
+	mu   sync.RWMutex
 }
 
-func NewMapDocument(data map[string]interface{}) (m *MapDocument) {
-	m = &MapDocument{}
+func NewMapDoc(data map[string]interface{}) (m *MapDoc) {
+	m = &MapDoc{}
 	if m.data = data; m.data == nil {
 		m.data = make(map[string]interface{})
 	}
@@ -35,10 +39,20 @@ func NewMapDocument(data map[string]interface{}) (m *MapDocument) {
 }
 
 // doc_set(key, {"name":"latermoon", "$rpush":["photos", "c.jpg", "d.jpg"], "$incr":["version", 1]})
-func (m *MapDocument) RichSet(input map[string]interface{}) (err error) {
+func (m *MapDoc) Set(in map[string]interface{}) (err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for k, v := range input {
+
+	defer func() {
+		if v := recover(); v != nil {
+			if e, ok := v.(error); ok {
+				err = e
+			} else {
+				err = errors.New(fmt.Sprint(v))
+			}
+		}
+	}()
+	for k, v := range in {
 		if !strings.HasPrefix(k, "$") {
 			parent, key, _, _ := m.findElement(k, true)
 			parent[key] = v
@@ -58,7 +72,7 @@ func (m *MapDocument) RichSet(input map[string]interface{}) (err error) {
 				parent, key, _, _ := m.findElement(field, true)
 				m.doRpush(parent, key, value.([]interface{}))
 			}
-		case "inc":
+		case "incr":
 			argmap := v.(map[string]interface{})
 			for field, value := range argmap {
 				parent, key, _, _ := m.findElement(field, true)
@@ -79,40 +93,44 @@ func (m *MapDocument) RichSet(input map[string]interface{}) (err error) {
 }
 
 // doc_get(key, ["name", "setting.mute", "photos.$1"])
-func (m *MapDocument) RichGet(fields ...string) (result map[string]interface{}) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	result = make(map[string]interface{})
-	if len(fields) == 0 {
+func (m *MapDoc) Get(fields ...string) (out map[string]interface{}) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	out = make(map[string]interface{})
+	if len(fields) == 0 || (len(fields) == 1 && fields[0] == "") {
 		for k, v := range m.data {
-			result[k] = v
+			out[k] = v
 		}
 		return
 	}
 
 	for _, field := range fields {
-		dstparent := result
-		srcparent := m.data
+		dst := out
+		src := m.data
 		// 逐个字段扫描copy
 		pairs := strings.Split(field, dot)
-		for i := 0; i < len(pairs); i++ {
+		count := len(pairs)
+		for i := 0; i < count; i++ {
 			curkey := pairs[i]
-			// var ok bool
-			obj, ok := srcparent[curkey]
+			obj, ok := src[curkey]
 			if !ok {
-				continue
-			} else if reflect.TypeOf(srcparent[curkey]) != msitype {
-				// 基础类型
-				dstparent[curkey] = obj
+				break
+			}
+			if i > 0 && i == count-1 {
+				dst[curkey] = obj
 				continue
 			}
-			dstparent[curkey] = make(map[string]interface{})
-			srcparent = srcparent[curkey].(map[string]interface{})
-			dstparent = dstparent[curkey].(map[string]interface{})
-		}
-		key := pairs[len(pairs)-1]
-		if obj, ok := srcparent[key]; ok {
-			dstparent[key] = obj
+			if reflect.TypeOf(obj) != msitype {
+				// 基础类型
+				dst[curkey] = obj
+				continue
+			}
+			if dst[curkey] == nil {
+				dst[curkey] = make(map[string]interface{})
+			}
+			src = src[curkey].(map[string]interface{})
+			dst = dst[curkey].(map[string]interface{})
 		}
 	}
 	return
@@ -123,7 +141,7 @@ func (m *MapDocument) RichGet(fields ...string) (result map[string]interface{}) 
  * @param field 多级的field使用"."分隔
  * @return parent[key] == obj，其中 parent 目标元素父对象，必定是map[string]interface{}，key 目标元素key，obj，目标元素
  */
-func (m *MapDocument) findElement(field string, createIfMissing bool) (parent map[string]interface{}, key string, obj interface{}, exist bool) {
+func (m *MapDoc) findElement(field string, createIfMissing bool) (parent map[string]interface{}, key string, obj interface{}, exist bool) {
 	pairs := strings.Split(field, dot)
 	parent = m.data
 	for i := 0; i < len(pairs)-1; i++ {
@@ -147,7 +165,7 @@ func (m *MapDocument) findElement(field string, createIfMissing bool) (parent ma
 	return
 }
 
-func (m *MapDocument) doRpush(parent map[string]interface{}, key string, elems []interface{}) (err error) {
+func (m *MapDoc) doRpush(parent map[string]interface{}, key string, elems []interface{}) (err error) {
 	obj := parent[key]
 	if obj != nil {
 		for i := 0; i < len(elems); i++ {
@@ -159,7 +177,7 @@ func (m *MapDocument) doRpush(parent map[string]interface{}, key string, elems [
 	return
 }
 
-func (m *MapDocument) doIncr(parent map[string]interface{}, key string, value interface{}) (err error) {
+func (m *MapDoc) doIncr(parent map[string]interface{}, key string, value interface{}) (err error) {
 	obj := parent[key]
 	if obj == nil {
 		parent[key] = value
@@ -186,11 +204,11 @@ func toInt(obj interface{}) (n int, err error) {
 	return
 }
 
-func (m *MapDocument) String() string {
+func (m *MapDoc) String() string {
 	b, _ := json.Marshal(m.data)
 	return string(b)
 }
 
-func (m *MapDocument) Map() map[string]interface{} {
+func (m *MapDoc) Map() map[string]interface{} {
 	return m.data
 }

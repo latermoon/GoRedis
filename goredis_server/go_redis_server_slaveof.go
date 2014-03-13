@@ -4,11 +4,19 @@ import (
 	. "GoRedis/goredis"
 	"fmt"
 	"net"
+	"runtime/debug"
 	"strings"
 )
 
 // 从主库获取数据
 func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd *Command) (reply *Reply) {
+	// 保障不会奔溃
+	defer func() {
+		if v := recover(); v != nil {
+			errlog.Printf("[%s] slaveof panic %s\n", session.RemoteAddr(), cmd)
+			errlog.Println(string(debug.Stack()))
+		}
+	}()
 	arg1, arg2 := cmd.StringAtIndex(1), cmd.StringAtIndex(2)
 	// SLAVEOF NO ONE
 	if strings.ToUpper(arg1) == "NO" && strings.ToUpper(arg2) == "ONE" {

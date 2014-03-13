@@ -5,6 +5,7 @@ import (
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
 	"bytes"
+	"runtime/debug"
 	"strconv"
 	"time"
 )
@@ -12,6 +13,13 @@ import (
 // 从库的同步请求，一旦进入OnSYNC，直到主从断开才会结束当前函数
 // SYNC [UID] [SEQ]
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
+	// 保障不会奔溃
+	defer func() {
+		if v := recover(); v != nil {
+			errlog.Printf("[%s] sync panic %s\n", session.RemoteAddr(), cmd)
+			errlog.Println(string(debug.Stack()))
+		}
+	}()
 	var seq int64 = -1
 	if len(cmd.Args) >= 3 {
 		var err error

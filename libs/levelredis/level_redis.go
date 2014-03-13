@@ -264,11 +264,11 @@ func (l *LevelRedis) GetSortedSet(key string) (z *LevelZSet) {
 	return obj.(*LevelZSet)
 }
 
-func (l *LevelRedis) GetDoc(key string) (d *LevelDocument) {
+func (l *LevelRedis) GetDoc(key string) (d *LevelDoc) {
 	obj := l.objFromCache(key, func() interface{} {
-		return NewLevelDocument(l, key)
+		return NewLevelDoc(l, key)
 	})
-	return obj.(*LevelDocument)
+	return obj.(*LevelDoc)
 }
 
 func (l *LevelRedis) TypeOf(key []byte) (t string) {

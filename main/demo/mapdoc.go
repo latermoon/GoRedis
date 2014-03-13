@@ -14,7 +14,6 @@ var (
 	BadArgumentCount = errors.New("bad argument count")
 	BadArgumentType  = errors.New("bad argument type")
 	msitype          = reflect.TypeOf(make(map[string]interface{}))
-	miitype          = reflect.TypeOf(make(map[interface{}]interface{}))
 )
 
 const (
@@ -25,18 +24,22 @@ func main() {
 	doc := NewMapDocument(nil)
 
 	in := map[string]interface{}{"name": "latermoon"}
-	doc.Set(in)
+	err := doc.Set(in)
 
-	in = map[string]interface{}{"tianya": map[string]interface{}{"u": "latermoon", "p": "1234", "more": map[string]interface{}{"a": 1, "b": 2, "c": 3}, "arr": []int{1, 2, 3}}}
-	doc.Set(in)
-	fmt.Println(doc)
+	in = map[string]interface{}{"tianya": map[string]interface{}{"u": "latermoon",
+		"p":    "1234",
+		"more": map[string]interface{}{"a": 1, "b": 2, "c": 3},
+		"arr":  []interface{}{1, 2, 3}}}
+	err = doc.Set(in)
+	fmt.Println(doc, err)
 
-	in = map[string]interface{}{"tianya.more.a": 4, "$del": "tianya.arr"}
-	doc.Set(in)
-	fmt.Println(doc)
+	in = map[string]interface{}{"tianya.more.a": 4, "$del": []interface{}{"tianya.arr"}}
+	err = doc.Set(in)
+	fmt.Println(doc, err)
 
-	fmt.Println()
-	fmt.Println(doc.Get("tianya.tianya", "tianya.u"))
+	in = map[string]interface{}{"$rpush": map[string]interface{}{"tianya.more": []interface{}{100}}}
+	err = doc.Set(in)
+	fmt.Println(doc, err)
 }
 
 // 提供面向document操作的map
@@ -57,10 +60,20 @@ func NewMapDocument(data map[string]interface{}) (m *MapDocument) {
 }
 
 // doc_set(key, {"name":"latermoon", "$rpush":["photos", "c.jpg", "d.jpg"], "$incr":["version", 1]})
-func (m *MapDocument) Set(input map[string]interface{}) (err error) {
+func (m *MapDocument) Set(in map[string]interface{}) (err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for k, v := range input {
+
+	defer func() {
+		if v := recover(); v != nil {
+			if e, ok := v.(error); ok {
+				err = e
+			} else {
+				err = errors.New(fmt.Sprint(v))
+			}
+		}
+	}()
+	for k, v := range in {
 		if !strings.HasPrefix(k, "$") {
 			parent, key, _, _ := m.findElement(k, true)
 			parent[key] = v
@@ -101,20 +114,20 @@ func (m *MapDocument) Set(input map[string]interface{}) (err error) {
 }
 
 // doc_get(key, ["name", "setting.mute", "photos.$1"])
-func (m *MapDocument) Get(fields ...string) (result map[string]interface{}) {
+func (m *MapDocument) Get(fields ...string) (out map[string]interface{}) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	result = make(map[string]interface{})
+	out = make(map[string]interface{})
 	if len(fields) == 0 || (len(fields) == 1 && fields[0] == "") {
 		for k, v := range m.data {
-			result[k] = v
+			out[k] = v
 		}
 		return
 	}
 
 	for _, field := range fields {
-		dst := result
+		dst := out
 		src := m.data
 		// 逐个字段扫描copy
 		pairs := strings.Split(field, dot)
