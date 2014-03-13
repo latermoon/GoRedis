@@ -101,11 +101,14 @@ func (s *SlaveClient) Sync() (err error) {
 		}
 	}
 	// 跳出循环必定有错误
-	s.Destory()
+	s.Close()
 	return
 }
 
 func (s *SlaveClient) Close() {
+	s.broken = true
+	s.synclog.Close()
+	s.session.Close()
 	return
 }
 
@@ -116,10 +119,8 @@ func (s *SlaveClient) recvCmd() {
 		}
 		cmd, ok := <-s.buffer
 		if !ok {
-			s.Destory()
 			break
 		}
-		// slavelog.Printf("[M %s] cmd: %s\n", s.RemoteAddr(), cmd)
 		s.counters.Get("proc").Incr(1)
 		s.server.On(s.session, cmd)
 	}
@@ -163,17 +164,6 @@ func (s *SlaveClient) recvRdb() (err error) {
 	return
 }
 
-func (s *SlaveClient) Broken() bool {
-	return s.broken
-}
-
-// 清空本地的同步状态
-func (s *SlaveClient) Destory() (err error) {
-	s.broken = true
-	s.synclog.Close()
-	return
-}
-
 func (s *SlaveClient) rdbFileWriter() (w *bufio.Writer, err error) {
 	var file *os.File
 	file, err = os.OpenFile(fmt.Sprintf("/tmp/%s.rdb", s.session.RemoteAddr()), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
@@ -193,7 +183,7 @@ func (s *SlaveClient) RdbRecvFinishCallback(r *bufio.Reader) {
 	if err != nil {
 		// must cancel
 		slavelog.Printf("[M %s] decode error %s\n", s.session.RemoteAddr(), err)
-		s.Destory()
+		s.Close()
 	}
 	return
 }
