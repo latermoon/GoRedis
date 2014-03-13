@@ -36,9 +36,15 @@ func NewSyncLog(db *levelredis.LevelRedis, prefix string) (s *SyncLog) {
 
 func (s *SyncLog) cleanRunloop() {
 	for {
+		if s.closed {
+			break
+		}
 		if s.seq-s.minseq > s.maxlen {
 			delseq := s.seq - s.maxlen
 			for i := s.minseq; i < delseq; i++ {
+				if s.closed {
+					break
+				}
 				s.db.RawDel(s.seqkey(i))
 				s.minseq = i + 1
 			}
