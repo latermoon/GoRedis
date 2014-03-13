@@ -2,7 +2,9 @@ package goredis_server
 
 import (
 	. "GoRedis/goredis"
+	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
+	"bytes"
 	"strings"
 	"time"
 )
@@ -15,8 +17,19 @@ func (server *GoRedisServer) OnMONITOR(session *Session, cmd *Command) (reply *R
 		switch strings.ToUpper(cmd.StringAtIndex(1)) {
 		case "KEYS":
 			server.monitorKeys(session, cmd)
-			return
+		case "AOF":
+			err := server.monitorAOF(session, cmd)
+			if err != nil {
+				stdlog.Println("monitor aof error ", err)
+			}
+		default:
+			reply = ErrorReply("bad monitor command")
+			go func() {
+				time.Sleep(time.Millisecond * 100)
+				session.Close()
+			}()
 		}
+		return
 	}
 
 	session.WriteReply(StatusReply("OK"))
@@ -33,6 +46,69 @@ func (server *GoRedisServer) OnMONITOR(session *Session, cmd *Command) (reply *R
 		stdlog.Printf("[%s] monitor exit\n", remoteHost)
 	}()
 
+	return
+}
+
+func (server *GoRedisServer) monitorAOF(session *Session, cmd *Command) (err error) {
+	defer session.Close()
+
+	if !server.synclog.IsEnabled() {
+		stdlog.Println("synclog enable")
+		server.synclog.Enable()
+	}
+
+	server.Suspend()                     //挂起全部操作
+	snap := server.levelRedis.Snapshot() // 挂起后建立快照
+	defer snap.Close()                   // 必须释放
+	lastseq := server.synclog.MaxSeq()   // 获取当前日志序号
+	server.Resume()
+
+	sendcount := 0
+	broken := false
+	prefix := []byte("")
+	server.levelRedis.KeyEnumerate(prefix, levelredis.IterForward, func(i int, key, keytype, value []byte, quit *bool) {
+		err = session.WriteReply(StatusReply(string(key) + "" + string(keytype)))
+		if err != nil {
+			broken = true
+			*quit = true
+		}
+		sendcount++
+	})
+
+	if broken {
+		return
+	}
+
+	seq := lastseq
+	deplymsec := 10
+	for {
+		var val []byte
+		val, err = server.synclog.Read(seq)
+		if err != nil {
+			break
+		}
+		if val == nil {
+			time.Sleep(time.Millisecond * time.Duration(deplymsec))
+			if deplymsec >= 10000 {
+				// 防死尸
+				if err = session.WriteReply(StatusReply("PING")); err != nil {
+					break
+				}
+			} else {
+				deplymsec += 10
+			}
+			continue
+		} else {
+			deplymsec = 10
+		}
+
+		c, _ := ParseCommand(bytes.NewBuffer(val))
+		err = session.WriteReply(StatusReply(c.String()))
+		if err != nil {
+			break
+		}
+		seq++
+	}
 	return
 }
 

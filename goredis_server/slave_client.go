@@ -74,12 +74,18 @@ func (s *SlaveClient) rdbfilename() string {
 // 开始同步
 func (s *SlaveClient) Sync() (err error) {
 
-	s.session.WriteCommand(NewCommand([]byte("SYNC")))
+	err = s.session.WriteCommand(NewCommand([]byte("SYNC")))
+	if err != nil {
+		return
+	}
 
 	rdbsaved := false
 	for {
 		var c byte
 		c, err = s.session.PeekByte()
+		if err != nil {
+			break
+		}
 		if !rdbsaved && c == '$' {
 			s.session.SetAttribute(S_STATUS, REPL_RECV_BULK)
 			err = s.recvRdb()
@@ -89,7 +95,10 @@ func (s *SlaveClient) Sync() (err error) {
 			}
 			rdbsaved = true
 		} else if c == '\n' {
-			s.session.ReadByte()
+			_, err = s.session.ReadByte()
+			if err != nil {
+				break
+			}
 			s.IdleCallback()
 		} else {
 			var cmd *Command

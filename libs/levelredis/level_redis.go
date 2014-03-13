@@ -4,6 +4,7 @@ import (
 	"GoRedis/libs/gorocks"
 	lru "GoRedis/libs/lrucache"
 	"bytes"
+	"errors"
 	"math"
 	"sync"
 )
@@ -104,23 +105,38 @@ type LevelRedis struct {
 	// stats
 	muCount  sync.Mutex
 	counters map[string]int64
+	snap     *gorocks.Snapshot
 }
 
-func NewLevelRedis(db *gorocks.DB) (l *LevelRedis) {
+// snapshot，快照模式
+func NewLevelRedis(db *gorocks.DB, snapshot bool) (l *LevelRedis) {
 	l = &LevelRedis{}
-	l.counters = map[string]int64{"get": 0, "set": 0, "batch": 0, "del": 0, "enum": 0, "lru_hit": 0, "lru_miss": 0}
 	l.db = db
 	l.ro = gorocks.NewReadOptions()
-	l.wo = gorocks.NewWriteOptions()
+	if snapshot {
+		l.snap = l.db.NewSnapshot() //必须调用Close()释放snap
+		l.ro.SetSnapshot(l.snap)
+		l.ro.SetFillCache(false)
+		l.wo = nil // snapshot模式下禁止写入数据
+	} else {
+		l.wo = gorocks.NewWriteOptions()
+	}
+	l.counters = map[string]int64{"get": 0, "set": 0, "batch": 0, "del": 0, "enum": 0, "lru_hit": 0, "lru_miss": 0}
 	l.lstring = NewLevelString(l)
 	l.g = newGlobal(l)
 	l.lruCache = lru.NewLRUCache(lruCacheSize)
 	l.mus = make([]sync.Mutex, objCacheCreateThread)
 	// 初始化最大的key，对于Enumerate从后面开始扫描key非常重要
 	// 使iter.Seek(key)必定Valid=true
-	maxkey := []byte{MAXBYTE}
-	l.RawSet(maxkey, nil)
+	if !snapshot {
+		maxkey := []byte{MAXBYTE}
+		l.RawSet(maxkey, nil)
+	}
 	return
+}
+
+func (l *LevelRedis) Snapshot() *LevelRedis {
+	return NewLevelRedis(l.db, true)
 }
 
 func (l *LevelRedis) DB() (db *gorocks.DB) {
@@ -130,7 +146,13 @@ func (l *LevelRedis) DB() (db *gorocks.DB) {
 func (l *LevelRedis) Close() {
 	l.ro.Close()
 	l.wo.Close()
-	l.db.Close()
+	// 处于snap模式的话，db不属于自己，只关闭其他变量
+	if l.snap != nil {
+		l.db.ReleaseSnapshot(l.snap)
+		l.snap = nil
+	} else {
+		l.db.Close()
+	}
 }
 
 func NewOptions() *gorocks.Options {
@@ -139,10 +161,6 @@ func NewOptions() *gorocks.Options {
 
 func NewDefaultEnv() *gorocks.Env {
 	return gorocks.NewDefaultEnv()
-}
-
-func NewWriteBatch() *gorocks.WriteBatch {
-	return gorocks.NewWriteBatch()
 }
 
 func NewLRUCache(capacity int) *gorocks.Cache {
@@ -203,16 +221,25 @@ func (l *LevelRedis) RawGet(key []byte) (value []byte, err error) {
 }
 
 func (l *LevelRedis) RawSet(key []byte, value []byte) error {
+	if l.snap != nil {
+		return errors.New("RawSet not allowed")
+	}
 	l.incrCounter("set")
 	return l.db.Put(l.wo, key, value)
 }
 
 func (l *LevelRedis) RawDel(key []byte) error {
+	if l.snap != nil {
+		return errors.New("RawDel not allowed")
+	}
 	l.incrCounter("del")
 	return l.db.Delete(l.wo, key)
 }
 
 func (l *LevelRedis) WriteBatch(w *gorocks.WriteBatch) error {
+	if l.snap != nil {
+		return errors.New("WriteBatch not allowed")
+	}
 	l.incrCounter("batch")
 	return l.db.Write(l.wo, w)
 }
@@ -353,15 +380,24 @@ func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IterDirection, fn 
 // key顺序扫描，常用于数据导出、附近搜索
 // 返回的key是面向用户的key，而非内部结构的raw_key
 func (l *LevelRedis) KeyEnumerate(seek []byte, direction IterDirection, fn func(i int, key, keytype, value []byte, quit *bool)) {
-	ro := gorocks.NewReadOptions()
-	ro.SetFillCache(false)
-	defer ro.Close()
-
-	iter := l.db.NewIterator(ro)
+	var iter *gorocks.Iterator
+	if l.snap != nil {
+		iter = l.db.NewIterator(l.ro)
+	} else {
+		ro := gorocks.NewReadOptions()
+		ro.SetFillCache(false)
+		defer ro.Close()
+		iter = l.db.NewIterator(ro)
+	}
 	defer iter.Close()
+
 	minkey := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(seek))
 	maxkey := []byte{MAXBYTE}
 	l.Enumerate(iter, minkey, maxkey, direction, func(i int, key, value []byte, quit *bool) {
+		if !bytes.HasPrefix(key, minkey) {
+			*quit = true
+			return
+		}
 		left := bytes.Index(key, []byte(SEP_LEFT))
 		right := bytes.LastIndex(key, []byte(SEP_RIGHT))
 		if left == -1 || right == -1 {
@@ -372,70 +408,22 @@ func (l *LevelRedis) KeyEnumerate(seek []byte, direction IterDirection, fn func(
 }
 
 func (l *LevelRedis) RangeEnumerate(min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
-	ro := gorocks.NewReadOptions()
-	ro.SetFillCache(false)
-	defer ro.Close()
-
-	iter := l.db.NewIterator(ro)
+	var iter *gorocks.Iterator
+	if l.snap != nil {
+		iter = l.db.NewIterator(l.ro)
+	} else {
+		ro := gorocks.NewReadOptions()
+		ro.SetFillCache(false)
+		defer ro.Close()
+		iter = l.db.NewIterator(ro)
+	}
 	defer iter.Close()
 	l.Enumerate(iter, min, max, direction, fn)
-}
-
-// 快照枚举
-func (l *LevelRedis) SnapshotEnumerate(snap *gorocks.Snapshot, min, max []byte, fn func(i int, key, value []byte, quit *bool)) {
-	l.incrCounter("enum")
-
-	ro := gorocks.NewReadOptions()
-	ro.SetFillCache(false)
-	ro.SetSnapshot(snap)
-	defer ro.Close()
-
-	iter := l.db.NewIterator(ro)
-	defer iter.Close()
-
-	found := false
-	if len(min) == 0 {
-		iter.SeekToFirst()
-	} else {
-		iter.Seek(min)
-	}
-	found = iter.Valid()
-	if !found {
-		return
-	}
-
-	i := -1
-	// 范围判断
-	if found && between(iter.Key(), min, max) {
-		i++
-		quit := false
-		fn(i, iter.Key(), iter.Value(), &quit)
-		if quit {
-			return
-		}
-	}
-	for {
-		iter.Next()
-		found = iter.Valid()
-		if found && between(iter.Key(), min, max) {
-			i++
-			quit := false
-			fn(i, iter.Key(), iter.Value(), &quit)
-			if quit {
-				return
-			}
-		} else {
-			break
-		}
-	}
-
-	return
 }
 
 // 范围扫描
 func (l *LevelRedis) Enumerate(iter *gorocks.Iterator, min, max []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
 	l.incrCounter("enum")
-
 	found := false
 	if direction == IterBackward {
 		if len(max) == 0 {

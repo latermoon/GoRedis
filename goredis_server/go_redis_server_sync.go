@@ -74,11 +74,11 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 
 // nextseq，返回快照的下一条seq位置
 func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err error) {
-	server.Suspend()                                   //挂起全部操作
-	snap := server.levelRedis.DB().NewSnapshot()       // 挂起后建立快照
-	defer server.levelRedis.DB().ReleaseSnapshot(snap) //
-	lastseq := server.synclog.MaxSeq()                 // 获取当前日志序号
-	server.Resume()                                    // 唤醒，如果不调用Resume，整个服务器无法继续工作
+	server.Suspend()                     //挂起全部操作
+	snap := server.levelRedis.Snapshot() // 挂起后建立只读快照
+	defer snap.Close()                   // 必须释放
+	lastseq := server.synclog.MaxSeq()   // 获取当前日志序号
+	server.Resume()                      // 唤醒，如果不调用Resume，整个服务器无法继续工作
 
 	if err = session.WriteCommand(NewCommand([]byte("SYNC_RAW_BEG"))); err != nil {
 		return
@@ -106,7 +106,7 @@ func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err 
 	}()
 
 	// gogogo
-	server.levelRedis.SnapshotEnumerate(snap, []byte{}, []byte{levelredis.MAXBYTE}, func(i int, key, value []byte, quit *bool) {
+	snap.RangeEnumerate([]byte{}, []byte{levelredis.MAXBYTE}, levelredis.IterForward, func(i int, key, value []byte, quit *bool) {
 		if bytes.HasPrefix(key, []byte(PREFIX)) {
 			return
 		}

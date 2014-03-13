@@ -91,7 +91,7 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 	if e1 != nil {
 		return e1
 	}
-	server.levelRedis = levelredis.NewLevelRedis(db)
+	server.levelRedis = levelredis.NewLevelRedis(db, false)
 	return
 }
 
@@ -113,7 +113,7 @@ func (server *GoRedisServer) initSyncLog() error {
 	if e1 != nil {
 		return e1
 	}
-	ldb := levelredis.NewLevelRedis(db)
+	ldb := levelredis.NewLevelRedis(db, false)
 	server.synclog = NewSyncLog(ldb, "sync")
 	return nil
 }
