@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -27,6 +28,36 @@ func ParseInt64(b []byte) (i int64, err error) {
 
 func openfile(filename string) (*os.File, error) {
 	return os.OpenFile(filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
+}
+
+func directoryTotalSize(root string) (size int64) {
+	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if info == nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+	return
+}
+
+func bytesInHuman(size int64) string {
+	f := float64(size)
+	if f > 1024*1024*1024*1024 {
+		return fmt.Sprintf("%0.2fT", f/1024/1024/1024/1024)
+	}
+	if f > 1024*1024*1024 {
+		return fmt.Sprintf("%0.2fG", f/1024/1024/1024)
+	}
+	if f > 1024*1024 {
+		return fmt.Sprintf("%0.2fM", f/1024/1024)
+	}
+	if f > 1024 {
+		return fmt.Sprintf("%0.2fK", f/1024)
+	}
+	return fmt.Sprintf("%dB", size)
 }
 
 // 将各种对象，转换为字符串形式，再转为[]byte数组
