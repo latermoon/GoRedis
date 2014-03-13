@@ -3,7 +3,7 @@ GoRedis release notes
 
 **GoRedis 1.0.57** @2014.3.13
 
-* [FIX] MSET的bug，线上业务需要更新
+* [FIX] MSET的bug，用到该指令的实例需要升级
 
 **GoRedis 1.0.56** @2014.3.12
 
