@@ -69,6 +69,13 @@ func formatByteSlice(v ...interface{}) (buf [][]byte) {
 	return
 }
 
+func splitHostPort(addr string) (host string, port int) {
+	tmp := strings.Split(addr, ":")
+	host = tmp[0]
+	port, _ = strconv.Atoi(tmp[1])
+	return
+}
+
 func redisInfo(session *Session) (isgoredis bool, version string, err error) {
 	cmdinfo := NewCommand([]byte("info"), []byte("server"))
 	session.WriteCommand(cmdinfo)

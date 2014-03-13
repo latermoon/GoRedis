@@ -11,7 +11,7 @@ import (
 )
 
 // 从库的同步请求，一旦进入OnSYNC，直到主从断开才会结束当前函数
-// SYNC [UID] [SEQ]
+// SYNC [UID] [SEQ] [SlavePort]
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
 	// 保障不会奔溃
 	defer func() {
@@ -21,11 +21,15 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 		}
 	}()
 	var seq int64 = -1
-	if len(cmd.Args) >= 3 {
+	if cmd.Len() >= 3 {
 		var err error
 		seq, err = cmd.Int64AtIndex(2)
 		if err != nil {
 			return ErrorReply("bad [SEQ]")
+		}
+		// 如果从库提供了自己的端口，记录之
+		if cmd.Len() >= 5 && cmd.StringAtIndex(3) == "PORT" {
+			session.SetAttribute(S_SLAVE_PORT, cmd.StringAtIndex(4))
 		}
 	}
 	stdlog.Printf("[S %s] recv %s\n", session.RemoteAddr(), cmd)

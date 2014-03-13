@@ -8,10 +8,9 @@ import (
 	"strings"
 )
 
-func (server *GoRedisServer) OnGC(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnGC(session *Session, cmd *Command) (reply *Reply) {
 	runtime.GC()
-	reply = StatusReply("OK")
-	return
+	return StatusReply("OK")
 }
 
 // http://1234n.com/?post/wgskfs
@@ -36,7 +35,7 @@ func (server *GoRedisServer) OnPPROF(cmd *Command) (reply *Reply) {
 	return
 }
 
-// leveldb_prop "leveldb.stats"
+// leveldb_prop "rocksdb.stats"
 func (server *GoRedisServer) OnLEVELDB_PROP(cmd *Command) (reply *Reply) {
 	prop := cmd.StringAtIndex(1)
 	v := server.levelRedis.DB().PropertyValue(prop)
@@ -51,21 +50,3 @@ func (server *GoRedisServer) OnLEVELDB_PROP(cmd *Command) (reply *Reply) {
 	reply = MultiBulksReply(bulks)
 	return
 }
-
-// // 存放id
-// func (server *GoRedisServer) slaveIdMap() (m map[string]interface{}) {
-// 	m = server.config.GetMap("slaveids")
-// 	if m == nil {
-// 		m = make(map[string]interface{})
-// 	}
-// 	return
-// }
-
-// // 发送snapshot完成后的回调
-// func (server *GoRedisServer) snapshotSentCallback(session *SlaveSession) {
-// 	m := server.slaveIdMap()
-// 	if session.AofEnabled() {
-// 		m[session.UID()] = ""
-// 	}
-// 	server.config.SetMap("slaveids", m)
-// }

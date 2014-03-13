@@ -58,7 +58,8 @@ func (s *SlaveClientV2) Sync() (err error) {
 	uid := s.server.UID()
 	s.lastseq = s.masterSeq(s.session.RemoteAddr().String())
 	seq := s.lastseq + 1
-	synccmd := NewCommand(formatByteSlice("SYNC", uid, seq)...)
+	_, port := splitHostPort(s.server.opt.Bind())
+	synccmd := NewCommand(formatByteSlice("SYNC", uid, seq, "PORT", port)...)
 	slavelog.Printf("[M %s] %s\n", s.session.RemoteAddr(), synccmd)
 
 	if err = s.session.WriteCommand(synccmd); err != nil {
