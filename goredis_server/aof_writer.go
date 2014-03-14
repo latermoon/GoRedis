@@ -29,6 +29,12 @@ func (a *AOFWriter) Write(p []byte) (n int, err error) {
 	return a.fd.Write(p)
 }
 
+func (a *AOFWriter) Flush() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.fd.Flush()
+}
+
 func (a *AOFWriter) AppendString(key, value []byte) {
 	cmd := NewCommand([]byte("SET"), key, value)
 	a.Write(cmd.Bytes())

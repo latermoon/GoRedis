@@ -1,6 +1,10 @@
 GoRedis release notes
 =====================
 
+**GoRedis 1.0.61** @2014.3.14
+
+* [Feature] 实现AOF
+
 **GoRedis 1.0.60** @2014.3.14
 
 * [FIX] db.Close时延时不破坏synclog操作
