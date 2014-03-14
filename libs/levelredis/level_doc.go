@@ -31,6 +31,10 @@ func NewLevelDoc(redis *LevelRedis, key string) (l *LevelDoc) {
 	return
 }
 
+func (l *LevelDoc) Key() string {
+	return l.key
+}
+
 func (l *LevelDoc) Size() int {
 	return 1
 }

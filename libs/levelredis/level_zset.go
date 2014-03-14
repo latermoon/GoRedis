@@ -15,7 +15,7 @@ type LevelZSet struct {
 	LevelElem
 	redis      *LevelRedis
 	key        string
-	mu         sync.Mutex
+	mu         sync.RWMutex
 	totalCount int
 }
 
@@ -26,6 +26,10 @@ func NewLevelZSet(redis *LevelRedis, key string) (l *LevelZSet) {
 	l.totalCount = -1
 	l.initOnce()
 	return
+}
+
+func (l *LevelZSet) Key() string {
+	return l.key
 }
 
 func (l *LevelZSet) Size() int {
@@ -122,8 +126,8 @@ func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 }
 
 func (l *LevelZSet) Score(member []byte) (score []byte) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	return l.score(member)
 }
 
@@ -163,8 +167,8 @@ func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 
 // 返回-1表示member不存在
 func (l *LevelZSet) Rank(high2low bool, member []byte) (idx int) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	// 对于不存在的key，先检查一次，减少扫描成本
 	if l.score(member) == nil {
 		return -1
@@ -193,15 +197,14 @@ func (l *LevelZSet) Rank(high2low bool, member []byte) (idx int) {
 }
 
 func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [][]byte) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	direction := IterForward
 	if high2low {
 		direction = IterBackward
 	}
 	scoreMembers = make([][]byte, 0, 2)
 	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), direction, func(i int, key, value []byte, quit *bool) {
-		// fmt.Println(i, string(key))
 		if i < start {
 			return
 		} else if i >= start && (stop == -1 || i <= stop) {
@@ -215,9 +218,18 @@ func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [
 	return
 }
 
+func (l *LevelZSet) Enumerate(fn func(i int, member, score []byte, quit *bool)) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
+		score, member := l.splitScoreKey(key)
+		fn(i, member, score, quit)
+	})
+}
+
 func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count int) (scoreMembers [][]byte) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	direction := IterForward
 	if high2low {
 		direction = IterBackward

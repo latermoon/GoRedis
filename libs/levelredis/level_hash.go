@@ -17,7 +17,7 @@ type LevelHash struct {
 	redis *LevelRedis
 	// key
 	entryKey string
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	// for SET
 	userForSet bool
 }
@@ -38,6 +38,10 @@ func NewLevelHash(redis *LevelRedis, entryKey string) (l *LevelHash) {
 	l.entryKey = entryKey
 	l.userForSet = false
 	return
+}
+
+func (l *LevelHash) Key() string {
+	return l.entryKey
 }
 
 func (l *LevelHash) Size() int {
@@ -75,8 +79,8 @@ func (l *LevelHash) fieldInKey(fieldkey []byte) (field []byte) {
 }
 
 func (l *LevelHash) Get(field []byte) (val []byte) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	return l.get(field)
 }
 
@@ -105,8 +109,8 @@ func (l *LevelHash) Set(fieldVals ...[]byte) (n int) {
 }
 
 func (l *LevelHash) GetAll(limit int) (elems []*HashElem) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 
 	elems = make([]*HashElem, 0, 10)
 	l.redis.PrefixEnumerate(l.fieldPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
@@ -120,6 +124,14 @@ func (l *LevelHash) GetAll(limit int) (elems []*HashElem) {
 		elems = append(elems, elem)
 	})
 	return
+}
+
+func (l *LevelHash) Enumerate(fn func(i int, key, value []byte, quit *bool)) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	l.redis.PrefixEnumerate(l.fieldPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
+		fn(i, l.fieldKey(key), value, quit)
+	})
 }
 
 func (l *LevelHash) Exist(field []byte) (exist bool) {

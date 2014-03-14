@@ -25,7 +25,7 @@ type LevelList struct {
 	// 游标控制
 	start int64
 	end   int64
-	mu    sync.Mutex
+	mu    sync.RWMutex
 }
 
 func NewLevelList(redis *LevelRedis, entryKey string) (l *LevelList) {
@@ -52,6 +52,10 @@ func (l *LevelList) initCount() {
 	if !(l.end == -1 && l.start == 0) && l.end < l.start {
 		panic("bad list: " + l.entryKey)
 	}
+}
+
+func (l *LevelList) Key() string {
+	return l.entryKey
 }
 
 func (l *LevelList) Size() int {
@@ -252,8 +256,8 @@ func (l *LevelList) Range(start, end int64) (e []*Element) {
 }
 
 func (l *LevelList) Index(i int64) (e *Element, err error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 
 	if i < 0 || i >= l.len() {
 		return nil, nil
@@ -265,6 +269,14 @@ func (l *LevelList) Index(i int64) (e *Element, err error) {
 		return
 	}
 	return
+}
+
+func (l *LevelList) Enumerate(fn func(i int, value []byte, quit *bool)) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	l.redis.PrefixEnumerate(l.keyPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
+		fn(i, value, quit)
+	})
 }
 
 func (l *LevelList) len() int64 {

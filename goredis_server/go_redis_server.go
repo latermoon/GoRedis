@@ -18,7 +18,7 @@ import (
 )
 
 // TODO 版本号，每次更新都需要升级一下
-const VERSION = "1.0.59"
+const VERSION = "1.0.61"
 const PREFIX = "__goredis:"
 
 var (
@@ -51,10 +51,11 @@ type GoRedisServer struct {
 	cmdMonitor    *stat.Writer
 	leveldbStatus *stat.Writer
 	// 从库
-	uid      string          // 实例id
-	syncmgr  *SessionManager // as master
-	slavemgr *SessionManager // as slave
-	synclog  *SyncLog
+	uid       string          // 实例id
+	syncmgr   *SessionManager // as master
+	slavemgr  *SessionManager // as slave
+	synclog   *SyncLog
+	aofwriter *AOFWriter
 	// monitor
 	sessmgr *SessionManager // all sessions
 	monmgr  *SessionManager
