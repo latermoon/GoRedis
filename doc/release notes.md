@@ -1,6 +1,11 @@
 GoRedis release notes
 =====================
 
+**GoRedis 1.0.59** @2014.3.14
+
+* [FIX] db.Close时延时不破坏synclog操作
+* [FIX] 修正Delete重构引入的bug
+
 **GoRedis 1.0.58** @2014.3.13
 
 * [Feature] 修正代码细节，正确显示主从端口
