@@ -66,6 +66,7 @@ func (server *GoRedisServer) initSignalNotify() {
 		time.Sleep(time.Millisecond * 1000) // 休息一下，Suspend瞬间可能还有数据库写入
 		server.levelRedis.Close()
 		server.synclog.Close()
+		time.Sleep(time.Millisecond * 1000) // 休息一下，Close瞬间可能还有数据写入
 		stdlog.Println("db closed, bye")
 		os.Exit(0)
 	}()

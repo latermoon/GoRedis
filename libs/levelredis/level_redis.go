@@ -337,14 +337,19 @@ func (l *LevelRedis) Delete(keys ...[]byte) (n int) {
 
 		if t == "string" {
 			n += l.Strings().Delete(keybytes)
+		} else if t == "none" {
+			continue
 		} else {
 			// 使用相同的lock来处理对象的创建和删除
 			mu := l.mus[SumOfStringChars(key)%objCacheCreateThread]
 			mu.Lock()
 			defer mu.Unlock()
 
-			if ok := l.GetElem(key, t).Drop(); ok {
-				n++
+			elem := l.GetElem(key, t)
+			if elem != nil {
+				if ok := elem.Drop(); ok {
+					n++
+				}
 			}
 			l.lruCache.Delete(key)
 		}
