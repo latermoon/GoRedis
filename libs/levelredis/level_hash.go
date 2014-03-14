@@ -40,6 +40,10 @@ func NewLevelHash(redis *LevelRedis, entryKey string) (l *LevelHash) {
 	return
 }
 
+func (l *LevelHash) Key() string {
+	return l.entryKey
+}
+
 func (l *LevelHash) Size() int {
 	return 1
 }
@@ -120,6 +124,14 @@ func (l *LevelHash) GetAll(limit int) (elems []*HashElem) {
 		elems = append(elems, elem)
 	})
 	return
+}
+
+func (l *LevelHash) Enumerate(fn func(i int, key, value []byte, quit *bool)) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	l.redis.PrefixEnumerate(l.fieldPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
+		fn(i, l.fieldKey(key), value, quit)
+	})
 }
 
 func (l *LevelHash) Exist(field []byte) (exist bool) {

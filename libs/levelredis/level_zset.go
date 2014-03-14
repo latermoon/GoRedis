@@ -28,6 +28,10 @@ func NewLevelZSet(redis *LevelRedis, key string) (l *LevelZSet) {
 	return
 }
 
+func (l *LevelZSet) Key() string {
+	return l.key
+}
+
 func (l *LevelZSet) Size() int {
 	return 1
 }
@@ -201,7 +205,6 @@ func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [
 	}
 	scoreMembers = make([][]byte, 0, 2)
 	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), direction, func(i int, key, value []byte, quit *bool) {
-		// fmt.Println(i, string(key))
 		if i < start {
 			return
 		} else if i >= start && (stop == -1 || i <= stop) {
@@ -213,6 +216,15 @@ func (l *LevelZSet) RangeByIndex(high2low bool, start, stop int) (scoreMembers [
 		}
 	})
 	return
+}
+
+func (l *LevelZSet) Enumerate(fn func(i int, member, score []byte, quit *bool)) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	l.redis.PrefixEnumerate(l.scoreKeyPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
+		score, member := l.splitScoreKey(key)
+		fn(i, member, score, quit)
+	})
 }
 
 func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count int) (scoreMembers [][]byte) {

@@ -94,6 +94,12 @@ var (
 	objCacheCreateThread = 100           // obj create threads
 )
 
+type LevelElem interface {
+	Key() string
+	Type() string
+	Drop() bool
+}
+
 type LevelRedis struct {
 	db       *gorocks.DB
 	ro       *gorocks.ReadOptions

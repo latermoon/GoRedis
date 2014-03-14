@@ -74,6 +74,7 @@ var cmdrules = map[string][]interface{}{
 	"ZSCORE":           []interface{}{3, 3},
 	// server
 	"CLIENT": []interface{}{2, 2},
+	"AOF":    []interface{}{2, 2},
 }
 
 // 验证指令参数数量、非法字符等

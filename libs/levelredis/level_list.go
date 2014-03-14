@@ -54,6 +54,10 @@ func (l *LevelList) initCount() {
 	}
 }
 
+func (l *LevelList) Key() string {
+	return l.entryKey
+}
+
 func (l *LevelList) Size() int {
 	return 1
 }
@@ -265,6 +269,14 @@ func (l *LevelList) Index(i int64) (e *Element, err error) {
 		return
 	}
 	return
+}
+
+func (l *LevelList) Enumerate(fn func(i int, value []byte, quit *bool)) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	l.redis.PrefixEnumerate(l.keyPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
+		fn(i, value, quit)
+	})
 }
 
 func (l *LevelList) len() int64 {

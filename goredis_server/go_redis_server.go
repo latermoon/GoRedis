@@ -51,10 +51,11 @@ type GoRedisServer struct {
 	cmdMonitor    *stat.Writer
 	leveldbStatus *stat.Writer
 	// 从库
-	uid      string          // 实例id
-	syncmgr  *SessionManager // as master
-	slavemgr *SessionManager // as slave
-	synclog  *SyncLog
+	uid       string          // 实例id
+	syncmgr   *SessionManager // as master
+	slavemgr  *SessionManager // as slave
+	synclog   *SyncLog
+	aofwriter *AOFWriter
 	// monitor
 	sessmgr *SessionManager // all sessions
 	monmgr  *SessionManager
