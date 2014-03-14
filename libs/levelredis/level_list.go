@@ -25,7 +25,7 @@ type LevelList struct {
 	// 游标控制
 	start int64
 	end   int64
-	mu    sync.Mutex
+	mu    sync.RWMutex
 }
 
 func NewLevelList(redis *LevelRedis, entryKey string) (l *LevelList) {
@@ -252,8 +252,8 @@ func (l *LevelList) Range(start, end int64) (e []*Element) {
 }
 
 func (l *LevelList) Index(i int64) (e *Element, err error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 
 	if i < 0 || i >= l.len() {
 		return nil, nil

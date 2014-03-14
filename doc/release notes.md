@@ -1,10 +1,11 @@
 GoRedis release notes
 =====================
 
-**GoRedis 1.0.59** @2014.3.14
+**GoRedis 1.0.60** @2014.3.14
 
 * [FIX] db.Close时延时不破坏synclog操作
 * [FIX] 修正Delete重构引入的bug
+* [FIX] 对zset、list、hash等使用RWMutex读写锁
 
 **GoRedis 1.0.58** @2014.3.13
 

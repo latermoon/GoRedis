@@ -17,7 +17,7 @@ type LevelHash struct {
 	redis *LevelRedis
 	// key
 	entryKey string
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	// for SET
 	userForSet bool
 }
@@ -75,8 +75,8 @@ func (l *LevelHash) fieldInKey(fieldkey []byte) (field []byte) {
 }
 
 func (l *LevelHash) Get(field []byte) (val []byte) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 	return l.get(field)
 }
 
@@ -105,8 +105,8 @@ func (l *LevelHash) Set(fieldVals ...[]byte) (n int) {
 }
 
 func (l *LevelHash) GetAll(limit int) (elems []*HashElem) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 
 	elems = make([]*HashElem, 0, 10)
 	l.redis.PrefixEnumerate(l.fieldPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
