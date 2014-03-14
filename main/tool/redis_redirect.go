@@ -115,14 +115,14 @@ func redirectToGoRedis(cmd *Command) (ok bool) {
 	for i := 1; i < len(cmd.Args); i++ {
 		args = append(args, cmd.Args[i])
 	}
-	reply, err := conn.Do(cmd.StringAtIndex(0), args...)
+	_, err := conn.Do(cmd.StringAtIndex(0), args...)
 	if err != nil {
 		// io.EOF or "connection refused"
-		stdlog.Println("ERR", len(buffer), total, cmd, err, reply)
+		stdlog.Println("ERR", len(buffer), total, cmd, err)
 		return false
 	}
 	total++
-	stdlog.Println(len(buffer), total, cmd, reply)
+	stdlog.Println(len(buffer), total, cmd)
 	return true
 }
 
