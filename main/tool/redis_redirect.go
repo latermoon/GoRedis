@@ -28,10 +28,12 @@ var desthost string
 var pools map[string]*redis.Pool
 var mu sync.Mutex
 var mode string
+var buffer chan *Command
 
 func init() {
 	runtime.GOMAXPROCS(4)
 	pools = make(map[string]*redis.Pool)
+	buffer = make(chan *Command, 100*10000) // 最大缓存100w
 
 	for _, cmd := range strings.Split(syncCmdlist, ",") {
 		needSync[cmd] = true
@@ -53,7 +55,7 @@ func main() {
 	flag.Parse()
 
 	if len(*srcptr) == 0 || len(*destptr) == 0 {
-		stdlog.Println("bad src or dest")
+		stdlog.Println("must set -src or -dest")
 		return
 	}
 	desthost = *destptr
@@ -62,6 +64,8 @@ func main() {
 		stdlog.Println("must set -mode [r|w|rw]")
 		return
 	}
+
+	go runloop()
 
 	r := redis_tool.NewMonitorReader(*srcptr)
 	r.DidRecvCommand = recvCommand // bind
@@ -78,20 +82,32 @@ func recvCommand(cmd *Command, prefix string) {
 	}
 	if strings.Contains(mode, "r") {
 		if !needSync[cmdName] {
-			redirectToGoRedis(cmd)
+			buffer <- cmd
 		}
 	}
 	if strings.Contains(mode, "w") {
 		if needSync[cmdName] {
-			redirectToGoRedis(cmd)
+			buffer <- cmd
 		}
 	}
+}
 
+func runloop() {
+	for {
+		cmd := <-buffer
+		ok := false
+		for !ok {
+			ok = redirectToGoRedis(cmd)
+			if !ok {
+				time.Sleep(time.Millisecond * 1000)
+			}
+		}
+	}
 }
 
 var total int64 = 0
 
-func redirectToGoRedis(cmd *Command) {
+func redirectToGoRedis(cmd *Command) (ok bool) {
 	pool := GetRedisPool(desthost)
 	conn := pool.Get()
 	defer conn.Close()
@@ -101,10 +117,13 @@ func redirectToGoRedis(cmd *Command) {
 	}
 	reply, err := conn.Do(cmd.StringAtIndex(0), args...)
 	if err != nil {
-		panic(err)
+		// io.EOF or "connection refused"
+		stdlog.Println("ERR", len(buffer), total, cmd, err, reply)
+		return false
 	}
 	total++
-	stdlog.Println(total, cmd, reply)
+	stdlog.Println(len(buffer), total, cmd, reply)
+	return true
 }
 
 func GetRedisPool(host string) (pool *redis.Pool) {
