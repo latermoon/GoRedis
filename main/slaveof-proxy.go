@@ -29,6 +29,10 @@ func main() {
 		return
 	}
 
+	stdlog.Println("connected", *src)
+	stdlog.Println("connected", *dest)
+	stdlog.Println("sync ...")
+
 	if *pullrate < 100 {
 		*pullrate = 100
 	}

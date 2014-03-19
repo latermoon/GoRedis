@@ -8,6 +8,7 @@ import (
 	"GoRedis/libs/stat"
 	"GoRedis/libs/stdlog"
 	"bufio"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -56,7 +57,7 @@ func (s *SlaveClient) SetPullRate(n int) {
 }
 
 func (s *SlaveClient) rdbfilename() string {
-	return s.directory + "dump.db"
+	return fmt.Sprintf("%s/%s_dump.db", s.directory, s.src.RemoteAddr())
 }
 
 func (s *SlaveClient) Sync() (err error) {
