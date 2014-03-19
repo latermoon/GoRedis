@@ -64,11 +64,11 @@ func (server *GoRedisServer) initSignalNotify() {
 		stdlog.Println("recv signal:", sig)
 		server.closing = true               // 标记退出
 		server.Suspend()                    // 挂起全部传入数据
-		time.Sleep(time.Millisecond * 1000) // 休息一下，Suspend瞬间可能还有数据库写入
+		time.Sleep(time.Millisecond * 2000) // 休息一下，Suspend瞬间可能还有数据库写入
 		server.levelRedis.Close()
 		server.synclog.Close()
 		stdlog.Println("bye")
-		time.Sleep(time.Millisecond * 2000) // 休息一下
+		time.Sleep(time.Millisecond * 7000) // 休息一下
 		os.Exit(0)
 	}()
 }
