@@ -18,7 +18,7 @@ import (
 )
 
 // TODO 版本号，每次更新都需要升级一下
-const VERSION = "1.0.61"
+const VERSION = "1.0.62"
 const PREFIX = "__goredis:"
 
 var (
@@ -66,8 +66,8 @@ type GoRedisServer struct {
 	rwlock  sync.RWMutex
 	rwwait  sync.WaitGroup
 	// exit
-	sigs     chan os.Signal
-	quitdone chan bool // 准备好退出
+	sigs    chan os.Signal
+	closing bool // 准备退出
 }
 
 /*

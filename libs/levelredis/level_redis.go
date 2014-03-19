@@ -112,6 +112,8 @@ type LevelRedis struct {
 	muCount  sync.Mutex
 	counters map[string]int64
 	snap     *gorocks.Snapshot
+	// closing func
+	closing func()
 }
 
 // snapshot，快照模式
@@ -149,6 +151,10 @@ func (l *LevelRedis) DB() (db *gorocks.DB) {
 	return l.db
 }
 
+func (l *LevelRedis) SetClosingFunc(fn func()) {
+	l.closing = fn
+}
+
 func (l *LevelRedis) Close() {
 	l.ro.Close()
 	if l.wo != nil {
@@ -160,6 +166,9 @@ func (l *LevelRedis) Close() {
 		l.snap = nil
 	} else {
 		l.db.Close()
+	}
+	if l.closing != nil {
+		l.closing()
 	}
 }
 

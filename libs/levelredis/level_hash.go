@@ -126,7 +126,7 @@ func (l *LevelHash) GetAll(limit int) (elems []*HashElem) {
 	return
 }
 
-func (l *LevelHash) Enumerate(fn func(i int, key, value []byte, quit *bool)) {
+func (l *LevelHash) Enumerate(fn func(i int, field, value []byte, quit *bool)) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	l.redis.PrefixEnumerate(l.fieldPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
