@@ -112,10 +112,9 @@ func (s *SlaveClient) procCommand() {
 
 func (s *SlaveClient) cleanReply() {
 	for {
-		_, err := s.dest.ReadReply()
-		s.counters.Get("reply").Incr(1)
+		_, err := s.dest.ReadByte()
 		if err != nil {
-			stdlog.Println("readReply error", err)
+			stdlog.Println("cleanReply error", err)
 			break
 		}
 	}
