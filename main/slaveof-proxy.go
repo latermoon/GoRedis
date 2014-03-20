@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// ./slaveof-proxy -src localhost:6379 -dest remote:6379 -pullrate 400 -pushrate
+// ./slaveof-proxy -src localhost:6379 -dest remote:6379 -pullrate 400 -pushrate 400
 func main() {
 	runtime.GOMAXPROCS(4)
 	src := flag.String("src", "", "master")
