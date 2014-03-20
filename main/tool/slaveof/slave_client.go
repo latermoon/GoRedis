@@ -13,9 +13,12 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 )
 
 type SlaveClient struct {
+	srchost   string
+	desthost  string
 	src       *Session          // 主库
 	dest      *Session          // 从库
 	directory string            // 工作目录
@@ -24,19 +27,29 @@ type SlaveClient struct {
 	wg        sync.WaitGroup    //
 	counters  *counter.Counters //
 	synclog   *stat.Writer      //
+	totalsize int64             //
 	rdbrate   int               // rdb传输速率
+	mu        sync.Mutex        //
+	connmu    sync.Mutex        //
+	online    bool              //
 }
 
-func NewClient(src net.Conn, dest net.Conn) (s *SlaveClient) {
+func NewClient(srchost, desthost string, buffersize int) (s *SlaveClient, err error) {
 	s = &SlaveClient{
-		src:       NewSession(src),
-		dest:      NewSession(dest),
-		directory: "/tmp/",
-		buffer:    make(chan *Command, 1000*10000),
+		srchost:   srchost,
+		desthost:  desthost,
+		directory: "/tmp",
+		buffer:    make(chan *Command, buffersize*10000),
 		jobs:      make(chan int, 10),
 		counters:  counter.NewCounters(),
 		rdbrate:   40 * 1024 * 1024, // 40MB
 	}
+	// warmup
+	conn, e1 := net.Dial("tcp", s.srchost)
+	if e1 != nil {
+		return nil, e1
+	}
+	s.src = NewSession(conn)
 	return
 }
 
@@ -54,6 +67,24 @@ func (s *SlaveClient) initlog() error {
 
 func (s *SlaveClient) SetPullRate(n int) {
 	s.rdbrate = n
+}
+
+func (s *SlaveClient) Dest() *Session {
+	s.connmu.Lock()
+	defer s.connmu.Unlock()
+	if s.dest == nil {
+		for {
+			conn, err := net.Dial("tcp", s.desthost)
+			if err != nil {
+				stdlog.Println("CONN_ERR", err)
+				time.Sleep(time.Millisecond * 1000)
+				continue
+			}
+			s.dest = NewSession(conn)
+			break
+		}
+	}
+	return s.dest
 }
 
 func (s *SlaveClient) rdbfilename() string {
@@ -97,7 +128,7 @@ func (s *SlaveClient) Sync() (err error) {
 func (s *SlaveClient) Close() {
 	s.synclog.Close()
 	s.src.Close()
-	s.dest.Close()
+	s.Dest().Close()
 }
 
 func (s *SlaveClient) procCommand() {
@@ -107,16 +138,32 @@ func (s *SlaveClient) procCommand() {
 			break
 		}
 		s.counters.Get("out").Incr(1)
-		s.dest.WriteCommand(cmd)
+		s.writeCommand(cmd)
 	}
 }
 
-func (s *SlaveClient) cleanReply() {
+func (s *SlaveClient) writeCommand(cmd *Command) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for {
-		_, err := s.dest.ReadByte()
+		err := s.Dest().WriteCommand(cmd)
 		if err != nil {
-			stdlog.Println("cleanReply error", err)
-			break
+			s.dest = nil
+			stdlog.Println("WRITE_ERR", err, cmd)
+			time.Sleep(time.Millisecond * 1000)
+			continue
+		}
+		break
+	}
+}
+
+func (s *SlaveClient) readAllReply() {
+	for {
+		_, err := s.Dest().ReadByte()
+		if err != nil {
+			s.dest = nil
+			stdlog.Println("ReadReply ERR", err)
+			time.Sleep(time.Millisecond * 1000)
 		}
 	}
 }
@@ -160,13 +207,14 @@ func (s *SlaveClient) recvRdb() (err error) {
 }
 
 func (s *SlaveClient) RdbSizeCallback(totalsize int64) {
-	stdlog.Printf("[M %s] rdb size: %d\n", s.src.RemoteAddr(), totalsize)
+	s.totalsize = totalsize
+	stdlog.Printf("[M %s] rdb size: %s\n", s.src.RemoteAddr(), bytesInHuman(totalsize))
 }
 
 func (s *SlaveClient) RdbRecvFinishCallback(r *bufio.Reader) {
 	stdlog.Printf("[M %s] rdb recv finish, start decoding... \n", s.src.RemoteAddr())
 	s.initlog()
-	go s.cleanReply()
+	go s.readAllReply()
 	// decode
 	dec := newRdbDecoder(s)
 	err := rdb.Decode(r, dec)
@@ -183,7 +231,7 @@ func (s *SlaveClient) rdbDecodeCommand(cmd *Command) {
 	s.jobs <- 1
 	s.wg.Add(1)
 	go func() {
-		s.dest.WriteCommand(cmd)
+		s.writeCommand(cmd)
 		<-s.jobs
 		s.wg.Done()
 	}()
@@ -192,9 +240,10 @@ func (s *SlaveClient) rdbDecodeCommand(cmd *Command) {
 func (s *SlaveClient) rdbDecodeFinish(n int64) {
 	// stdlog.Printf("[M %s] rdb decode finish, items: %d\n", s.src.RemoteAddr(), n)
 	s.wg.Wait()
+	s.online = true
 	go s.procCommand() // 开始消化command
 }
 
 func (s *SlaveClient) RdbRecvProcessCallback(size int64, rate int) {
-	stdlog.Printf("[M %s] rdb recv: %d, rate:%d\n", s.src.RemoteAddr(), size, rate)
+	stdlog.Printf("[M %s] rdb recv: %s/%s, rate:%s\n", s.src.RemoteAddr(), bytesInHuman(size), bytesInHuman(s.totalsize), bytesInHuman(size))
 }

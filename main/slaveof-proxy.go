@@ -5,7 +5,6 @@ import (
 	"GoRedis/libs/stdlog"
 	"flag"
 	"fmt"
-	"net"
 	"runtime"
 	"time"
 )
@@ -16,28 +15,28 @@ func main() {
 	src := flag.String("src", "", "master")
 	dest := flag.String("dest", "", "slave")
 	pullrate := flag.Int("pullrate", 400, "rdb pull rate in Mbits/s")
+	buffer := flag.Int("buffer", 100, "buffer x10000 records")
 	flag.Parse()
-
-	srcConn, e1 := net.Dial("tcp", *src)
-	if e1 != nil {
-		stdlog.Println("connect master error", e1)
-		return
-	}
-	destConn, e2 := net.Dial("tcp", *dest)
-	if e2 != nil {
-		stdlog.Println("connect slave error", e2)
-		return
-	}
-
-	stdlog.Println(*src, "connected")
-	stdlog.Println(*dest, "connected")
-	stdlog.Println("sync ...")
 
 	if *pullrate < 100 {
 		*pullrate = 100
 	}
+	if *buffer < 100 {
+		*buffer = 100
+	} else if *buffer > 1000 {
+		*buffer = 1000
+	}
 
-	client := NewClient(srcConn, destConn)
+	stdlog.Println("slaveof-proxy 1.0.1")
+	stdlog.Printf("from [%s] to [%s]\n", *src, *dest)
+	stdlog.Printf("pull [%d] buffer [%d]\n", *pullrate, *buffer)
+	stdlog.Println("SYNC ...")
+
+	client, err := NewClient(*src, *dest, *buffer)
+	if err != nil {
+		stdlog.Println("ERR", err)
+		return
+	}
 	client.SetPullRate(*pullrate / 8 * 1024 * 1024)
 	client.Sync()
 }

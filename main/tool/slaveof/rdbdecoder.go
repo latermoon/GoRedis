@@ -70,6 +70,7 @@ func (p *rdbDecoder) EndHash(key []byte) {
 	if p.hashEntry != nil && len(p.hashEntry) > 2 {
 		cmd := NewCommand(p.hashEntry...)
 		p.client.rdbDecodeCommand(cmd)
+		p.hashEntry = nil
 	}
 }
 
@@ -95,6 +96,7 @@ func (p *rdbDecoder) EndSet(key []byte) {
 	if p.setEntry != nil && len(p.setEntry) > 2 {
 		cmd := NewCommand(p.setEntry...)
 		p.client.rdbDecodeCommand(cmd)
+		p.setEntry = nil
 	}
 }
 
@@ -122,6 +124,7 @@ func (p *rdbDecoder) EndList(key []byte) {
 	if p.listEntry != nil && len(p.listEntry) > 2 {
 		cmd := NewCommand(p.listEntry...)
 		p.client.rdbDecodeCommand(cmd)
+		p.listEntry = nil
 	}
 }
 
@@ -149,5 +152,6 @@ func (p *rdbDecoder) EndZSet(key []byte) {
 	if p.zsetEntry != nil && len(p.zsetEntry) > 2 {
 		cmd := NewCommand(p.zsetEntry...)
 		p.client.rdbDecodeCommand(cmd)
+		p.zsetEntry = nil
 	}
 }
