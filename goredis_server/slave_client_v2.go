@@ -55,11 +55,15 @@ func (s *SlaveClientV2) Session() *Session {
 }
 
 func (s *SlaveClientV2) Sync() (err error) {
-	uid := s.server.UID()
 	s.lastseq = s.masterSeq(s.session.RemoteAddr().String())
-	seq := s.lastseq + 1
 	_, port := splitHostPort(s.server.opt.Bind())
-	synccmd := NewCommand(formatByteSlice("SYNC", uid, seq, "PORT", port)...)
+	args := formatByteSlice("SYNC", "UID", s.server.UID(), "PORT", port)
+	if s.lastseq < 0 {
+		args = append(args, formatByteSlice("SNAP", "1")...)
+	} else {
+		args = append(args, formatByteSlice("SEQ", s.lastseq)...)
+	}
+	synccmd := NewCommand(args...)
 	slavelog.Printf("[M %s] %s\n", s.session.RemoteAddr(), synccmd)
 
 	if err = s.session.WriteCommand(synccmd); err != nil {
@@ -74,15 +78,15 @@ func (s *SlaveClientV2) Sync() (err error) {
 		}
 		cmdName := cmd.Name()
 		switch cmdName {
-		case "SYNC_RAW_BEG":
+		case "SYNC_RAW_START":
 			s.Session().SetAttribute(S_STATUS, REPL_RECV_BULK)
 			slavelog.Printf("[M %s] recv bulk start\n", s.session.RemoteAddr())
 		case "SYNC_RAW":
 			s.counters.Get("raw").Incr(1)
 			s.server.OnRAW_SET(cmd)
-		case "SYNC_RAW_FIN":
+		case "SYNC_RAW_END":
 			slavelog.Printf("[M %s] recv bulk finish\n", s.session.RemoteAddr())
-		case "SYNC_SEQ_BEG":
+		case "SYNC_SEQ_START":
 			slavelog.Printf("[M %s] sync online ...\n", s.session.RemoteAddr())
 			s.Session().SetAttribute(S_STATUS, REPL_ONLINE)
 			s.recvCommandSeq(cmd) // 进入后只有出错才退出

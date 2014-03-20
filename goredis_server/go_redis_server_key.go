@@ -11,9 +11,46 @@ func (server *GoRedisServer) OnPING(cmd *Command) (reply *Reply) {
 	return
 }
 
-// 官方redis的dbsize输出key数量，这里输出数据库大小
-func (server *GoRedisServer) OnDBSIZE(cmd *Command) (reply *Reply) {
-	return StatusReply(bytesInHuman(server.info.db_size()))
+func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
+	return ErrorReply("use 'KEYSERACH [PREFIX] [LIMIT]' instead")
+}
+
+// keys重命名为keysearch
+func (server *GoRedisServer) OnKEYSEARCH(cmd *Command) (reply *Reply) {
+	seekkey := []byte("")
+	if cmd.Len() > 1 {
+		seekkey = cmd.Args[1]
+	}
+
+	count := 10
+	if cmd.Len() > 2 {
+		var err error
+		if count, err = cmd.IntAtIndex(2); err != nil {
+			return ErrorReply(err)
+		}
+		if count < 1 || count > 10000 {
+			return ErrorReply("count range: 1 < count < 10000")
+		}
+	}
+
+	withtype := false
+	if cmd.Len() > 3 {
+		withtype = strings.ToUpper(cmd.StringAtIndex(3)) == "WITHTYPE"
+	}
+
+	// search
+	bulks := make([]interface{}, 0, count)
+	server.levelRedis.Keys(seekkey, func(i int, key, keytype []byte, quit *bool) {
+		if i >= count {
+			*quit = true
+			return
+		}
+		bulks = append(bulks, key)
+		if withtype {
+			bulks = append(bulks, keytype)
+		}
+	})
+	return MultiBulksReply(bulks)
 }
 
 // keyprev [seek] [count] [withtype] [withvalue]
@@ -80,44 +117,6 @@ func (server *GoRedisServer) keyEnumerate(cmd *Command, direction levelredis.Ite
 	return MultiBulksReply(bulks)
 }
 
-// 找出下一个key
-func (server *GoRedisServer) OnKEYSEARCH(cmd *Command) (reply *Reply) {
-	seekkey := []byte("")
-	if cmd.Len() > 1 {
-		seekkey = cmd.Args[1]
-	}
-
-	count := 10
-	if cmd.Len() > 2 {
-		var err error
-		if count, err = cmd.IntAtIndex(2); err != nil {
-			return ErrorReply(err)
-		}
-		if count < 1 || count > 10000 {
-			return ErrorReply("count range: 1 < count < 10000")
-		}
-	}
-
-	withtype := false
-	if cmd.Len() > 3 {
-		withtype = strings.ToUpper(cmd.StringAtIndex(3)) == "WITHTYPE"
-	}
-
-	// search
-	bulks := make([]interface{}, 0, count)
-	server.levelRedis.Keys(seekkey, func(i int, key, keytype []byte, quit *bool) {
-		if i >= count {
-			*quit = true
-			return
-		}
-		bulks = append(bulks, key)
-		if withtype {
-			bulks = append(bulks, keytype)
-		}
-	})
-	return MultiBulksReply(bulks)
-}
-
 // 扫描内部key
 func (server *GoRedisServer) OnRAW_KEYSEARCH(cmd *Command) (reply *Reply) {
 	seekkey := []byte("")
@@ -172,6 +171,11 @@ func (server *GoRedisServer) OnRAW_SET(cmd *Command) (reply *Reply) {
 	} else {
 		return StatusReply("OK")
 	}
+}
+
+// 官方redis的dbsize输出key数量，这里输出数据库大小
+func (server *GoRedisServer) OnDBSIZE(cmd *Command) (reply *Reply) {
+	return StatusReply(bytesInHuman(server.info.db_size()))
 }
 
 /**

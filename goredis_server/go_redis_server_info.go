@@ -140,9 +140,8 @@ func (server *GoRedisServer) replicationInfo() string {
 	buf.WriteString(fmt.Sprintf("connected_slaves:%d\n", server.info.connected_slaves()))
 	server.syncmgr.Enumerate(func(i int, key string, val interface{}) {
 		sess := val.(*Session)
-		host, _ := splitHostPort(sess.RemoteAddr().String())
-		port := fmt.Sprint(sess.GetAttribute(S_SLAVE_PORT))
-		buf.WriteString(fmt.Sprintf("slave%d:%s,%s,%s\n", i, host, port, sess.GetAttribute(S_STATUS)))
+		host, port := splitHostPort(sess.GetAttribute(S_HOST).(string))
+		buf.WriteString(fmt.Sprintf("slave%d:%s,%d,%s\n", i, host, port, sess.GetAttribute(S_STATUS)))
 	})
 
 	buf.WriteString(fmt.Sprintf("connected_masters:%d\n", server.info.connected_masters()))

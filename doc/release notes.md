@@ -1,6 +1,11 @@
 GoRedis release notes
 =====================
 
+**GoRedis 1.0.62** @2014.3.19
+
+* [Feature] 调整主从同步指令，与旧版不兼容
+* [Fix] 补全AOF指令
+
 **GoRedis 1.0.61** @2014.3.14
 
 * [Feature] 实现AOF

@@ -38,24 +38,76 @@ func (a *AOFWriter) Flush() error {
 func (a *AOFWriter) AppendString(key, value []byte) {
 	cmd := NewCommand([]byte("SET"), key, value)
 	a.Write(cmd.Bytes())
+	a.Flush()
 }
 
 func (a *AOFWriter) AppendHash(h *levelredis.LevelHash) {
-	h.Enumerate(func(i int, key, value []byte, quit *bool) {
-
+	var buf [][]byte
+	bufsize := 200
+	h.Enumerate(func(i int, field, value []byte, quit *bool) {
+		if buf == nil {
+			buf = make([][]byte, 0, bufsize+4)
+			buf = append(buf, []byte("HMSET"), []byte(h.Key()))
+		}
+		buf = append(buf, field, value)
+		if len(buf) > bufsize {
+			cmd := NewCommand(buf...)
+			a.Write(cmd.Bytes())
+			buf = nil
+		}
 	})
+	if len(buf) > bufsize {
+		cmd := NewCommand(buf...)
+		a.Write(cmd.Bytes())
+	}
+	a.Flush()
+	return
 }
 
 func (a *AOFWriter) AppendSet(h *levelredis.LevelHash) {
-	h.Enumerate(func(i int, key, value []byte, quit *bool) {
-
+	var buf [][]byte
+	bufsize := 200
+	h.Enumerate(func(i int, field, value []byte, quit *bool) {
+		if buf == nil {
+			buf = make([][]byte, 0, bufsize+4)
+			buf = append(buf, []byte("SADD"), []byte(h.Key()))
+		}
+		buf = append(buf, field)
+		if len(buf) > bufsize {
+			cmd := NewCommand(buf...)
+			a.Write(cmd.Bytes())
+			buf = nil
+		}
 	})
+	if len(buf) > bufsize {
+		cmd := NewCommand(buf...)
+		a.Write(cmd.Bytes())
+	}
+	a.Flush()
+	return
 }
 
 func (a *AOFWriter) AppendList(h *levelredis.LevelList) {
+	var buf [][]byte
+	bufsize := 200
 	h.Enumerate(func(i int, value []byte, quit *bool) {
-
+		if buf == nil {
+			buf = make([][]byte, 0, bufsize+4)
+			buf = append(buf, []byte("RPUSH"), []byte(h.Key()))
+		}
+		buf = append(buf, value)
+		if len(buf) > bufsize {
+			cmd := NewCommand(buf...)
+			a.Write(cmd.Bytes())
+			buf = nil
+		}
 	})
+	if len(buf) > bufsize {
+		cmd := NewCommand(buf...)
+		a.Write(cmd.Bytes())
+	}
+	a.Flush()
+	return
 }
 
 func (a *AOFWriter) AppendZSet(z *levelredis.LevelZSet) {
@@ -77,11 +129,12 @@ func (a *AOFWriter) AppendZSet(z *levelredis.LevelZSet) {
 		cmd := NewCommand(buf...)
 		a.Write(cmd.Bytes())
 	}
-	a.fd.Flush()
+	a.Flush()
 	return
 }
 
 func (a *AOFWriter) AppendDoc(d *levelredis.LevelDoc) {
+	a.Flush()
 	return
 }
 

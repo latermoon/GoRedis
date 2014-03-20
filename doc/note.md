@@ -1,7 +1,6 @@
 
 ### 安装GoRedis
-	wget ssd002:8801/install_goredis.sh -O install_goredis.sh
-	sh install_goredis.sh
+	 /home/scripts/redis/install_goredis.sh
 	GoRedis默认会在/data目录下存放数据，如果/data不存在，会放到/tmp下
 	
 ### 运行GoRedis

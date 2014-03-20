@@ -5,60 +5,69 @@ import (
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
 	"bytes"
-	"runtime/debug"
+	"errors"
+	"fmt"
 	"strconv"
 	"time"
 )
 
-// 从库的同步请求，一旦进入OnSYNC，直到主从断开才会结束当前函数
-// SYNC [UID] [SEQ] [SlavePort]
+// S: SYNC UID [UID] PORT [PORT] SNAP [1/0] SEQ [-1/...]
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
-	// 保障不会奔溃
-	defer func() {
-		if v := recover(); v != nil {
-			stdlog.Printf("[%s] sync panic %s\n", session.RemoteAddr(), cmd)
-			stdlog.Println(string(debug.Stack()))
-		}
-	}()
-	var seq int64 = -1
-	if cmd.Len() >= 3 {
-		var err error
-		seq, err = cmd.Int64AtIndex(2)
-		if err != nil {
-			return ErrorReply("bad [SEQ]")
-		}
-		// 如果从库提供了自己的端口，记录之
-		if cmd.Len() >= 5 && cmd.StringAtIndex(3) == "PORT" {
-			session.SetAttribute(S_SLAVE_PORT, cmd.StringAtIndex(4))
-		}
-	}
-	stdlog.Printf("[S %s] recv %s\n", session.RemoteAddr(), cmd)
+	stdlog.Printf("[S %s] %s\n", session.RemoteAddr(), cmd)
 
-	// 第一次出现从库时才开启写日志
+	args := cmd.Args[1:]
+	if len(args) < 2 || len(args)%2 != 0 {
+		session.Close()
+		return
+	}
+	for i := 0; i < len(args); i += 2 {
+		session.SetAttribute(string(args[i]), string(args[i+1]))
+	}
+
 	if !server.synclog.IsEnabled() {
 		stdlog.Println("synclog enable")
 		server.synclog.Enable()
 	}
 
-	reply = NOREPLY
-
-	if seq != -1 && (seq < server.synclog.MinSeq() || seq > server.synclog.MaxSeq()+1) {
-		stdlog.Printf("[S %s] seq %d not in (%d, %d), closed\n", session.RemoteAddr(), seq, server.synclog.MinSeq(), server.synclog.MaxSeq())
-		session.Close()
-		return
-	}
-
-	remoteHost := session.RemoteAddr().String() // 真正的IP与端口地址
+	// 使用从库端口代替socket端口，标识来源
+	h, _ := splitHostPort(session.RemoteAddr().String())
+	remoteHost := fmt.Sprintf("%s:%s", h, session.GetAttribute("PORT"))
+	session.SetAttribute(S_HOST, remoteHost)
 	session.SetAttribute(S_STATUS, REPL_WAIT)
-	server.syncmgr.Put(remoteHost, session)
-	defer func() {
+
+	go func() {
+		server.syncmgr.Put(remoteHost, session)
+		err := server.doSync(session, cmd)
+		if err != nil {
+			stdlog.Println("sync ", err)
+		}
+		session.Close()
 		server.syncmgr.Remove(remoteHost)
 	}()
 
-	nextseq := seq // 最后要发送的seq
-	// 全新同步，先发送快照
-	if seq < 0 {
-		var err error
+	return NOREPLY
+}
+
+func (server *GoRedisServer) doSync(session *Session, cmd *Command) (err error) {
+	// snapshot
+	var nextseq int64
+	if session.GetAttribute("SEQ") != nil {
+		nextseq, err = strconv.ParseInt(session.GetAttribute("SEQ").(string), 10, 64)
+		if err != nil {
+			return
+		}
+	}
+	if nextseq < 0 {
+		nextseq = 0
+	}
+	remoteHost := session.GetAttribute(S_HOST).(string)
+
+	if nextseq < server.synclog.MinSeq() || nextseq > server.synclog.MaxSeq()+1 {
+		stdlog.Printf("[S %s] seq %d not in (%d, %d), closed\n", remoteHost, nextseq, server.synclog.MinSeq(), server.synclog.MaxSeq())
+		return errors.New("bad seq range")
+	}
+
+	if session.GetAttribute("SNAP") != nil && session.GetAttribute("SNAP").(string) == "1" {
 		session.SetAttribute(S_STATUS, REPL_SEND_BULK)
 		if nextseq, err = server.sendSnapshot(session); err != nil {
 			stdlog.Printf("[S %s] snap send broken (%s)\n", remoteHost, err)
@@ -66,14 +75,15 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 		}
 	}
 
+	// 如果整个同步过程s
+
 	stdlog.Println("sync online ...")
 	session.SetAttribute(S_STATUS, REPL_ONLINE)
 	// 发送日志数据
-	err := server.syncRunloop(session, nextseq)
+	err = server.syncRunloop(session, nextseq)
 	if err != nil {
 		stdlog.Printf("[S %s] sync broken (%s)\n", remoteHost, err)
 	}
-
 	return
 }
 
@@ -85,7 +95,7 @@ func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err 
 	lastseq := server.synclog.MaxSeq()   // 获取当前日志序号
 	server.Resume()                      // 唤醒，如果不调用Resume，整个服务器无法继续工作
 
-	if err = session.WriteCommand(NewCommand([]byte("SYNC_RAW_BEG"))); err != nil {
+	if err = session.WriteCommand(NewCommand([]byte("SYNC_RAW_START"))); err != nil {
 		return
 	}
 
@@ -102,10 +112,10 @@ func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err 
 				break // cancel
 			}
 			if sendfinish {
-				stdlog.Printf("[S %s] snap send finish, %d raw items\n", session.RemoteAddr(), sendcount)
+				stdlog.Printf("[S %s] snap send finish, %d raw items\n", session.GetAttribute(S_HOST), sendcount)
 				break
 			} else {
-				stdlog.Printf("[S %s] snap send %d raw items\n", session.RemoteAddr(), sendcount)
+				stdlog.Printf("[S %s] snap send %d raw items\n", session.GetAttribute(S_HOST), sendcount)
 			}
 		}
 	}()
@@ -130,7 +140,8 @@ func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err 
 
 	sendfinish = true
 
-	if err = session.WriteCommand(NewCommand([]byte("SYNC_RAW_FIN"))); err != nil {
+	curseq := server.synclog.MaxSeq()
+	if err = session.WriteCommand(NewCommand(formatByteSlice("SYNC_RAW_END", sendcount, lastseq, curseq)...)); err != nil {
 		return
 	}
 	nextseq = lastseq + 1
@@ -139,7 +150,7 @@ func (server *GoRedisServer) sendSnapshot(session *Session) (nextseq int64, err 
 
 // 每发送一个SYNC_SEQ再发送一个CMD
 func (server *GoRedisServer) syncRunloop(session *Session, lastseq int64) (err error) {
-	if err = session.WriteCommand(NewCommand([]byte("SYNC_SEQ_BEG"))); err != nil {
+	if err = session.WriteCommand(NewCommand([]byte("SYNC_SEQ_START"))); err != nil {
 		return
 	}
 	seq := lastseq
@@ -148,17 +159,16 @@ func (server *GoRedisServer) syncRunloop(session *Session, lastseq int64) (err e
 		var val []byte
 		val, err = server.synclog.Read(seq)
 		if err != nil {
-			stdlog.Printf("[S %s] synclog read error %s\n", session.RemoteAddr(), err)
 			break
 		}
 		if val == nil {
 			time.Sleep(time.Millisecond * time.Duration(deplymsec))
 			deplymsec += 10
-			// 防死尸
-			if deplymsec >= 100 {
+			if deplymsec >= 1000 { // 防死尸
 				if err = session.WriteCommand(NewCommand([]byte("PING"))); err != nil {
 					break
 				}
+				deplymsec = 10
 			}
 			continue
 		} else {

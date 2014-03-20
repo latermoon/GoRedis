@@ -1,3 +1,24 @@
+
+#### KEY_NEXT
+	
+key_next用于扫描整个数据库，key顺序排序，使用上一次key_next返回的最后一个key，作为下一次key_next的[seek]可以实现扫描整个数据库，但要注意第二次key_next返回的第一个结果和上次最后一个结果相同，需要去重。
+
+	keynext [seek] [count] [withtype] [withvalue]
+
+	[seek] 要定位的起始key，或key前缀
+	[count] 要返回的数量
+	[withtype] 选填，返回key类型，string/hash/set/list/zset
+	[withvalue] 选填，如果要扫描的对象是string，这里直接返回string内容，其它数据类型的返回值没有意义
+
+实例：
+
+	key_next '' 100 从开始扫描100条数据
+	key_next 'user:100422:profile' 100 从指定的key开始想下扫描100条数据
+	key_next '' 100 withtype 同时返回key类型，返回结果key,type,key,type,...
+	key_next '' 100 withtype withvalue，同时返回key类型和key值，返回结果key,type,value,key,type,value,...
+
+
+
 ### GoRedis指令大全
 
 #### 指令的IO消耗

@@ -8,4 +8,5 @@ const (
 	REPL_RECV_BULK = "recv_bulk" // slave
 	REPL_ONLINE    = "online"
 	S_SLAVE_PORT   = "slaveport"
+	S_HOST         = "host"
 )
