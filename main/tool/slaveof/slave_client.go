@@ -164,6 +164,7 @@ func (s *SlaveClient) writeCommand(cmd *Command) {
 		_, err := s.Writer().Write(cmd.Bytes())
 		if err != nil {
 			s.dest = nil
+			s.destwriter = nil
 			stdlog.Println("WRITE_ERR", err, cmd)
 			time.Sleep(time.Millisecond * 1000)
 			continue
@@ -177,6 +178,7 @@ func (s *SlaveClient) readAllReply() {
 		_, err := s.Dest().ReadByte()
 		if err != nil {
 			s.dest = nil
+			s.destwriter = nil
 			stdlog.Println("ReadReply ERR", err)
 			time.Sleep(time.Millisecond * 1000)
 		}

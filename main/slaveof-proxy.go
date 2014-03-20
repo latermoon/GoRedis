@@ -31,7 +31,7 @@ func main() {
 		*buffer = 1000
 	}
 
-	stdlog.Println("slaveof-proxy 1.0.2")
+	stdlog.Println("slaveof-proxy 1.0.3")
 	stdlog.Printf("from [%s] to [%s]\n", *src, *dest)
 	stdlog.Printf("pull [%d] buffer [%d]\n", *pullrate, *buffer)
 	stdlog.Println("SYNC ...")
