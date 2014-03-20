@@ -4,6 +4,7 @@ import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"
 	"GoRedis/libs/iotool"
+	"GoRedis/libs/ratelimit"
 	"GoRedis/libs/rdb"
 	"GoRedis/libs/stat"
 	"GoRedis/libs/stdlog"
@@ -17,21 +18,23 @@ import (
 )
 
 type SlaveClient struct {
-	srchost   string
-	desthost  string
-	src       *Session          // 主库
-	dest      *Session          // 从库
-	directory string            // 工作目录
-	buffer    chan *Command     // 缓存实时指令
-	jobs      chan int          // 并发工作
-	wg        sync.WaitGroup    //
-	counters  *counter.Counters //
-	synclog   *stat.Writer      //
-	totalsize int64             //
-	rdbrate   int               // rdb传输速率
-	mu        sync.Mutex        //
-	connmu    sync.Mutex        //
-	online    bool              //
+	srchost    string
+	desthost   string
+	src        *Session          // 主库
+	dest       *Session          // 从库
+	destwriter io.Writer         //
+	directory  string            // 工作目录
+	buffer     chan *Command     // 缓存实时指令
+	jobs       chan int          // 并发工作
+	wg         sync.WaitGroup    //
+	counters   *counter.Counters //
+	synclog    *stat.Writer      //
+	totalsize  int64             //
+	pullrate   int               // rdb传输速率
+	pushrate   int               //
+	mu         sync.Mutex        //
+	connmu     sync.Mutex        //
+	online     bool              //
 }
 
 func NewClient(srchost, desthost string, buffersize int) (s *SlaveClient, err error) {
@@ -42,7 +45,8 @@ func NewClient(srchost, desthost string, buffersize int) (s *SlaveClient, err er
 		buffer:    make(chan *Command, buffersize*10000),
 		jobs:      make(chan int, 10),
 		counters:  counter.NewCounters(),
-		rdbrate:   40 * 1024 * 1024, // 40MB
+		pullrate:  40 * 1024 * 1024, // 40MB
+		pushrate:  40 * 1024 * 1024, // 40MB
 	}
 	// warmup
 	conn, e1 := net.Dial("tcp", s.srchost)
@@ -66,7 +70,18 @@ func (s *SlaveClient) initlog() error {
 }
 
 func (s *SlaveClient) SetPullRate(n int) {
-	s.rdbrate = n
+	s.pullrate = n
+}
+
+func (s *SlaveClient) SetPushRate(n int) {
+	s.pushrate = n
+}
+
+func (s *SlaveClient) Writer() io.Writer {
+	if s.destwriter == nil {
+		s.destwriter = ratelimit.NewRateLimiter(s.Dest(), s.pushrate)
+	}
+	return s.destwriter
 }
 
 func (s *SlaveClient) Dest() *Session {
@@ -146,7 +161,7 @@ func (s *SlaveClient) writeCommand(cmd *Command) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for {
-		err := s.Dest().WriteCommand(cmd)
+		_, err := s.Writer().Write(cmd.Bytes())
 		if err != nil {
 			s.dest = nil
 			stdlog.Println("WRITE_ERR", err, cmd)
@@ -188,7 +203,7 @@ func (s *SlaveClient) recvRdb() (err error) {
 	// read
 	w := bufio.NewWriter(f)
 	// var written int64
-	_, err = iotool.RateLimitCopy(w, io.LimitReader(session, size), s.rdbrate, func(written int64, rate int) {
+	_, err = iotool.RateLimitCopy(w, io.LimitReader(session, size), s.pullrate, func(written int64, rate int) {
 		s.RdbRecvProcessCallback(written, rate)
 	})
 	if err != nil {
@@ -245,5 +260,5 @@ func (s *SlaveClient) rdbDecodeFinish(n int64) {
 }
 
 func (s *SlaveClient) RdbRecvProcessCallback(size int64, rate int) {
-	stdlog.Printf("[M %s] rdb recv: %s/%s, rate:%s\n", s.src.RemoteAddr(), bytesInHuman(size), bytesInHuman(s.totalsize), bytesInHuman(size))
+	stdlog.Printf("[M %s] rdb recv: %s/%s, rate:%s\n", s.src.RemoteAddr(), bytesInHuman(size), bytesInHuman(s.totalsize), bytesInHuman(int64(rate)))
 }
