@@ -9,3 +9,8 @@ type GoRedisProxy struct {
 	ServerHandler
 	RedisServer
 }
+
+func NewProxy() (s *GoRedisProxy) {
+	s = &GoRedisProxy{}
+	return
+}
