@@ -412,8 +412,9 @@ func (l *LevelRedis) KeyEnumerate(seek []byte, direction IterDirection, fn func(
 
 	minkey := joinStringBytes(KEY_PREFIX, SEP_LEFT, string(seek))
 	maxkey := []byte{MAXBYTE}
+	prefix := joinStringBytes(KEY_PREFIX, SEP_LEFT)
 	l.Enumerate(iter, minkey, maxkey, direction, func(i int, key, value []byte, quit *bool) {
-		if !bytes.HasPrefix(key, minkey) {
+		if !bytes.HasPrefix(key, prefix) {
 			*quit = true
 			return
 		}

@@ -68,7 +68,7 @@ func (server *GoRedisServer) initSignalNotify() {
 		server.levelRedis.Close()
 		server.synclog.Close()
 		stdlog.Println("bye")
-		time.Sleep(time.Millisecond * 7000) // 休息一下
+		time.Sleep(time.Millisecond * 4000) // 休息一下
 		os.Exit(0)
 	}()
 }
@@ -79,9 +79,9 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 	cache := levelredis.NewLRUCache(512 * 1024 * 1024)
 	opts.SetCache(cache)
 	opts.SetCompression(levelredis.SnappyCompression)
-	opts.SetBlockSize(32 * 1024)
+	opts.SetBlockSize(16 * 1024)
 	opts.SetMaxBackgroundCompactions(6)
-	opts.SetWriteBufferSize(128 * 1024 * 1024)
+	opts.SetWriteBufferSize(32 * 1024 * 1024)
 	opts.SetMaxOpenFiles(100000)
 	opts.SetCreateIfMissing(true)
 	env := levelredis.NewDefaultEnv()
@@ -108,9 +108,9 @@ func (server *GoRedisServer) initSyncLog() error {
 	cache := levelredis.NewLRUCache(32 * 1024 * 1024)
 	opts.SetCache(cache)
 	opts.SetCompression(levelredis.SnappyCompression)
-	opts.SetBlockSize(32 * 1024)
+	opts.SetBlockSize(16 * 1024)
 	opts.SetMaxBackgroundCompactions(2)
-	opts.SetWriteBufferSize(128 * 1024 * 1024)
+	opts.SetWriteBufferSize(32 * 1024 * 1024)
 	opts.SetMaxOpenFiles(100000)
 	opts.SetCreateIfMissing(true)
 	env := levelredis.NewDefaultEnv()

@@ -4,6 +4,12 @@ GoRedis和GoRedis之间可以实现一主多从或一从多主，同时同步过
 
 GoRedis可以作为一个或多个Redis的从库，但暂时不可以作为Redis的主库（计划中）。
 
+
+### 配置方式
+
+目前只支持
+
+
 #### GoRedis与GoRedis
 
 ##### 同步机制
