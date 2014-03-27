@@ -57,15 +57,8 @@ func (server *GoRedisServer) doSync(session *Session, cmd *Command) (err error) 
 			return
 		}
 	}
-	if nextseq < 0 {
-		nextseq = 0
-	}
-	remoteHost := session.GetAttribute(S_HOST).(string)
 
-	if nextseq < server.synclog.MinSeq() || nextseq > server.synclog.MaxSeq()+1 {
-		stdlog.Printf("[S %s] seq %d not in (%d, %d), closed\n", remoteHost, nextseq, server.synclog.MinSeq(), server.synclog.MaxSeq())
-		return errors.New("bad seq range")
-	}
+	remoteHost := session.GetAttribute(S_HOST).(string)
 
 	if session.GetAttribute("SNAP") != nil && session.GetAttribute("SNAP").(string) == "1" {
 		session.SetAttribute(S_STATUS, REPL_SEND_BULK)
@@ -73,6 +66,14 @@ func (server *GoRedisServer) doSync(session *Session, cmd *Command) (err error) 
 			stdlog.Printf("[S %s] snap send broken (%s)\n", remoteHost, err)
 			return
 		}
+	}
+
+	if nextseq < 0 {
+		nextseq = 0
+	}
+	if nextseq < server.synclog.MinSeq() || nextseq > server.synclog.MaxSeq()+1 {
+		stdlog.Printf("[S %s] seq %d not in (%d, %d), closed\n", remoteHost, nextseq, server.synclog.MinSeq(), server.synclog.MaxSeq())
+		return errors.New("bad seq range")
 	}
 
 	// 如果整个同步过程s
