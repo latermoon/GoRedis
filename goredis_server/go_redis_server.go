@@ -5,9 +5,9 @@ import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"
 	"GoRedis/libs/levelredis"
-	"GoRedis/libs/stat"
 	"GoRedis/libs/stdlog"
 	"GoRedis/libs/uuid"
+	"container/list"
 	"errors"
 	"os"
 	"reflect"
@@ -18,7 +18,7 @@ import (
 )
 
 // TODO 版本号，每次更新都需要升级一下
-const VERSION = "1.0.62"
+const VERSION = "1.0.66"
 const PREFIX = "__goredis:"
 
 var (
@@ -47,9 +47,6 @@ type GoRedisServer struct {
 	execCounters    *counter.Counters //指令执行时间计数器
 	// info
 	info *Info
-	// logger
-	cmdMonitor    *stat.Writer
-	leveldbStatus *stat.Writer
 	// 从库
 	uid       string          // 实例id
 	syncmgr   *SessionManager // as master
@@ -66,8 +63,9 @@ type GoRedisServer struct {
 	rwlock  sync.RWMutex
 	rwwait  sync.WaitGroup
 	// exit
-	sigs    chan os.Signal
-	closing bool // 准备退出
+	sigs        chan os.Signal
+	closing     bool       // 准备退出
+	closingFunc *list.List // 退出执行函数FIFO
 }
 
 /*
@@ -82,6 +80,7 @@ func NewGoRedisServer(opt *Options) (server *GoRedisServer) {
 	server.SetHandler(server)
 	server.methodCache = make(map[string]reflect.Value)
 	server.cmdChan = make(chan *CommandEx, 1000)
+	server.closingFunc = list.New()
 	go server.processCommandChan()
 	server.monmgr = NewSessionManager()
 	server.syncmgr = NewSessionManager()
