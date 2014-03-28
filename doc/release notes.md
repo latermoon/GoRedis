@@ -1,6 +1,10 @@
 GoRedis release notes
 =====================
 
+**GoRedis 1.0.66** @2014.3.28
+
+* [Fix] make release rocksdb, defined NDEBUG
+
 **GoRedis 1.0.64** @2014.3.28
 
 * [Fix] 增加DeferClosing

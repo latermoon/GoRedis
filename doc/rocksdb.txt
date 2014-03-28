@@ -1,5 +1,10 @@
-rocksdb
+rocksdb安装
 
 export CXX=/opt/rh/devtoolset-2/root/usr/bin/g++
 export CC=/opt/rh/devtoolset-2/root/usr/bin/gcc
+make release
 make shared_lib
+
+
+export CGO_CFLAGS="-I/home/download/rocksdb/include/"
+export CGO_LDFLAGS="-L/home/download/rocksdb/ -lsnappy -lgflags -lz -lbz2"
