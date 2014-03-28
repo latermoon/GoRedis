@@ -1,0 +1,5 @@
+rocksdb
+
+export CXX=/opt/rh/devtoolset-2/root/usr/bin/g++
+export CC=/opt/rh/devtoolset-2/root/usr/bin/gcc
+make shared_lib
