@@ -13,12 +13,6 @@ GoRedis
 	3、Hash/Set/List/SortedSet也是基于rocksdb的特点设计，可以实现海量日志存储而不消耗内存
 	4、MultiSlave，GoRedis之间可以一主多从和一从多主
 
-#### TODO
-	1、精细修正命名和注释、日志等维护性代码
-	2、修正全部需要分配buf的地方，监控过大内存的分配
-	3、校对全部有error输出的地方是否处理正确
-	4、校对全部由用户传入的数据格式是否合法
-
 #### Install:
 	先安装rocksdb，复制代码，编译GoRedis
 	git clone github.com/latermoon/GoRedis
@@ -28,12 +22,5 @@ GoRedis
 #### Run:
 	cd /home/server/goredis/bin/
 	./goredis-server -procs 8 -p 1602
-
-#### 本地二次开发
-
-	将GoRedis目录软连到本地$GOPATH/src下，然后运行 sh install.sh 编译libs下的依赖包
-	cd $GOAPTH/src
-	ln -s ~/Downloads/GitHub/GoRedis .
-	sh install.sh
 
 
