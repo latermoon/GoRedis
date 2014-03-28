@@ -1,6 +1,15 @@
 GoRedis release notes
 =====================
 
+**GoRedis 1.0.64** @2014.3.28
+
+* [Fix] 增加DeferClosing
+* [Fix] NoCache, Smaller BlockSize
+
+**GoRedis 1.0.63** @2014.3.27
+
+* [Fix] 修正keynext指令
+
 **GoRedis 1.0.62** @2014.3.19
 
 * [Feature] 调整主从同步指令，与旧版不兼容

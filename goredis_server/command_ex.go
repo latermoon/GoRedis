@@ -17,8 +17,8 @@ type CommandEx struct {
 func NewCommandEx(session *Session, cmd *Command) (c *CommandEx) {
 	c = &CommandEx{
 		session: session,
+		Command: cmd,
 	}
-	c.Command = cmd
 	return
 }
 

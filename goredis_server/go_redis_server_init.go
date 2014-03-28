@@ -16,7 +16,7 @@ func (server *GoRedisServer) Init() (err error) {
 
 	server.initSignalNotify()
 
-	stdlog.Println("server init ...")
+	stdlog.Println("server init, version", VERSION, "...")
 	err = server.initLevelDB()
 	if err != nil {
 		return
@@ -43,6 +43,46 @@ func (server *GoRedisServer) Init() (err error) {
 	return
 }
 
+// 关闭服务器前执行
+func (server *GoRedisServer) DeferClosing(fn func()) {
+	server.rwlock.Lock()
+	defer server.rwlock.Unlock()
+	server.closingFunc.PushBack(fn)
+}
+
+// 处理退出事件
+func (server *GoRedisServer) initSignalNotify() {
+	server.sigs = make(chan os.Signal, 1)
+	signal.Notify(server.sigs, syscall.SIGTERM)
+	go func() {
+		sig := <-server.sigs
+		stdlog.Println("recv signal:", sig)
+		server.Close()
+	}()
+}
+
+// 关闭服务
+func (server *GoRedisServer) Close() {
+	server.closing = true               // 标记退出
+	server.Suspend()                    // 挂起全部传入数据
+	time.Sleep(time.Millisecond * 2000) // 休息一下，Suspend瞬间可能还有数据库写入
+	server.levelRedis.Close()
+	server.levelRedis = nil // 防止调用
+	server.synclog.Close()
+	server.synclog = nil // 防止调用
+	for e := server.closingFunc.Front(); e != nil; e = e.Next() {
+		fn, ok := e.Value.(func())
+		if ok {
+			fn()
+		} else {
+			stdlog.Println("closing func err", e.Value)
+		}
+	}
+	time.Sleep(time.Millisecond * 2000) // 休息一下
+	stdlog.Println("bye")
+	os.Exit(0)
+}
+
 // 发起主从同步请求
 func (server *GoRedisServer) initSlaveOf() {
 	host, port := server.opt.SlaveOf()
@@ -55,31 +95,13 @@ func (server *GoRedisServer) initSlaveOf() {
 	}
 }
 
-// 处理退出事件
-func (server *GoRedisServer) initSignalNotify() {
-	server.sigs = make(chan os.Signal, 1)
-	signal.Notify(server.sigs, syscall.SIGTERM)
-	go func() {
-		sig := <-server.sigs
-		stdlog.Println("recv signal:", sig)
-		server.closing = true               // 标记退出
-		server.Suspend()                    // 挂起全部传入数据
-		time.Sleep(time.Millisecond * 2000) // 休息一下，Suspend瞬间可能还有数据库写入
-		server.levelRedis.Close()
-		server.synclog.Close()
-		stdlog.Println("bye")
-		time.Sleep(time.Millisecond * 4000) // 休息一下
-		os.Exit(0)
-	}()
-}
-
 // 初始化leveldb
 func (server *GoRedisServer) initLevelDB() (err error) {
 	opts := levelredis.NewOptions()
-	cache := levelredis.NewLRUCache(512 * 1024 * 1024)
-	opts.SetCache(cache)
+	// cache := levelredis.NewLRUCache(512 * 1024 * 1024)
+	// opts.SetCache(cache)
 	opts.SetCompression(levelredis.SnappyCompression)
-	opts.SetBlockSize(16 * 1024)
+	opts.SetBlockSize(8 * 1024)
 	opts.SetMaxBackgroundCompactions(6)
 	opts.SetWriteBufferSize(32 * 1024 * 1024)
 	opts.SetMaxOpenFiles(100000)
@@ -93,9 +115,9 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 		return e1
 	}
 	server.levelRedis = levelredis.NewLevelRedis(db, false)
-	server.levelRedis.SetClosingFunc(func() {
+	server.DeferClosing(func() {
 		opts.Close()
-		cache.Close()
+		// cache.Close()
 		env.Close()
 		stdlog.Println("db closed")
 	})
@@ -105,10 +127,10 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 // 初始化主从日志
 func (server *GoRedisServer) initSyncLog() error {
 	opts := levelredis.NewOptions()
-	cache := levelredis.NewLRUCache(32 * 1024 * 1024)
-	opts.SetCache(cache)
+	// cache := levelredis.NewLRUCache(200 * 10000)
+	// opts.SetCache(nil)
 	opts.SetCompression(levelredis.SnappyCompression)
-	opts.SetBlockSize(16 * 1024)
+	opts.SetBlockSize(4 * 1024)
 	opts.SetMaxBackgroundCompactions(2)
 	opts.SetWriteBufferSize(32 * 1024 * 1024)
 	opts.SetMaxOpenFiles(100000)
@@ -122,13 +144,13 @@ func (server *GoRedisServer) initSyncLog() error {
 		return e1
 	}
 	ldb := levelredis.NewLevelRedis(db, false)
-	ldb.SetClosingFunc(func() {
+	server.synclog = NewSyncLog(ldb, "sync")
+	server.DeferClosing(func() {
 		opts.Close()
-		cache.Close()
+		// cache.Close()
 		env.Close()
 		stdlog.Println("synclog closed")
 	})
-	server.synclog = NewSyncLog(ldb, "sync")
 	return nil
 }
 
@@ -139,8 +161,7 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 		panic(err)
 	}
 
-	server.cmdMonitor = stat.New(file)
-	st := server.cmdMonitor
+	st := stat.New(file)
 	st.Add(stat.TextItem("time", 8, func() interface{} { return stat.TimeString() }))
 	st.Add(stat.IncrItem("total", 7, func() int64 { return server.cmdCateCounters.Get("total").Count() }))
 	// key, string, hash, list, ...
@@ -157,6 +178,9 @@ func (server *GoRedisServer) initCommandMonitor(path string) {
 	st.Add(stat.TextItem("connection", 11, func() interface{} { return server.counters.Get("connection").Count() }))
 
 	go st.Start()
+	server.DeferClosing(func() {
+		st.Close()
+	})
 }
 
 func (server *GoRedisServer) initExecLog(path string) {
@@ -172,6 +196,9 @@ func (server *GoRedisServer) initExecLog(path string) {
 		}(name)
 	}
 	go st.Start()
+	server.DeferClosing(func() {
+		st.Close()
+	})
 }
 
 func (server *GoRedisServer) initSeqLog(path string) {
@@ -203,6 +230,9 @@ func (server *GoRedisServer) initSeqLog(path string) {
 		}
 	}))
 	go st.Start()
+	server.DeferClosing(func() {
+		st.Close()
+	})
 }
 
 func (server *GoRedisServer) initSlowlog(path string) {
@@ -219,8 +249,7 @@ func (server *GoRedisServer) initLeveldbIOLog(path string) {
 	if err != nil {
 		panic(err)
 	}
-	server.leveldbStatus = stat.New(file)
-	st := server.leveldbStatus
+	st := stat.New(file)
 	st.Add(stat.TextItem("time", 8, func() interface{} { return stat.TimeString() }))
 
 	// leveldb io 操作数
@@ -232,6 +261,9 @@ func (server *GoRedisServer) initLeveldbIOLog(path string) {
 		}(k)
 	}
 	go st.Start()
+	server.DeferClosing(func() {
+		st.Close()
+	})
 }
 
 func (server *GoRedisServer) initLeveldbStatsLog(path string) {
@@ -250,6 +282,9 @@ func (server *GoRedisServer) initLeveldbStatsLog(path string) {
 			file.WriteString("\n")
 		}
 	}()
+	server.DeferClosing(func() {
+		ticker.Stop()
+	})
 }
 
 func (server *GoRedisServer) initCommandCounterLog(cate string, cmds []string) {
@@ -271,4 +306,7 @@ func (server *GoRedisServer) initCommandCounterLog(cate string, cmds []string) {
 		}(k)
 	}
 	go st.Start()
+	server.DeferClosing(func() {
+		st.Close()
+	})
 }
