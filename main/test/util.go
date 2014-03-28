@@ -1,9 +1,15 @@
-package tool
+package test
 
 import (
 	"github.com/latermoon/redigo/redis"
 	"time"
 )
+
+var host = "localhost:1602"
+
+func NewRedisConn(host string) (redis.Conn, error) {
+	return redis.Dial("tcp", host)
+}
 
 func RedisPool(host string) (pool *redis.Pool) {
 	pool = &redis.Pool{
