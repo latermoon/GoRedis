@@ -98,8 +98,8 @@ func (server *GoRedisServer) initSlaveOf() {
 // 初始化leveldb
 func (server *GoRedisServer) initLevelDB() (err error) {
 	opts := levelredis.NewOptions()
-	// cache := levelredis.NewLRUCache(512 * 1024 * 1024)
-	// opts.SetCache(cache)
+	cache := levelredis.NewLRUCache(128 * 1024 * 1024)
+	opts.SetCache(cache)
 	opts.SetCompression(levelredis.SnappyCompression)
 	opts.SetBlockSize(8 * 1024)
 	opts.SetMaxBackgroundCompactions(6)
@@ -117,7 +117,7 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 	server.levelRedis = levelredis.NewLevelRedis(db, false)
 	server.DeferClosing(func() {
 		opts.Close()
-		// cache.Close()
+		cache.Close()
 		env.Close()
 		stdlog.Println("db closed")
 	})
@@ -127,8 +127,8 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 // 初始化主从日志
 func (server *GoRedisServer) initSyncLog() error {
 	opts := levelredis.NewOptions()
-	// cache := levelredis.NewLRUCache(200 * 10000)
-	// opts.SetCache(nil)
+	cache := levelredis.NewLRUCache(32 * 1024 * 1024)
+	opts.SetCache(cache)
 	opts.SetCompression(levelredis.SnappyCompression)
 	opts.SetBlockSize(4 * 1024)
 	opts.SetMaxBackgroundCompactions(2)
@@ -147,7 +147,7 @@ func (server *GoRedisServer) initSyncLog() error {
 	server.synclog = NewSyncLog(ldb, "sync")
 	server.DeferClosing(func() {
 		opts.Close()
-		// cache.Close()
+		cache.Close()
 		env.Close()
 		stdlog.Println("synclog closed")
 	})
