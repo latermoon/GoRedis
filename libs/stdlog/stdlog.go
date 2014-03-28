@@ -1,6 +1,6 @@
 // Copyright 2013 Latermoon. All rights reserved.
 
-// 一个简洁通用的log工具，模仿golang原生的log
+// 一个简洁通用的log工具，参照golang原生的log，增加灵活的用法
 //
 // 最主要的变化是使用函数作为Prefix，可以灵活输出想要的时间格式，以及Target、runtime.Caller等，而golang原生log无法定制
 //
@@ -8,9 +8,6 @@
 package stdlog
 
 /*
-Install:
-go get github.com/latermoon/GoRedis/libs/stdlog
-
 import "github.com/latermoon/GoRedis/libs/stdlog"
 
 一、单例用法
