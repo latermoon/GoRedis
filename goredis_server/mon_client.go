@@ -71,7 +71,11 @@ func (m *MonClient) Close() {
 // +1386347668.732167 [0 10.80.101.169:8400] "ZADD" "user:update:timestamp" "1.386347668E9" "40530990"
 func (m *MonClient) formatCommandLine(cmdex *CommandEx) (s string) {
 	// 对于cmd，用json编码，然后去掉前后的"[]"以及中间的逗号"," ["SET", "name", "latermoon"] => "SET" "name" "lateroon"
-	b, err := json.Marshal(cmdex.StringArgs())
+	args := make([]string, cmdex.Len())
+	for i, b := range cmdex.Args {
+		args[i] = string(b)
+	}
+	b, err := json.Marshal(args)
 	cmdstr := string(b)
 	if err != nil {
 		cmdstr = cmdex.String()

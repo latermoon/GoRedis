@@ -25,7 +25,7 @@ type Session struct {
 	conn              net.Conn
 	rw                *bufio.ReadWriter
 	mu                sync.RWMutex
-	attributes        map[string]interface{}
+	attrs             map[string]interface{}
 }
 
 func NewSession(conn net.Conn) (s *Session) {
@@ -38,19 +38,19 @@ func NewSession(conn net.Conn) (s *Session) {
 func (s *Session) SetAttribute(name string, v interface{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.attributes == nil {
-		s.attributes = make(map[string]interface{})
+	if s.attrs == nil {
+		s.attrs = make(map[string]interface{})
 	}
-	s.attributes[name] = v
+	s.attrs[name] = v
 }
 
 func (s *Session) GetAttribute(name string) interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.attributes == nil {
+	if s.attrs == nil {
 		return nil
 	}
-	return s.attributes[name]
+	return s.attrs[name]
 }
 
 // 返回数据到客户端

@@ -4,9 +4,7 @@ package levelredis
 
 import (
 	"GoRedis/libs/gorocks"
-	"GoRedis/libs/stdlog"
 	"bytes"
-	"runtime/debug"
 	"strconv"
 	"sync"
 )
@@ -91,12 +89,6 @@ func (l *LevelZSet) scoreKeyPrefixWith(scoreint int64) []byte {
 
 // _z[user_rank]s#1378000907596#100428 = ""
 func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
-	defer func() {
-		if err := recover(); err != nil {
-			stdlog.Printf("splitScoreKey: %s", string(scorekey))
-			stdlog.Printf("error %s\n%s", err, string(debug.Stack()))
-		}
-	}()
 	pos2 := bytes.LastIndex(scorekey, []byte(SEP))
 	sepr := bytes.Index(scorekey, []byte(SEP_RIGHT))
 	pos1 := bytes.Index(scorekey[sepr:], []byte(SEP)) + sepr
@@ -152,7 +144,7 @@ func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 	score := l.score(member)
 	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
-	// stdlog.Println("zincrby", l.key, string(member), incr, BytesToInt64(score))
+
 	oldcount := l.totalCount
 	if score == nil {
 		newscore = Int64ToBytes(incr)
