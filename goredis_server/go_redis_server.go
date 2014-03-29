@@ -143,7 +143,7 @@ func (server *GoRedisServer) On(session *Session, cmd Command) (reply Reply) {
 	server.rwlock.Lock()
 	server.rwlock.Unlock()
 
-	cmd.SetAttribute("session", session)
+	cmd.SetAttribute(C_SESSION, session)
 
 	// varify command
 	if err := verifyCommand(cmd); err != nil {
@@ -155,7 +155,7 @@ func (server *GoRedisServer) On(session *Session, cmd Command) (reply Reply) {
 	reply = server.invokeCommandHandler(session, cmd)
 
 	elapsed := time.Now().Sub(begin)
-	cmd.SetAttribute("elapsed", elapsed)
+	cmd.SetAttribute(C_ELAPSED, elapsed)
 
 	// async: counter/sync/monitor
 	server.rwwait.Add(1)
@@ -182,8 +182,8 @@ func (server *GoRedisServer) processCommandChan() {
 		cmdName := strings.ToUpper(cmd.StringAtIndex(0))
 
 		// last cmd
-		session := cmd.GetAttribute("session").(*Session)
-		session.SetAttribute("cmd", cmdName)
+		session := cmd.GetAttribute(C_SESSION).(*Session)
+		session.SetAttribute(S_LAST_COMMAND, cmdName)
 
 		server.incrCommandCounter(cmdName)
 
@@ -222,7 +222,7 @@ func (server *GoRedisServer) broadcastMonitor(cmd Command) {
 
 // 统计指令耗时
 func (server *GoRedisServer) calcExecTime(cmd Command) {
-	elapsed := cmd.GetAttribute("elapsed").(time.Duration)
+	elapsed := cmd.GetAttribute(C_ELAPSED).(time.Duration)
 	msec := elapsed.Seconds() * 1000
 	switch {
 	case msec < 1:
@@ -237,7 +237,7 @@ func (server *GoRedisServer) calcExecTime(cmd Command) {
 		server.execCounters.Get(">30ms").Incr(1)
 	}
 	if msec > slowexec {
-		session := cmd.GetAttribute("session").(*Session)
+		session := cmd.GetAttribute(C_SESSION).(*Session)
 		slowlog.Printf("[%s] exec %0.2f ms [%s]\n", session.RemoteAddr(), msec, cmd)
 	}
 }

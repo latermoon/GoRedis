@@ -83,7 +83,7 @@ func (m *MonClient) formatCommandLine(cmd Command) (s string) {
 		cmdstr = cmdstr[1 : len(cmdstr)-1] // trim "[" & "]"
 		cmdstr = strings.Replace(cmdstr, "\",\"", "\" \"", -1)
 	}
-	session := cmd.GetAttribute("session").(*Session)
+	session := cmd.GetAttribute(C_SESSION).(*Session)
 	s = fmt.Sprintf("+%f [0 %s] %s", float64(time.Now().UnixNano())/1e9, session.RemoteAddr(), cmdstr)
 	return
 }

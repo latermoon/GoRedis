@@ -21,6 +21,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd Command) (reply Reply)
 		return
 	}
 	for i := 0; i < len(args); i += 2 {
+		// 其中有PORT
 		session.SetAttribute(string(args[i]), string(args[i+1]))
 	}
 
