@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func (server *GoRedisServer) OnGC(session *Session, cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnGC(session *Session, cmd Command) (reply Reply) {
 	runtime.GC()
 	return StatusReply("OK")
 }
@@ -16,7 +16,7 @@ func (server *GoRedisServer) OnGC(session *Session, cmd *Command) (reply *Reply)
 // http://1234n.com/?post/wgskfs
 // http://blog.golang.org/profiling-go-programs
 // http://www.cnblogs.com/yjf512/archive/2012/12/27/2835331.html
-func (server *GoRedisServer) OnPPROF(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnPPROF(cmd Command) (reply Reply) {
 	action := cmd.StringAtIndex(1)
 	switch action {
 	case "mem":
@@ -36,7 +36,7 @@ func (server *GoRedisServer) OnPPROF(cmd *Command) (reply *Reply) {
 }
 
 // leveldb_prop "rocksdb.stats"
-func (server *GoRedisServer) OnLEVELDB_PROP(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnLEVELDB_PROP(cmd Command) (reply Reply) {
 	prop := cmd.StringAtIndex(1)
 	v := server.levelRedis.DB().PropertyValue(prop)
 	lines := strings.Split(v, "\n")

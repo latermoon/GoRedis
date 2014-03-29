@@ -5,19 +5,19 @@ import (
 )
 
 // 缓存下标对应的字符串
-var itoanums []string
+var itoaNums []string
 
 func init() {
-	itoanums = make([]string, 1000)
-	for i, count := 0, len(itoanums); i < count; i++ {
-		itoanums[i] = strconv.Itoa(i)
+	itoaNums = make([]string, 1000)
+	for i, count := 0, len(itoaNums); i < count; i++ {
+		itoaNums[i] = strconv.Itoa(i)
 	}
 }
 
 // 经过缓存优化的itoa函数，减少strconv.Itoa的调用
 func itoa(i int) string {
-	if i < len(itoanums) {
-		return itoanums[i]
+	if i >= 0 && i < len(itoaNums) {
+		return itoaNums[i]
 	} else {
 		return strconv.Itoa(i)
 	}

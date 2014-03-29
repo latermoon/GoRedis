@@ -21,7 +21,7 @@ type MonitorReader struct {
 	host               string
 	reader             *bufio.Reader
 	DidRecvMonitorLine func(line string)
-	DidRecvCommand     func(cmd *Command, prefix string)
+	DidRecvCommand     func(cmd Command, prefix string)
 }
 
 func NewMonitorReader(host string) (m *MonitorReader) {
@@ -65,9 +65,9 @@ func (m *MonitorReader) Connect() (err error) {
 		}
 
 		if m.DidRecvCommand != nil {
-			cmd := &Command{}
-			cmd.Args = make([][]byte, 0, 5)
-			splitMonitorLine(line, cmd)
+			args := make([][]byte, 0, 5)
+			splitMonitorLine(line, args)
+			cmd := NewCommand(args...)
 			rightSep := bytes.Index(line, []byte("]"))
 			prefix := line[:rightSep+1]
 			m.DidRecvCommand(cmd, string(prefix))
@@ -78,7 +78,7 @@ func (m *MonitorReader) Connect() (err error) {
 
 // 将monitor里输出的 +1386347668.732167 [0 10.80.101.169:8400] "ZADD" "user:update:timestamp" "1.386347668E9" "40530990"
 // 转换为Command对象
-func splitMonitorLine(line []byte, cmd *Command) (err error) {
+func splitMonitorLine(line []byte, args [][]byte) (err error) {
 	firstQuote := bytes.Index(line, []byte("\""))    // 第一个引号
 	lastQuote := bytes.LastIndex(line, []byte("\"")) // 最后一个引号，主要是为了去掉最后的换行符
 
@@ -98,8 +98,8 @@ func splitMonitorLine(line []byte, cmd *Command) (err error) {
 			quoteMatched++
 			// 遇到第一个引号，创建内存空间
 			if quoteMatched == 1 {
-				cmd.Args = append(cmd.Args, []byte{})
-				argidx = len(cmd.Args) - 1
+				args = append(args, []byte{})
+				argidx = len(args) - 1
 			} else if quoteMatched == 2 {
 				// 遇到另一个引号，标记关闭
 				quoteMatched = 0
@@ -107,7 +107,7 @@ func splitMonitorLine(line []byte, cmd *Command) (err error) {
 		case ' ':
 			//  引号内的空格属于内容
 			if quoteMatched == 1 {
-				cmd.Args[argidx] = append(cmd.Args[argidx], c)
+				args[argidx] = append(args[argidx], c)
 			}
 		case '\\':
 			// 转义字符，添加下一个字符
@@ -115,9 +115,9 @@ func splitMonitorLine(line []byte, cmd *Command) (err error) {
 			if err != nil {
 				break
 			}
-			cmd.Args[argidx] = append(cmd.Args[argidx], c)
+			args[argidx] = append(args[argidx], c)
 		default:
-			cmd.Args[argidx] = append(cmd.Args[argidx], c)
+			args[argidx] = append(args[argidx], c)
 		}
 	}
 	return

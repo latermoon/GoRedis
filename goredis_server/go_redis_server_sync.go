@@ -12,10 +12,10 @@ import (
 )
 
 // S: SYNC UID [UID] PORT [PORT] SNAP [1/0] SEQ [-1/...]
-func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnSYNC(session *Session, cmd Command) (reply Reply) {
 	stdlog.Printf("[S %s] %s\n", session.RemoteAddr(), cmd)
 
-	args := cmd.Args[1:]
+	args := cmd.Args()[1:]
 	if len(args) < 2 || len(args)%2 != 0 {
 		session.Close()
 		return
@@ -48,7 +48,7 @@ func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Repl
 	return NOREPLY
 }
 
-func (server *GoRedisServer) doSync(session *Session, cmd *Command) (err error) {
+func (server *GoRedisServer) doSync(session *Session, cmd Command) (err error) {
 	// snapshot
 	var nextseq int64
 	if session.GetAttribute("SEQ") != nil {

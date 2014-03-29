@@ -10,39 +10,65 @@ import (
 )
 
 // Command
-type Command struct {
-	Args [][]byte
+type Command interface {
+	Args() [][]byte // command data
+	Len() int       // len(Args())
+	Bytes() []byte  // Redis协议
+	String() string
+	// Accessor
+	ArgAtIndex(i int) (arg []byte, err error)
+	IntAtIndex(i int) (n int, err error)
+	Int64AtIndex(i int) (n int64, err error)
+	FloatAtIndex(i int) (n float64, err error)
+	StringAtIndex(i int) string
+	// Attribte
+	SetAttribute(name string, v interface{})
+	GetAttribute(name string) (v interface{})
 }
 
-func NewCommand(args ...[]byte) (cmd *Command) {
-	cmd = &Command{
-		Args: args,
+// 内部实现
+type baseCommand struct {
+	args  [][]byte
+	attrs map[string]interface{}
+}
+
+func NewCommand(args ...[]byte) (cmd Command) {
+	cmd = &baseCommand{
+		args:  args,
+		attrs: make(map[string]interface{}),
 	}
 	return
 }
 
-// Name returns cmd.Args[0]
-func (cmd *Command) Name() string {
-	return string(cmd.Args[0])
+func (cmd *baseCommand) SetAttribute(name string, v interface{}) {
+	cmd.attrs[name] = v
 }
 
-func (cmd *Command) StringAtIndex(i int) string {
-	if i >= len(cmd.Args) {
+func (cmd *baseCommand) GetAttribute(name string) (v interface{}) {
+	return cmd.attrs[name]
+}
+
+func (cmd *baseCommand) Args() [][]byte {
+	return cmd.args
+}
+
+func (cmd *baseCommand) StringAtIndex(i int) string {
+	if i >= cmd.Len() {
 		return ""
 	}
-	return string(cmd.Args[i])
+	return string(cmd.args[i])
 }
 
-func (cmd *Command) ArgAtIndex(i int) (arg []byte, err error) {
-	if i >= len(cmd.Args) {
-		err = errors.New(fmt.Sprintf("out of range %d/%d", i, len(cmd.Args)))
+func (cmd *baseCommand) ArgAtIndex(i int) (arg []byte, err error) {
+	if i >= cmd.Len() {
+		err = errors.New(fmt.Sprintf("out of range %d/%d", i, cmd.Len()))
 		return
 	}
-	arg = cmd.Args[i]
+	arg = cmd.args[i]
 	return
 }
 
-func (cmd *Command) IntAtIndex(i int) (n int, err error) {
+func (cmd *baseCommand) IntAtIndex(i int) (n int, err error) {
 	var f float64
 	if f, err = cmd.FloatAtIndex(i); err == nil {
 		n = int(f)
@@ -50,7 +76,7 @@ func (cmd *Command) IntAtIndex(i int) (n int, err error) {
 	return
 }
 
-func (cmd *Command) Int64AtIndex(i int) (n int64, err error) {
+func (cmd *baseCommand) Int64AtIndex(i int) (n int64, err error) {
 	var f float64
 	if f, err = cmd.FloatAtIndex(i); err == nil {
 		n = int64(f)
@@ -58,17 +84,17 @@ func (cmd *Command) Int64AtIndex(i int) (n int64, err error) {
 	return
 }
 
-func (cmd *Command) FloatAtIndex(i int) (n float64, err error) {
-	if i >= len(cmd.Args) {
-		err = errors.New(fmt.Sprintf("out of range %d/%d", i, len(cmd.Args)))
+func (cmd *baseCommand) FloatAtIndex(i int) (n float64, err error) {
+	if i >= cmd.Len() {
+		err = errors.New(fmt.Sprintf("out of range %d/%d", i, cmd.Len()))
 		return
 	}
-	n, err = strconv.ParseFloat(string(cmd.Args[i]), 64)
+	n, err = strconv.ParseFloat(string(cmd.args[i]), 64)
 	return
 }
 
-func (cmd *Command) Len() int {
-	return len(cmd.Args)
+func (cmd *baseCommand) Len() int {
+	return len(cmd.args)
 }
 
 // Redis协议的Command数据
@@ -80,76 +106,76 @@ $<number of bytes of argument 1> CR LF
 $<number of bytes of argument N> CR LF
 <argument data> CR LF
 */
-func (cmd *Command) Bytes() []byte {
+func (cmd *baseCommand) Bytes() []byte {
 	buf := bytes.Buffer{}
 	buf.WriteByte('*')
-	argCount := len(cmd.Args)
+	argCount := cmd.Len()
 	//<number of arguments>
 	buf.WriteString(itoa(argCount))
 	buf.WriteString(CRLF)
 	for i := 0; i < argCount; i++ {
 		buf.WriteByte('$')
 		//<number of bytes of argument i>
-		argSize := len(cmd.Args[i])
+		argSize := len(cmd.args[i])
 		buf.WriteString(itoa(argSize))
 		buf.WriteString(CRLF)
-		buf.Write(cmd.Args[i]) //<argument data>
+		buf.Write(cmd.args[i]) //<argument data>
 		buf.WriteString(CRLF)
 	}
 	return buf.Bytes()
 }
 
-// func ParseCommand(buf *bytes.Buffer) (*Command, error) {
-// 	cmd := &Command{}
+func ParseCommand(buf *bytes.Buffer) (Command, error) {
+	cmd := &baseCommand{}
 
-// 	// Read ( *<number of arguments> CR LF )
-// 	if c, err := buf.ReadByte(); c != '*' { // io.EOF
-// 		return nil, err
-// 	}
-// 	// number of arguments
-// 	line, err := buf.ReadBytes(LF)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	argCount, _ := strconv.Atoi(string(line[:len(line)-2]))
-// 	cmd.Args = make([][]byte, argCount)
-// 	for i := 0; i < argCount; i++ {
-// 		// Read ( $<number of bytes of argument 1> CR LF )
-// 		if c, err := buf.ReadByte(); c != '$' {
-// 			return nil, err
-// 		}
+	// Read ( *<number of arguments> CR LF )
+	if c, err := buf.ReadByte(); c != '*' { // io.EOF
+		return nil, err
+	}
+	// number of arguments
+	line, err := buf.ReadBytes(LF)
+	if err != nil {
+		return nil, err
+	}
+	argCount, _ := strconv.Atoi(string(line[:len(line)-2]))
+	cmd.args = make([][]byte, argCount)
+	for i := 0; i < argCount; i++ {
+		// Read ( $<number of bytes of argument 1> CR LF )
+		if c, err := buf.ReadByte(); c != '$' {
+			return nil, err
+		}
 
-// 		line, err := buf.ReadBytes(LF)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		argSize, _ := strconv.Atoi(string(line[:len(line)-2]))
-// 		// Read ( <argument data> CR LF )
-// 		cmd.Args[i] = make([]byte, argSize)
-// 		n, e2 := buf.Read(cmd.Args[i])
-// 		if n != argSize {
-// 			return nil, errors.New("argSize too short")
-// 		}
-// 		if e2 != nil {
-// 			return nil, e2
-// 		}
+		line, err := buf.ReadBytes(LF)
+		if err != nil {
+			return nil, err
+		}
+		argSize, _ := strconv.Atoi(string(line[:len(line)-2]))
+		// Read ( <argument data> CR LF )
+		cmd.args[i] = make([]byte, argSize)
+		n, e2 := buf.Read(cmd.args[i])
+		if n != argSize {
+			return nil, errors.New("argSize too short")
+		}
+		if e2 != nil {
+			return nil, e2
+		}
 
-// 		_, err = buf.ReadBytes(LF)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
+		_, err = buf.ReadBytes(LF)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-// 	return cmd, nil
-// }
+	return cmd, nil
+}
 
-func (cmd *Command) String() string {
+func (cmd *baseCommand) String() string {
 	buf := &bytes.Buffer{}
 	for i, count := 0, cmd.Len(); i < count; i++ {
 		if i > 0 {
 			buf.WriteString(" ")
 		}
-		buf.Write(cmd.Args[i])
+		buf.Write(cmd.args[i])
 	}
 	return buf.String()
 }

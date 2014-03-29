@@ -79,24 +79,24 @@ func splitHostPort(addr string) (host string, port int) {
 func redisInfo(session *Session) (isgoredis bool, version string, err error) {
 	cmdinfo := NewCommand([]byte("info"), []byte("server"))
 	session.WriteCommand(cmdinfo)
-	var reply *Reply
+	var reply Reply
 	reply, err = session.ReadReply()
 	if err != nil {
 		return
 	}
-	if reply.Value == nil {
+	if reply.Value() == nil {
 		err = errors.New("reply nil")
 		return
 	}
 
 	var info string
-	switch reply.Value.(type) {
+	switch reply.Value().(type) {
 	case string:
-		info = reply.Value.(string)
+		info = reply.Value().(string)
 	case []byte:
-		info = string(reply.Value.([]byte))
+		info = string(reply.Value().([]byte))
 	default:
-		info = reply.String()
+		info = fmt.Sprint(reply)
 	}
 
 	// 切分info返回的数据，存放到map里

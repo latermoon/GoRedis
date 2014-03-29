@@ -4,9 +4,9 @@ import (
 	. "GoRedis/goredis"
 )
 
-func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnLPUSH(cmd Command) (reply Reply) {
 	key := cmd.StringAtIndex(1)
-	vals := cmd.Args[2:]
+	vals := cmd.Args()[2:]
 	lst := server.levelRedis.GetList(key)
 	err := lst.LPush(vals...)
 	if err != nil {
@@ -16,9 +16,9 @@ func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 	return IntegerReply(length)
 }
 
-func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnRPUSH(cmd Command) (reply Reply) {
 	key := cmd.StringAtIndex(1)
-	vals := cmd.Args[2:]
+	vals := cmd.Args()[2:]
 	lst := server.levelRedis.GetList(key)
 	err := lst.RPush(vals...)
 	if err != nil {
@@ -28,7 +28,7 @@ func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 	return IntegerReply(length)
 }
 
-func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnRPOP(cmd Command) (reply Reply) {
 	key := cmd.StringAtIndex(1)
 	lst := server.levelRedis.GetList(key)
 	if lst == nil {
@@ -46,7 +46,7 @@ func (server *GoRedisServer) OnRPOP(cmd *Command) (reply *Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnLPOP(cmd Command) (reply Reply) {
 	key := cmd.StringAtIndex(1)
 	lst := server.levelRedis.GetList(key)
 	if lst == nil {
@@ -64,7 +64,7 @@ func (server *GoRedisServer) OnLPOP(cmd *Command) (reply *Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnLINDEX(cmd Command) (reply Reply) {
 	key := cmd.StringAtIndex(1)
 	lst := server.levelRedis.GetList(key)
 	if lst == nil {
@@ -84,7 +84,7 @@ func (server *GoRedisServer) OnLINDEX(cmd *Command) (reply *Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnLTRIM(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnLTRIM(cmd Command) (reply Reply) {
 	key := cmd.StringAtIndex(1)
 	lst := server.levelRedis.GetList(key)
 	start, e1 := cmd.IntAtIndex(2)
@@ -101,7 +101,7 @@ func (server *GoRedisServer) OnLTRIM(cmd *Command) (reply *Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnLRANGE(cmd Command) (reply Reply) {
 	key := cmd.StringAtIndex(1)
 	lst := server.levelRedis.GetList(key)
 	start, e1 := cmd.IntAtIndex(2)
@@ -132,7 +132,7 @@ func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnLLEN(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnLLEN(cmd Command) (reply Reply) {
 	key := cmd.StringAtIndex(1)
 	lst := server.levelRedis.GetList(key)
 	if lst == nil {

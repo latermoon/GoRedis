@@ -22,8 +22,8 @@ type SlaveClient struct {
 	ISlaveClient
 	session  *Session
 	server   *GoRedisServer
-	buffer   chan *Command // 缓存实时指令
-	rdbjobs  chan int      // 并发工作
+	buffer   chan Command // 缓存实时指令
+	rdbjobs  chan int     // 并发工作
 	wg       sync.WaitGroup
 	broken   bool // 无效连接
 	counters *counter.Counters
@@ -34,7 +34,7 @@ func NewSlaveClient(server *GoRedisServer, session *Session) (s *SlaveClient, er
 	s = &SlaveClient{}
 	s.server = server
 	s.session = session
-	s.buffer = make(chan *Command, 1000*10000)
+	s.buffer = make(chan Command, 1000*10000)
 	s.rdbjobs = make(chan int, 10)
 	s.counters = counter.NewCounters()
 	os.Mkdir(s.directory(), os.ModePerm)
@@ -101,7 +101,7 @@ func (s *SlaveClient) Sync() (err error) {
 			}
 			s.IdleCallback()
 		} else {
-			var cmd *Command
+			var cmd Command
 			cmd, err = s.session.ReadCommand()
 			if err != nil {
 				break
@@ -197,7 +197,7 @@ func (s *SlaveClient) RdbRecvFinishCallback(r *bufio.Reader) {
 	return
 }
 
-func (s *SlaveClient) rdbDecodeCommand(cmd *Command) {
+func (s *SlaveClient) rdbDecodeCommand(cmd Command) {
 	// slavelog.Printf("[M %s] rdb decode %s\n", client.RemoteAddr(), cmd)
 	s.counters.Get("rdb").Incr(1)
 	s.rdbjobs <- 1
@@ -224,7 +224,7 @@ func (s *SlaveClient) IdleCallback() {
 	slavelog.Printf("[M %s] slaveof waiting\n", s.session.RemoteAddr())
 }
 
-func (s *SlaveClient) CommandRecvCallback(cmd *Command) {
+func (s *SlaveClient) CommandRecvCallback(cmd Command) {
 	// slavelog.Printf("[M %s] recv: %s\n", s.session.RemoteAddr(), cmd)
 	s.counters.Get("recv").Incr(1)
 	s.buffer <- cmd

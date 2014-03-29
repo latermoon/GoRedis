@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func (server *GoRedisServer) OnINFO(cmd *Command) (reply *Reply) {
+func (server *GoRedisServer) OnINFO(cmd Command) (reply Reply) {
 	section := strings.ToLower(cmd.StringAtIndex(1))
 	switch section {
 	case "memory":
