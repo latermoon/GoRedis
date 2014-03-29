@@ -45,4 +45,23 @@ func TestHash(t *testing.T) {
 			t.Error("bad reply")
 		}
 	}
+
+	// if reply, err := conn.Do("HINCRBY", "user", "age", "2"); err != nil {
+	// 	t.Fatal(err)
+	// } else if reply.(int64) != 14 {
+	// 	t.Error("bad reply")
+	// }
+
+	if reply, err := conn.Do("HLEN", "user"); err != nil {
+		t.Fatal(err)
+	} else if reply.(int64) != 3 {
+		t.Error("bad reply")
+	}
+
+	if reply, err := conn.Do("HDEL", "user", "sex"); err != nil {
+		t.Fatal(err)
+	} else if reply.(int64) != 1 {
+		t.Error("bad reply")
+	}
+
 }

@@ -79,6 +79,16 @@ func (l *LevelZSet) scoreKeyPrefix() []byte {
 	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, "s", SEP)
 }
 
+func (l *LevelZSet) scoreKeyPrefixWith(scoreint int64) []byte {
+	var sign string // 正负数
+	if scoreint < 0 {
+		sign = "0"
+	} else {
+		sign = "1"
+	}
+	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, "s", SEP, sign, string(Int64ToBytes(scoreint)))
+}
+
 // _z[user_rank]s#1378000907596#100428 = ""
 func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
 	defer func() {
@@ -227,15 +237,15 @@ func (l *LevelZSet) Enumerate(fn func(i int, member, score []byte, quit *bool)) 
 	})
 }
 
-func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count int) (scoreMembers [][]byte) {
+func (l *LevelZSet) RangeByScore(high2low bool, min, max int64, offset, count int) (scoreMembers [][]byte) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	direction := IterForward
 	if high2low {
 		direction = IterBackward
 	}
-	min2 := joinBytes(l.scoreKeyPrefix(), min)
-	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
+	min2 := l.scoreKeyPrefixWith(min)
+	max2 := joinBytes(l.scoreKeyPrefixWith(max), []byte{MAXBYTE})
 	scoreMembers = make([][]byte, 0, 2)
 	l.redis.RangeEnumerate(min2, max2, direction, func(i int, key, value []byte, quit *bool) {
 		if i < offset { // skip
@@ -309,11 +319,11 @@ func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 	return
 }
 
-func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
+func (l *LevelZSet) RemoveByScore(min, max int64) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	min2 := joinBytes(l.scoreKeyPrefix(), min)
-	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
+	min2 := l.scoreKeyPrefixWith(min)
+	max2 := joinBytes(l.scoreKeyPrefixWith(max), []byte{MAXBYTE})
 	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	l.redis.RangeEnumerate(min2, max2, IterForward, func(i int, key, value []byte, quit *bool) {

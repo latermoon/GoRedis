@@ -106,10 +106,13 @@ func (server *GoRedisServer) OnZREVRANGE(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) rangeByScore(cmd *Command, high2low bool) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	min, e1 := cmd.Int64AtIndex(2)
-	max, e2 := cmd.Int64AtIndex(3)
+	score1, e1 := cmd.Int64AtIndex(2)
+	score2, e2 := cmd.Int64AtIndex(3)
 	if e1 != nil || e2 != nil {
 		return ErrorReply("Bad min/max")
+	}
+	if high2low {
+		score1, score2 = score2, score1
 	}
 	// 输出score
 	withScore := false
@@ -117,7 +120,7 @@ func (server *GoRedisServer) rangeByScore(cmd *Command, high2low bool) (reply *R
 		withScore = true
 	}
 	zset := server.levelRedis.GetSortedSet(key)
-	scoreMembers := zset.RangeByScore(high2low, Int64ToBytes(min), Int64ToBytes(max), 0, -1)
+	scoreMembers := zset.RangeByScore(high2low, score1, score2, 0, -1)
 	count := len(scoreMembers)
 	bulks := make([]interface{}, 0, count)
 	for i := 0; i < count; i += 2 {
@@ -179,7 +182,7 @@ func (server *GoRedisServer) OnZREMRANGEBYSCORE(cmd *Command) (reply *Reply) {
 		return ErrorReply("Bad min/max")
 	}
 	zset := server.levelRedis.GetSortedSet(key)
-	n := zset.RemoveByScore(Int64ToBytes(min), Int64ToBytes(max))
+	n := zset.RemoveByScore(min, max)
 	reply = IntegerReply(n)
 	return
 }
