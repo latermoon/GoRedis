@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/latermoon/redigo/redis"
 	"testing"
 )
 
@@ -66,4 +67,40 @@ func TestString(t *testing.T) {
 	} else if reply.(int64) != -2 {
 		t.Error("bad reply")
 	}
+}
+
+func BenchmarkIncr(b *testing.B) {
+	benchmark(b, func(conn redis.Conn) {
+		conn.Do("DEL", "count")
+	}, func(conn redis.Conn) (err error) {
+		_, err = conn.Do("INCR", "count")
+		return
+	})
+}
+
+func BenchmarkDecr(b *testing.B) {
+	benchmark(b, func(conn redis.Conn) {
+		conn.Do("SET", "count", "100000")
+	}, func(conn redis.Conn) (err error) {
+		_, err = conn.Do("DECR", "count")
+		return
+	})
+}
+
+func BenchmarkSet(b *testing.B) {
+	benchmark(b, func(conn redis.Conn) {
+		conn.Do("DEL", "str")
+	}, func(conn redis.Conn) (err error) {
+		_, err = conn.Do("SET", "str", "value")
+		return
+	})
+}
+
+func BenchmarkGet(b *testing.B) {
+	benchmark(b, func(conn redis.Conn) {
+		conn.Do("SET", "str", "value")
+	}, func(conn redis.Conn) (err error) {
+		_, err = conn.Do("GET", "str")
+		return
+	})
 }

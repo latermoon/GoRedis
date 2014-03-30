@@ -78,3 +78,7 @@ func commandCategory(cmd string) CCate {
 func needSync(cmd string) bool {
 	return synccmds[cmd]
 }
+
+func NeedSync(cmd string) bool {
+	return needSync(cmd)
+}
