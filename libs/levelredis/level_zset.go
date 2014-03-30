@@ -112,12 +112,13 @@ func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 			batch.Delete(l.scoreKey(member, oldscore))
 		} else {
 			l.totalCount++
+			// The number of elements added to the sorted sets, not including elements already existing for which the score was updated.
+			n++
 		}
 		// set member
 		batch.Put(memberkey, score)
 		// new score
 		batch.Put(l.scoreKey(member, score), nil)
-		n++
 	}
 	batch.Put(l.zsetKey(), l.zsetValue())
 	err := l.redis.WriteBatch(batch)

@@ -114,7 +114,7 @@ func (s *Session) ReadReply() (reply *Reply, err error) {
 		if argCount == -1 {
 			reply.Value = nil // *-1
 		} else {
-			args := make([][]byte, argCount)
+			args := make([]interface{}, argCount)
 			for i := 0; i < argCount; i++ {
 				// TODO multi bulk 的类型 $和:
 				err = s.skipByte('$')
@@ -129,11 +129,12 @@ func (s *Session) ReadReply() (reply *Reply, err error) {
 				if argSize == -1 {
 					args[i] = nil
 				} else {
-					args[i] = make([]byte, argSize)
-					_, err = io.ReadFull(s, args[i])
+					arg := make([]byte, argSize)
+					_, err = io.ReadFull(s, arg)
 					if err != nil {
 						break
 					}
+					args[i] = arg
 				}
 				s.skipBytes([]byte{CR, LF})
 			}

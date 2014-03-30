@@ -1,6 +1,7 @@
 package test
 
 import (
+	// "fmt"
 	"testing"
 )
 
@@ -38,10 +39,8 @@ func TestHash(t *testing.T) {
 		t.Fatal(err)
 	} else {
 		bulks := reply.([]interface{})
-		if string(bulks[0].([]byte)) != "age" ||
-			string(bulks[1].([]byte)) != "12" ||
-			string(bulks[2].([]byte)) != "sex" ||
-			string(bulks[3].([]byte)) != "male" {
+		if string(bulks[0].([]byte)) != "12" ||
+			string(bulks[1].([]byte)) != "male" {
 			t.Error("bad reply")
 		}
 	}

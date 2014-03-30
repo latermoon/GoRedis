@@ -43,10 +43,9 @@ func (server *GoRedisServer) OnHMGET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	hash := server.levelRedis.GetHash(key)
 	fields := cmd.Args()[2:]
-	keyvals := make([]interface{}, 0, len(fields)*2)
+	keyvals := make([]interface{}, 0, len(fields))
 	for _, field := range fields {
 		val := hash.Get(field)
-		keyvals = append(keyvals, field)
 		keyvals = append(keyvals, val)
 	}
 	reply = MultiBulksReply(keyvals)

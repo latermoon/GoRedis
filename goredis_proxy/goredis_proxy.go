@@ -5,11 +5,13 @@ import (
 	"GoRedis/goredis_server"
 	"GoRedis/libs/counter"
 	"GoRedis/libs/stdlog"
+	"errors"
+	"math/rand"
 	"runtime/debug"
 	"sync"
 )
 
-const VERSION = "1.0.2"
+const VERSION = "1.0.3"
 
 // Redis代理
 type GoRedisProxy struct {
@@ -75,18 +77,42 @@ func (server *GoRedisProxy) On(session *Session, cmd *Command) (reply *Reply) {
 		return server.OnINFO(session, cmd)
 	}
 
-	var err error
-	var remote *RemoteSession
-
-	// dispatch
-	if goredis_server.NeedSync(cmdName) {
-		remote = server.master
-	} else {
-		remote = server.slave
+	if cmd.Len() < 2 {
+		return ErrorReply("not support")
 	}
 
-	// process
-	reply, err = remote.Invoke(session, cmd)
+	key := cmd.StringAtIndex(1)
+
+	// dispatch
+	var err error
+	if isWriteAction(cmdName) {
+		// 写入主库
+		if server.options.CanWrite() {
+			reply, err = server.master.Invoke(session, cmd)
+			session.SetAttribute(S_LAST_WRITE_KEY, key)
+		} else {
+			err = errors.New("reject write")
+		}
+	} else {
+		// 默认顺序先从库，再主库
+		remotes := []*RemoteSession{server.slave, server.master}
+		lastWriteKey, ok := session.GetAttribute(S_LAST_WRITE_KEY).(string)
+		// 如果上次是写操作，然后再读取相同的key，优先访问主库，保障一致性
+		// 如果可以读主库，则随机读取，否则读从库
+		// 如果第一选择访问失败，则尝试第二选择而不论主从
+		if (ok && lastWriteKey == key) || (server.options.CanReadMaster() && rand.Intn(2) == 1) {
+			remotes[0], remotes[1] = remotes[1], remotes[0]
+		}
+		for _, remote := range remotes {
+			reply, err = remote.Invoke(session, cmd)
+			session.SetAttribute(S_LAST_WRITE_KEY, "")
+			if err == nil {
+				break
+			}
+		}
+	}
+
+	// check
 	if err != nil {
 		reply = ErrorReply(err)
 	}

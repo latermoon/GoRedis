@@ -1,7 +1,13 @@
 GoRedis release notes
 =====================
+**GoRedis 1.0.68** @2014.3.30
 
-**GoRedis 1.0.67** @2014.3.30
+* [Fix] 修正SADD返回值
+* [Fix] 修正HMGET返回值
+* [Fix] 修正ZADD返回值
+* [Fix] 修正Session.ReadReply兼容性
+
+**GoRedis 1.0.67** @2014.3.29
 
 * [Fix] 修正ZRANGEBYSCORE/ZREVRANGEBYSCORE/OnZREMRANGEBYSCORE
 * [Feature] 大量代码风格修正

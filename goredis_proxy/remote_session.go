@@ -10,9 +10,10 @@ import (
 )
 
 type RemoteInfo struct {
-	Ops_per_sec    int64
-	last_total_ops int64
-	Uptime         time.Time
+	Ops_per_sec        int64
+	last_total_ops     int64
+	Uptime             time.Time
+	LastCommandIsWrite bool
 }
 
 // RemoteSession表示一个远程会话

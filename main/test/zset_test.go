@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -91,15 +92,18 @@ func TestSortedSet(t *testing.T) {
 		t.Error("bad reply")
 	}
 
+	// B
 	if reply, err := conn.Do("ZCARD", "visitor"); err != nil {
 		t.Fatal(err)
 	} else if reply.(int64) != 1 {
 		t.Error("bad reply")
 	}
 
+	// ABCEFGH - B = 6
 	if reply, err := conn.Do("ZADD", "visitor", "4", "E", "5", "F", "1", "A", "2", "B", "3", "C", "6", "G", "7", "H"); err != nil {
 		t.Fatal(err)
-	} else if reply.(int64) != 7 {
+	} else if reply.(int64) != 6 {
+		fmt.Println(reply)
 		t.Error("bad reply")
 	}
 
