@@ -42,6 +42,9 @@ func (cmd *Command) Args() [][]byte {
 }
 
 func (cmd *Command) StringAtIndex(i int) string {
+	if i >= cmd.Len() {
+		return ""
+	}
 	return string(cmd.args[i])
 }
 

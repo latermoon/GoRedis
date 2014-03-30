@@ -6,9 +6,10 @@ import (
 	"GoRedis/libs/counter"
 	"GoRedis/libs/stdlog"
 	"runtime/debug"
+	"sync"
 )
 
-const VERSION = "1.0.1"
+const VERSION = "1.0.2"
 
 // Redis代理
 type GoRedisProxy struct {
@@ -23,6 +24,8 @@ type GoRedisProxy struct {
 	// sessions
 	master *RemoteSession
 	slave  *RemoteSession
+	// lock
+	rwlock sync.Mutex
 }
 
 func NewProxy(opt *Options) (s *GoRedisProxy) {
@@ -60,20 +63,29 @@ func (server *GoRedisProxy) ExceptionCaught(err error) {
 
 // ServerHandler.On()
 func (server *GoRedisProxy) On(session *Session, cmd *Command) (reply *Reply) {
+	// for Suspend & Resume
+	server.rwlock.Lock()
+	server.rwlock.Unlock()
+
 	cmdName := cmd.Name()
-	if cmdName == "INFO" {
+	switch cmdName {
+	case "CONFIG":
+		return server.OnCONFIG(session, cmd)
+	case "INFO":
 		return server.OnINFO(session, cmd)
 	}
 
 	var err error
 	var remote *RemoteSession
 
+	// dispatch
 	if goredis_server.NeedSync(cmdName) {
 		remote = server.master
 	} else {
 		remote = server.slave
 	}
 
+	// process
 	reply, err = remote.Invoke(session, cmd)
 	if err != nil {
 		stdlog.Println("invoke error", err)
@@ -82,12 +94,12 @@ func (server *GoRedisProxy) On(session *Session, cmd *Command) (reply *Reply) {
 	return
 }
 
-func (server *GoRedisProxy) OnINFO(session *Session, cmd *Command) (reply *Reply) {
-	lines := server.master.LockInfo()
-	bulks := make([]interface{}, len(lines))
-	for i, line := range lines {
-		bulks[i] = line
-	}
-	reply = MultiBulksReply(bulks)
-	return
+// 挂起
+func (server *GoRedisProxy) Suspend() {
+	server.rwlock.Lock()
+}
+
+// 恢复
+func (server *GoRedisProxy) Resume() {
+	server.rwlock.Unlock()
 }

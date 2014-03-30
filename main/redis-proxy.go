@@ -13,23 +13,32 @@ import (
 func main() {
 	runtime.GOMAXPROCS(8)
 	// options
-	opt := &goredis_proxy.Options{}
+	opt := goredis_proxy.NewOptions()
 	// flags
 	version := flag.Bool("v", false, "print goredis-proxy version")
 	flag.StringVar(&opt.Host, "h", "", "server host")
 	flag.IntVar(&opt.Port, "p", 1602, "server port")
 	flag.StringVar(&opt.MasterHost, "master", "", "master")
 	flag.StringVar(&opt.SlaveHost, "slave", "", "slave")
+	flag.StringVar(&opt.Mode, "mode", "rw", "rw(default) = only read from slave; rrw = read from both")
+	flag.IntVar(&opt.PoolSize, "poolsize", 100, "pool for remote server")
 	flag.Parse()
 
 	if *version {
-		fmt.Println("goredis-proxy ", goredis_proxy.VERSION)
+		fmt.Println("redis-proxy ", goredis_proxy.VERSION)
 		return
 	}
 
-	stdlog.Println("goredis-proxy ", goredis_proxy.VERSION)
+	if len(opt.MasterHost) == 0 || len(opt.SlaveHost) == 0 {
+		stdlog.Println("bad master/slave")
+		return
+	}
+
+	stdlog.Println("redis-proxy ", goredis_proxy.VERSION)
 	stdlog.Printf("master:[%s], slave:[%s]\n", opt.MasterHost, opt.SlaveHost)
 	stdlog.Println("listen", opt.Addr())
+
+	// start
 	server := goredis_proxy.NewProxy(opt)
 	err := server.Init()
 	if err != nil {
