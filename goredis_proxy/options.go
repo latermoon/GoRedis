@@ -5,10 +5,6 @@ import (
 	"strings"
 )
 
-// Mode=r, 从库提供读，写操作返回错误
-// Mode=rr, 主从均提供读，写操作返回错误
-// Mode=rw, 主库提供写，从库提供读
-// Mode=rrw，主库提供读写，从库提供读
 type Options struct {
 	MasterHost string
 	SlaveHost  string

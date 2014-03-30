@@ -9,7 +9,7 @@ import (
 // 配置Proxy
 // > config master localhost:6379
 // > config slave localhost:6379
-// > config mode rw/rrw
+// > config mode r/rr/rw/rrw
 func (server *GoRedisProxy) OnCONFIG(session *Session, cmd *Command) (reply *Reply) {
 	if cmd.Len() < 3 {
 		return ErrorReply("bad command")
@@ -64,6 +64,11 @@ func (server *GoRedisProxy) resetSlave(host string) (err error) {
 	return
 }
 
+// 包含w表示可写入，包容rr表示主从均可以读
+// mode=r, 从库提供读，写操作返回错误
+// mode=rr, 主从均提供读，写操作返回错误
+// mode=rw, 主库提供写，从库提供读
+// mode=rrw，主库提供写，主从均提供读
 func (server *GoRedisProxy) resetMode(mode string) (err error) {
 	server.Suspend()
 	defer server.Resume()
