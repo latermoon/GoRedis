@@ -22,7 +22,7 @@ func (server *GoRedisServer) replyClientList(session *Session, cmd Command) (rep
 	buf := bytes.Buffer{}
 	server.sessmgr.Enumerate(func(i int, key string, val interface{}) {
 		sess := val.(*Session)
-		lastcmd := sess.GetAttribute(S_LAST_COMMAND)
+		lastcmd := sess.GetAttribute("cmd")
 		if lastcmd == nil {
 			lastcmd = ""
 		}

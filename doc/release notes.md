@@ -4,7 +4,6 @@ GoRedis release notes
 **GoRedis 1.0.67** @2014.3.29
 
 * [Fix] 修正ZRANGEBYSCORE/ZREVRANGEBYSCORE/OnZREMRANGEBYSCORE
-* [Feature] Core Reflect
 
 **GoRedis 1.0.66** @2014.3.28
 
