@@ -28,11 +28,12 @@ func (o *Options) Addr() string {
 	return fmt.Sprintf("%s:%d", o.Host, o.Port)
 }
 
-// 是否允许写主库
+// 包含w表示可写入
 func (o *Options) CanWrite() bool {
 	return strings.Contains(o.Mode, "w")
 }
 
+// 包容rr表示主从均可以读
 func (o *Options) CanReadMaster() bool {
 	return strings.Contains(o.Mode, "rr")
 }
