@@ -15,7 +15,9 @@ type Options struct {
 
 func NewOptions() (o *Options) {
 	o = &Options{
+		Host:     "",
 		Port:     1602,
+		Mode:     "rw",
 		PoolSize: 100,
 	}
 	return

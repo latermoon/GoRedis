@@ -88,7 +88,6 @@ func (server *GoRedisProxy) On(session *Session, cmd *Command) (reply *Reply) {
 	// process
 	reply, err = remote.Invoke(session, cmd)
 	if err != nil {
-		stdlog.Println("invoke error", err)
 		reply = ErrorReply(err)
 	}
 	return
