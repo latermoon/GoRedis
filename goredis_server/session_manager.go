@@ -4,7 +4,7 @@ import (
 	"sync"
 )
 
-// 管理一堆连接，本质是一个安全的map
+// 通用连接管理，本质是一个安全的map
 type SessionManager struct {
 	clients map[string]interface{}
 	mu      sync.RWMutex

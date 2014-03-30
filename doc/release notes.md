@@ -1,9 +1,10 @@
 GoRedis release notes
 =====================
 
-**GoRedis 1.0.67** @2014.3.29
+**GoRedis 1.0.67** @2014.3.30
 
 * [Fix] 修正ZRANGEBYSCORE/ZREVRANGEBYSCORE/OnZREMRANGEBYSCORE
+* [Feature] 大量代码风格修正
 
 **GoRedis 1.0.66** @2014.3.28
 
