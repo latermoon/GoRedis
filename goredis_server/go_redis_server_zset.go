@@ -10,7 +10,7 @@ import (
 // Add one or more members to a sorted set, or update its score if it already exists
 func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	scoreMembers := cmd.Args[2:]
+	scoreMembers := cmd.Args()[2:]
 	count := len(scoreMembers)
 	if count%2 != 0 {
 		return ErrorReply("Bad argument count")
@@ -73,7 +73,7 @@ func (server *GoRedisServer) rangeByIndex(cmd *Command, high2low bool) (reply *R
 	}
 	// 输出score
 	withScore := false
-	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
+	if cmd.Len() >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
 		withScore = true
 	}
 	zset := server.levelRedis.GetSortedSet(key)
@@ -116,7 +116,7 @@ func (server *GoRedisServer) rangeByScore(cmd *Command, high2low bool) (reply *R
 	}
 	// 输出score
 	withScore := false
-	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
+	if cmd.Len() >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
 		withScore = true
 	}
 	zset := server.levelRedis.GetSortedSet(key)
@@ -150,7 +150,7 @@ func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd *Command) (reply *Reply) {
 // Remove one or more members from a sorted set
 func (server *GoRedisServer) OnZREM(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	members := cmd.Args[2:]
+	members := cmd.Args()[2:]
 	zset := server.levelRedis.GetSortedSet(key)
 	n := zset.Remove(members...)
 	reply = IntegerReply(n)

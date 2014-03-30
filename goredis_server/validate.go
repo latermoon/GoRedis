@@ -83,7 +83,7 @@ func verifyCommand(cmd *Command) error {
 		return BadCommandError
 	}
 
-	name := strings.ToUpper(cmd.Name())
+	name := cmd.Name()
 	rule, exist := cmdrules[name]
 	if !exist {
 		return nil

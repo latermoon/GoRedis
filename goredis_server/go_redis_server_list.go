@@ -6,7 +6,7 @@ import (
 
 func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	vals := cmd.Args[2:]
+	vals := cmd.Args()[2:]
 	lst := server.levelRedis.GetList(key)
 	err := lst.LPush(vals...)
 	if err != nil {
@@ -18,7 +18,7 @@ func (server *GoRedisServer) OnLPUSH(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnRPUSH(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	vals := cmd.Args[2:]
+	vals := cmd.Args()[2:]
 	lst := server.levelRedis.GetList(key)
 	err := lst.RPush(vals...)
 	if err != nil {
