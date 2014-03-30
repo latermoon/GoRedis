@@ -35,6 +35,7 @@ func (server *GoRedisProxy) remoteInfo(prefix string, remote *RemoteSession) str
 	buf.WriteString(fmt.Sprintf("%s:%s,%s\n", prefix, strings.Replace(remote.RemoteAddr(), ":", ",", 1), status))
 	upsec := time.Now().Sub(remote.Info.Uptime).Seconds()
 	buf.WriteString(fmt.Sprintf("%s_uptime_in_seconds:%0.0f\n", prefix, upsec))
+	buf.WriteString(fmt.Sprintf("%s_total_commands:%d\n", prefix, remote.Info.TotalCommands))
 	buf.WriteString(fmt.Sprintf("%s_ops_per_sec:%d\n", prefix, remote.Info.Ops_per_sec))
 	return buf.String()
 }

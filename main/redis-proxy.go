@@ -20,7 +20,7 @@ func main() {
 	flag.IntVar(&opt.Port, "p", 1602, "server port")
 	flag.StringVar(&opt.MasterHost, "master", "", "master")
 	flag.StringVar(&opt.SlaveHost, "slave", "", "slave")
-	flag.StringVar(&opt.Mode, "mode", "rw", "rw(default) = only read from slave; rrw = read from both")
+	flag.StringVar(&opt.Mode, "mode", "rrw", "r/rr/rw/rrw, default rrw")
 	flag.IntVar(&opt.PoolSize, "poolsize", 100, "pool for remote server")
 	flag.Parse()
 
@@ -35,7 +35,7 @@ func main() {
 	}
 
 	stdlog.Println("redis-proxy ", goredis_proxy.VERSION)
-	stdlog.Printf("master:[%s], slave:[%s]\n", opt.MasterHost, opt.SlaveHost)
+	stdlog.Printf("master:[%s], slave:[%s], mode:[%s], poolsize:[%d]\n", opt.MasterHost, opt.SlaveHost, opt.Mode, opt.PoolSize)
 	stdlog.Println("listen", opt.Addr())
 
 	// start

@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-const VERSION = "1.0.3"
+const VERSION = "1.0.4"
 
 // Redis代理
 type GoRedisProxy struct {
@@ -69,29 +69,32 @@ func (server *GoRedisProxy) On(session *Session, cmd *Command) (reply *Reply) {
 	server.rwlock.Lock()
 	server.rwlock.Unlock()
 
-	cmdName := cmd.Name()
-	switch cmdName {
-	case "CONFIG":
-		return server.OnCONFIG(session, cmd)
-	case "INFO":
-		return server.OnINFO(session, cmd)
+	// preprocess
+	reply = server.invokeCommand(session, cmd)
+	if reply != nil {
+		return
 	}
 
 	if cmd.Len() < 2 {
 		return ErrorReply("not support")
 	}
 
+	cmdName := cmd.Name()
 	key := cmd.StringAtIndex(1)
 
 	// dispatch
 	var err error
 	if isWriteAction(cmdName) {
 		// 写入主库
-		if server.options.CanWrite() {
-			reply, err = server.master.Invoke(session, cmd)
-			session.SetAttribute(S_LAST_WRITE_KEY, key)
+		if server.master.Available() {
+			if server.options.CanWrite() {
+				reply, err = server.master.Invoke(session, cmd)
+				session.SetAttribute(S_LAST_WRITE_KEY, key)
+			} else {
+				err = errors.New("reject write")
+			}
 		} else {
-			err = errors.New("reject write")
+			err = errors.New("master gone away")
 		}
 	} else {
 		// 默认顺序先从库，再主库
@@ -115,6 +118,22 @@ func (server *GoRedisProxy) On(session *Session, cmd *Command) (reply *Reply) {
 	// check
 	if err != nil {
 		reply = ErrorReply(err)
+	}
+	return
+}
+
+func (server *GoRedisProxy) invokeCommand(session *Session, cmd *Command) (reply *Reply) {
+	cmdName := cmd.Name()
+	switch cmdName {
+	case "CONFIG":
+		return server.OnCONFIG(session, cmd)
+	case "INFO":
+		return server.OnINFO(session, cmd)
+	case "PING":
+		return StatusReply("PONG")
+	}
+	if ignoreSync[cmdName] {
+		return ErrorReply("not support")
 	}
 	return
 }

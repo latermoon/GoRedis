@@ -1,5 +1,10 @@
 GoRedis release notes
 =====================
+
+**Proxy 1.0.4** @2014.3.30
+
+* [Feature] 实现基本功能
+
 **GoRedis 1.0.68** @2014.3.30
 
 * [Fix] 修正SADD返回值

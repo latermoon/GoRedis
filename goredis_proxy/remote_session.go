@@ -4,6 +4,7 @@ import (
 	. "GoRedis/goredis"
 	"GoRedis/libs/counter"
 	"crypto/md5"
+	"errors"
 	"net"
 	"sync"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 type RemoteInfo struct {
 	Ops_per_sec        int64
+	TotalCommands      int64
 	last_total_ops     int64
 	Uptime             time.Time
 	LastCommandIsWrite bool
@@ -48,7 +50,9 @@ func NewRemoteSession(host string, poolSize int) (s *RemoteSession, err error) {
 			break
 		}
 	}
-	go s.secondTicker()
+	if s.available {
+		go s.secondTicker()
+	}
 	return
 }
 
@@ -56,13 +60,17 @@ func (s *RemoteSession) secondTicker() {
 	s.ticker = time.NewTicker(time.Second * 1)
 	for _ = range s.ticker.C {
 		// ops_per_sec
-		total := s.counters.Get("total").Count()
-		s.Info.Ops_per_sec, s.Info.last_total_ops = total-s.Info.last_total_ops, total
+		s.Info.TotalCommands = s.counters.Get("total").Count()
+		s.Info.Ops_per_sec, s.Info.last_total_ops = s.Info.TotalCommands-s.Info.last_total_ops, s.Info.TotalCommands
 	}
 }
 
 // 发送指令到远程Redis，并返回结果
 func (s *RemoteSession) Invoke(session *Session, cmd *Command) (reply *Reply, err error) {
+	if !s.available {
+		err = errors.New("unavailable")
+		return
+	}
 	i := s.indexOf([]byte(session.RemoteAddr().String()))
 	s.counters.Get("total").Incr(1)
 	// lock
@@ -84,11 +92,19 @@ func (s *RemoteSession) Available() bool {
 }
 
 func (s *RemoteSession) RemoteAddr() string {
+	if !s.available {
+		return s.host
+	}
 	return s.sessions[0].RemoteAddr().String()
 }
 
 func (s *RemoteSession) Close() {
+	if !s.available {
+		return
+	}
 	s.available = false
+	s.Info.LastCommandIsWrite = false
+	s.Info.Ops_per_sec = 0
 	for _, session := range s.sessions {
 		session.Close()
 	}
