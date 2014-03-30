@@ -26,7 +26,7 @@ func NewMonClient(session *Session) (m *MonClient) {
 	return
 }
 
-func (m *MonClient) Send(cmd Command) (err error) {
+func (m *MonClient) Send(cmdex *CommandEx) (err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
@@ -37,7 +37,7 @@ func (m *MonClient) Send(cmd Command) (err error) {
 		return errors.New("out of buffer limit")
 	}
 
-	line := m.formatCommandLine(cmd)
+	line := m.formatCommandLine(cmdex)
 	m.buffer <- line
 	return
 }
@@ -69,21 +69,20 @@ func (m *MonClient) Close() {
 
 // 将Command转换为下面格式
 // +1386347668.732167 [0 10.80.101.169:8400] "ZADD" "user:update:timestamp" "1.386347668E9" "40530990"
-func (m *MonClient) formatCommandLine(cmd Command) (s string) {
+func (m *MonClient) formatCommandLine(cmdex *CommandEx) (s string) {
 	// 对于cmd，用json编码，然后去掉前后的"[]"以及中间的逗号"," ["SET", "name", "latermoon"] => "SET" "name" "lateroon"
-	args := make([]string, cmd.Len())
-	for i, b := range cmd.Args() {
+	args := make([]string, cmdex.Len())
+	for i, b := range cmdex.Args {
 		args[i] = string(b)
 	}
 	b, err := json.Marshal(args)
 	cmdstr := string(b)
 	if err != nil {
-		cmdstr = cmd.String()
+		cmdstr = cmdex.String()
 	} else if len(cmdstr) >= 2 {
 		cmdstr = cmdstr[1 : len(cmdstr)-1] // trim "[" & "]"
 		cmdstr = strings.Replace(cmdstr, "\",\"", "\" \"", -1)
 	}
-	session := cmd.GetAttribute("session").(*Session)
-	s = fmt.Sprintf("+%f [0 %s] %s", float64(time.Now().UnixNano())/1e9, session.RemoteAddr(), cmdstr)
+	s = fmt.Sprintf("+%f [0 %s] %s", float64(time.Now().UnixNano())/1e9, cmdex.Session().RemoteAddr(), cmdstr)
 	return
 }

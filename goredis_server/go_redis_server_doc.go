@@ -45,7 +45,7 @@ doc_set hi '{"name":"latermoon", "sex":"M", "version":10, "setting":{"start":23,
 doc_set hi '{"$inc":{"version":1}}'
 doc_set hi '{"$del":["version", "setting.start"]}'
 */
-func (server *GoRedisServer) OnDOC_SET(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnDOC_SET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	// 传入的json字节
 	jsonbytes, err := cmd.ArgAtIndex(2)
@@ -68,7 +68,7 @@ func (server *GoRedisServer) OnDOC_SET(cmd Command) (reply Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnDOC_GET(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnDOC_GET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	fields := strings.Split(cmd.StringAtIndex(2), ",")
 	doc := server.levelRedis.GetDoc(key)

@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func (server *GoRedisServer) OnAOF(session *Session, cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnAOF(session *Session, cmd *Command) (reply *Reply) {
 	defer func() {
 		if v := recover(); v != nil {
 			stdlog.Printf("aof panic %s\n", cmd)
@@ -134,7 +134,7 @@ func (server *GoRedisServer) aofStart() (err error) {
 	return nil
 }
 
-func (server *GoRedisServer) onAOF_NO() (reply Reply) {
+func (server *GoRedisServer) onAOF_NO() (reply *Reply) {
 	if server.aofwriter == nil {
 		return ErrorReply("aof not inited")
 	}

@@ -8,9 +8,9 @@ import (
 
 // ZADD key score member [score member ...]
 // Add one or more members to a sorted set, or update its score if it already exists
-func (server *GoRedisServer) OnZADD(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZADD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	scoreMembers := cmd.Args()[2:]
+	scoreMembers := cmd.Args[2:]
 	count := len(scoreMembers)
 	if count%2 != 0 {
 		return ErrorReply("Bad argument count")
@@ -34,14 +34,14 @@ func (server *GoRedisServer) OnZADD(cmd Command) (reply Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnZCARD(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZCARD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	zset := server.levelRedis.GetSortedSet(key)
 	reply = IntegerReply(zset.Len())
 	return
 }
 
-func (server *GoRedisServer) zrank(cmd Command, high2low bool) (reply Reply) {
+func (server *GoRedisServer) zrank(cmd *Command, high2low bool) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	member, err := cmd.ArgAtIndex(2)
 	if err != nil {
@@ -56,15 +56,15 @@ func (server *GoRedisServer) zrank(cmd Command, high2low bool) (reply Reply) {
 	}
 }
 
-func (server *GoRedisServer) OnZRANK(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZRANK(cmd *Command) (reply *Reply) {
 	return server.zrank(cmd, false)
 }
 
-func (server *GoRedisServer) OnZREVRANK(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZREVRANK(cmd *Command) (reply *Reply) {
 	return server.zrank(cmd, true)
 }
 
-func (server *GoRedisServer) rangeByIndex(cmd Command, high2low bool) (reply Reply) {
+func (server *GoRedisServer) rangeByIndex(cmd *Command, high2low bool) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	start, e1 := cmd.IntAtIndex(2)
 	stop, e2 := cmd.IntAtIndex(3)
@@ -73,7 +73,7 @@ func (server *GoRedisServer) rangeByIndex(cmd Command, high2low bool) (reply Rep
 	}
 	// 输出score
 	withScore := false
-	if len(cmd.Args()) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
+	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
 		withScore = true
 	}
 	zset := server.levelRedis.GetSortedSet(key)
@@ -94,17 +94,17 @@ func (server *GoRedisServer) rangeByIndex(cmd Command, high2low bool) (reply Rep
 // http://redis.io/commands/zrange
 // ZRANGE key start stop [WITHSCORES]
 // Return a range of members in a sorted set, by index
-func (server *GoRedisServer) OnZRANGE(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZRANGE(cmd *Command) (reply *Reply) {
 	return server.rangeByIndex(cmd, false)
 }
 
 // ZREVRANGE key start stop [WITHSCORES]
 // Return a range of members in a sorted set, by index, with scores ordered from high to low
-func (server *GoRedisServer) OnZREVRANGE(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZREVRANGE(cmd *Command) (reply *Reply) {
 	return server.rangeByIndex(cmd, true)
 }
 
-func (server *GoRedisServer) rangeByScore(cmd Command, high2low bool) (reply Reply) {
+func (server *GoRedisServer) rangeByScore(cmd *Command, high2low bool) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	score1, e1 := cmd.Int64AtIndex(2)
 	score2, e2 := cmd.Int64AtIndex(3)
@@ -116,7 +116,7 @@ func (server *GoRedisServer) rangeByScore(cmd Command, high2low bool) (reply Rep
 	}
 	// 输出score
 	withScore := false
-	if len(cmd.Args()) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
+	if len(cmd.Args) >= 5 && strings.ToUpper(cmd.StringAtIndex(4)) == "WITHSCORES" {
 		withScore = true
 	}
 	zset := server.levelRedis.GetSortedSet(key)
@@ -136,21 +136,21 @@ func (server *GoRedisServer) rangeByScore(cmd Command, high2low bool) (reply Rep
 
 // ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
 // Return a range of members in a sorted set, by score
-func (server *GoRedisServer) OnZRANGEBYSCORE(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	return server.rangeByScore(cmd, false)
 }
 
 // ZREVRANGEBYSCORE key max min [WITHSCORES] [LIMIT offset count]
 // Return a range of members in a sorted set, by score, with scores ordered from high to low
-func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZREVRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	return server.rangeByScore(cmd, true)
 }
 
 // ZREM key member [member ...]
 // Remove one or more members from a sorted set
-func (server *GoRedisServer) OnZREM(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZREM(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	members := cmd.Args()[2:]
+	members := cmd.Args[2:]
 	zset := server.levelRedis.GetSortedSet(key)
 	n := zset.Remove(members...)
 	reply = IntegerReply(n)
@@ -159,7 +159,7 @@ func (server *GoRedisServer) OnZREM(cmd Command) (reply Reply) {
 
 // ZREMRANGEBYRANK key start stop
 // Remove all members in a sorted set within the given indexes
-func (server *GoRedisServer) OnZREMRANGEBYRANK(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZREMRANGEBYRANK(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	start, e1 := cmd.IntAtIndex(2)
 	stop, e2 := cmd.IntAtIndex(3)
@@ -174,7 +174,7 @@ func (server *GoRedisServer) OnZREMRANGEBYRANK(cmd Command) (reply Reply) {
 
 // ZREMRANGEBYSCORE key min max
 // Remove all members in a sorted set within the given scores
-func (server *GoRedisServer) OnZREMRANGEBYSCORE(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZREMRANGEBYSCORE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	min, e1 := cmd.Int64AtIndex(2)
 	max, e2 := cmd.Int64AtIndex(3)
@@ -187,7 +187,7 @@ func (server *GoRedisServer) OnZREMRANGEBYSCORE(cmd Command) (reply Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnZINCRBY(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZINCRBY(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	incrmemt, e1 := cmd.Int64AtIndex(2)
 	member, e2 := cmd.ArgAtIndex(3)
@@ -203,7 +203,7 @@ func (server *GoRedisServer) OnZINCRBY(cmd Command) (reply Reply) {
 
 // ZSCORE key member
 // Get the score associated with the given member in a sorted set
-func (server *GoRedisServer) OnZSCORE(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnZSCORE(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
 	member, _ := cmd.ArgAtIndex(2)
 	// zset := server.levelRedis.GetSortedSet(key)

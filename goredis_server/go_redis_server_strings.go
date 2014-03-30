@@ -9,20 +9,20 @@ import (
 
 var maxCmdLock = 100
 
-func (server *GoRedisServer) OnGET(cmd Command) (reply Reply) {
-	key := cmd.Args()[1]
+func (server *GoRedisServer) OnGET(cmd *Command) (reply *Reply) {
+	key := cmd.Args[1]
 	value := server.levelRedis.Strings().Get(key)
 	return BulkReply(value)
 }
 
-func (server *GoRedisServer) OnSET(cmd Command) (reply Reply) {
-	key, val := cmd.Args()[1], cmd.Args()[2]
+func (server *GoRedisServer) OnSET(cmd *Command) (reply *Reply) {
+	key, val := cmd.Args[1], cmd.Args[2]
 	server.levelRedis.Strings().Set(key, val)
 	return StatusReply("OK")
 }
 
-func (server *GoRedisServer) OnMGET(cmd Command) (reply Reply) {
-	keys := cmd.Args()[1:]
+func (server *GoRedisServer) OnMGET(cmd *Command) (reply *Reply) {
+	keys := cmd.Args[1:]
 	vals := make([]interface{}, len(keys))
 	for i, key := range keys {
 		vals[i] = server.levelRedis.Strings().Get(key)
@@ -31,8 +31,8 @@ func (server *GoRedisServer) OnMGET(cmd Command) (reply Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnMSET(cmd Command) (reply Reply) {
-	keyvals := cmd.Args()[1:]
+func (server *GoRedisServer) OnMSET(cmd *Command) (reply *Reply) {
+	keyvals := cmd.Args[1:]
 	if len(keyvals)%2 != 0 {
 		return ErrorReply(WrongArgumentCount)
 	}
@@ -72,7 +72,7 @@ func (server *GoRedisServer) incrStringKey(key []byte, chg int) (newvalue int, e
 	return
 }
 
-func (server *GoRedisServer) OnINCR(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnINCR(cmd *Command) (reply *Reply) {
 	key, _ := cmd.ArgAtIndex(1)
 	newvalue, err := server.incrStringKey(key, 1)
 	if err != nil {
@@ -83,8 +83,8 @@ func (server *GoRedisServer) OnINCR(cmd Command) (reply Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnINCRBY(cmd Command) (reply Reply) {
-	key := cmd.Args()[1]
+func (server *GoRedisServer) OnINCRBY(cmd *Command) (reply *Reply) {
+	key := cmd.Args[1]
 	chg, e1 := strconv.Atoi(cmd.StringAtIndex(2))
 	if e1 != nil {
 		reply = ErrorReply(e1)
@@ -99,8 +99,8 @@ func (server *GoRedisServer) OnINCRBY(cmd Command) (reply Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnDECR(cmd Command) (reply Reply) {
-	key := cmd.Args()[1]
+func (server *GoRedisServer) OnDECR(cmd *Command) (reply *Reply) {
+	key := cmd.Args[1]
 	newvalue, err := server.incrStringKey(key, -1)
 	if err != nil {
 		reply = ErrorReply(err)
@@ -110,8 +110,8 @@ func (server *GoRedisServer) OnDECR(cmd Command) (reply Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnDECRBY(cmd Command) (reply Reply) {
-	key := cmd.Args()[1]
+func (server *GoRedisServer) OnDECRBY(cmd *Command) (reply *Reply) {
+	key := cmd.Args[1]
 	chg, e1 := strconv.Atoi(cmd.StringAtIndex(2))
 	if e1 != nil {
 		reply = ErrorReply(e1)

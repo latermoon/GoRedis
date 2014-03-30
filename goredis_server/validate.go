@@ -78,12 +78,12 @@ var cmdrules = map[string][]interface{}{
 }
 
 // 验证指令参数数量、非法字符等
-func verifyCommand(cmd Command) error {
+func verifyCommand(cmd *Command) error {
 	if cmd == nil || cmd.Len() == 0 {
 		return BadCommandError
 	}
 
-	name := strings.ToUpper(cmd.StringAtIndex(0))
+	name := strings.ToUpper(cmd.Name())
 	rule, exist := cmdrules[name]
 	if !exist {
 		return nil

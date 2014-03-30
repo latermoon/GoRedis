@@ -10,7 +10,7 @@ import (
 )
 
 // 从主库获取数据
-func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd *Command) (reply *Reply) {
 	// 保障不会奔溃
 	defer func() {
 		if v := recover(); v != nil {
@@ -72,7 +72,7 @@ func (server *GoRedisServer) OnSLAVEOF(session *Session, cmd Command) (reply Rep
 }
 
 // SLAVEOF NO ONE will stop replication
-func (server *GoRedisServer) onSlaveOfNoOne(session *Session, cmd Command) (reply Reply) {
+func (server *GoRedisServer) onSlaveOfNoOne(session *Session, cmd *Command) (reply *Reply) {
 	slavelog.Printf("SLAVEOF NO ONE, will disconnect %d connection(s)\n", server.slavemgr.Len())
 	reply = StatusReply(fmt.Sprintf("disconnect %d connections(s)", server.slavemgr.Len()))
 

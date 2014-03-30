@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func (server *GoRedisServer) OnCLIENT(session *Session, cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnCLIENT(session *Session, cmd *Command) (reply *Reply) {
 	switch strings.ToUpper(cmd.StringAtIndex(1)) {
 	case "LIST":
 		reply = server.replyClientList(session, cmd)
@@ -18,7 +18,7 @@ func (server *GoRedisServer) OnCLIENT(session *Session, cmd Command) (reply Repl
 }
 
 // Get the list of client connections
-func (server *GoRedisServer) replyClientList(session *Session, cmd Command) (reply Reply) {
+func (server *GoRedisServer) replyClientList(session *Session, cmd *Command) (reply *Reply) {
 	buf := bytes.Buffer{}
 	server.sessmgr.Enumerate(func(i int, key string, val interface{}) {
 		sess := val.(*Session)

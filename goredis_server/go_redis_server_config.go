@@ -12,7 +12,7 @@ slowlog-log-slower-than 100000
 
 */
 
-func (server *GoRedisServer) OnCONFIG(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnCONFIG(cmd *Command) (reply *Reply) {
 	action := cmd.StringAtIndex(1)
 	switch strings.ToUpper(action) {
 	case "GET":
@@ -28,7 +28,7 @@ func (server *GoRedisServer) OnCONFIG(cmd Command) (reply Reply) {
 	return
 }
 
-func (server *GoRedisServer) configGet(cmd Command) (reply Reply) {
+func (server *GoRedisServer) configGet(cmd *Command) (reply *Reply) {
 	patten := cmd.StringAtIndex(2)
 	if patten == "*" {
 		bulks := make([]interface{}, 0, 10)

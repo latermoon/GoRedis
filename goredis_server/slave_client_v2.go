@@ -71,12 +71,12 @@ func (s *SlaveClientV2) Sync() (err error) {
 	}
 
 	for {
-		var cmd Command
+		var cmd *Command
 		cmd, err = s.session.ReadCommand()
 		if err != nil {
 			break
 		}
-		cmdName := cmd.StringAtIndex(0)
+		cmdName := cmd.Name()
 		switch cmdName {
 		case "SYNC_RAW_START":
 			s.Session().SetAttribute(S_STATUS, REPL_RECV_BULK)
@@ -105,7 +105,7 @@ func (s *SlaveClientV2) Close() {
 }
 
 // 收取快照完成后，开始收取实时数据
-func (s *SlaveClientV2) recvCommandSeq(cmd Command) (err error) {
+func (s *SlaveClientV2) recvCommandSeq(cmd *Command) (err error) {
 	session := s.session
 	for {
 		// SYNC_SEQ
@@ -113,7 +113,7 @@ func (s *SlaveClientV2) recvCommandSeq(cmd Command) (err error) {
 		if err != nil {
 			break
 		}
-		cmdName := cmd.StringAtIndex(0)
+		cmdName := cmd.Name()
 		switch cmdName {
 		case "PING":
 			continue

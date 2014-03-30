@@ -6,9 +6,9 @@ import (
 
 // SADD key member [member ...]
 // Add one or more members to a set
-func (server *GoRedisServer) OnSADD(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnSADD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	members := cmd.Args()[2:]
+	members := cmd.Args[2:]
 	hash := server.levelRedis.GetSet(key)
 	// 使用leveldb的mset，无法得知新增key数量
 	fieldVals := make([][]byte, 0, len(members)*2)
@@ -19,14 +19,14 @@ func (server *GoRedisServer) OnSADD(cmd Command) (reply Reply) {
 	return IntegerReply(n)
 }
 
-func (server *GoRedisServer) OnSCARD(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnSCARD(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	hash := server.levelRedis.GetSet(key)
 	n := hash.Count()
 	return IntegerReply(n)
 }
 
-func (server *GoRedisServer) OnSISMEMBER(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnSISMEMBER(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	member, _ := cmd.ArgAtIndex(2)
 	hash := server.levelRedis.GetSet(key)
@@ -38,7 +38,7 @@ func (server *GoRedisServer) OnSISMEMBER(cmd Command) (reply Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnSMEMBERS(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnSMEMBERS(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	hash := server.levelRedis.GetSet(key)
 	elems := hash.GetAll(1000)
@@ -50,9 +50,9 @@ func (server *GoRedisServer) OnSMEMBERS(cmd Command) (reply Reply) {
 	return
 }
 
-func (server *GoRedisServer) OnSREM(cmd Command) (reply Reply) {
+func (server *GoRedisServer) OnSREM(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	members := cmd.Args()[2:]
+	members := cmd.Args[2:]
 	hash := server.levelRedis.GetSet(key)
 	n := hash.Remove(members...)
 	return IntegerReply(n)

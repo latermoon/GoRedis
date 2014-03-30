@@ -19,7 +19,7 @@ const (
 type ServerHandler interface {
 	SessionOpened(session *Session)
 	SessionClosed(session *Session, err error)
-	On(session *Session, cmd Command) (reply Reply)
+	On(session *Session, cmd *Command) (reply *Reply)
 	ExceptionCaught(err error)
 }
 
@@ -88,7 +88,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 	server.handler.SessionOpened(session)
 
 	for {
-		var cmd Command
+		var cmd *Command
 		cmd, err = session.ReadCommand()
 		// 常见的error是:
 		// 1) io.EOF
@@ -100,7 +100,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 		// 处理
 		reply := server.handler.On(session, cmd)
 		if reply != nil {
-			err = session.WriteReply(reply)
+			err = session.Reply(reply)
 			if err != nil {
 				session.Close()
 				break
