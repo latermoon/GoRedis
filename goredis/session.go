@@ -10,54 +10,37 @@ import (
 	"io"
 	"net"
 	"strconv"
-	"sync"
 )
 
-// ==============================
-// Session维护一个net.Conn连接，代表一个客户端会话
+// Session继承了net.Conn，代表一个客户端会话
 // 提供各种标准的Reply方法, Status/Error/Integer/Bulk/MultiBulks
 // cmd, err := session.ReadCommand()
-// session.Reply(StatusReply("OK"))
+// session.ReplyReply(StatusReply("OK"))
 // 协议参考：http://redis.io/topics/protocol
-// ==============================
 type Session struct {
-	*bufio.ReadWriter // 实现了Read和Write方法即可
-	conn              net.Conn
-	rw                *bufio.ReadWriter
-	mu                sync.RWMutex
-	attributes        map[string]interface{}
+	net.Conn
+	rw    *bufio.Reader
+	attrs map[string]interface{}
 }
 
 func NewSession(conn net.Conn) (s *Session) {
-	s = &Session{}
-	s.conn = conn
-	s.rw = bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+	s = &Session{
+		Conn:  conn,
+		attrs: make(map[string]interface{}),
+	}
+	s.rw = bufio.NewReader(s.Conn)
 	return
 }
 
 func (s *Session) SetAttribute(name string, v interface{}) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.attributes == nil {
-		s.attributes = make(map[string]interface{})
-	}
-	s.attributes[name] = v
+	s.attrs[name] = v
 }
 
 func (s *Session) GetAttribute(name string) interface{} {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.attributes == nil {
-		return nil
-	}
-	return s.attributes[name]
+	return s.attrs[name]
 }
 
 // 返回数据到客户端
-func (s *Session) Reply(reply *Reply) (err error) {
-	return s.WriteReply(reply)
-}
-
 func (s *Session) WriteReply(reply *Reply) (err error) {
 	switch reply.Type {
 	case ReplyTypeStatus:
@@ -71,16 +54,13 @@ func (s *Session) WriteReply(reply *Reply) (err error) {
 	case ReplyTypeMultiBulks:
 		err = s.replyMultiBulks(reply.Value.([]interface{}))
 	default:
-		err = errors.New("Illegal ReplyType: " + strconv.Itoa(int(reply.Type)))
+		err = errors.New("Illegal ReplyType: " + itoa(int(reply.Type)))
 	}
 	return
 }
 
 func (s *Session) WriteCommand(cmd *Command) (err error) {
-	_, err = s.rw.Write(cmd.Bytes())
-	if err == nil {
-		err = s.rw.Flush()
-	}
+	_, err = s.Write(cmd.Bytes())
 	return
 }
 
@@ -134,7 +114,7 @@ func (s *Session) ReadReply() (reply *Reply, err error) {
 		if argCount == -1 {
 			reply.Value = nil // *-1
 		} else {
-			args := make([][]byte, argCount)
+			args := make([]interface{}, argCount)
 			for i := 0; i < argCount; i++ {
 				// TODO multi bulk 的类型 $和:
 				err = s.skipByte('$')
@@ -149,11 +129,12 @@ func (s *Session) ReadReply() (reply *Reply, err error) {
 				if argSize == -1 {
 					args[i] = nil
 				} else {
-					args[i] = make([]byte, argSize)
-					_, err = io.ReadFull(s, args[i])
+					arg := make([]byte, argSize)
+					_, err = io.ReadFull(s, arg)
 					if err != nil {
 						break
 					}
+					args[i] = arg
 				}
 				s.skipBytes([]byte{CR, LF})
 			}
@@ -176,8 +157,6 @@ $<number of bytes of argument N> CR LF
 <argument data> CR LF
 */
 func (s *Session) ReadCommand() (cmd *Command, err error) {
-	cmd = &Command{}
-
 	// Read ( *<number of arguments> CR LF )
 	err = s.skipByte('*')
 	if err != nil { // io.EOF
@@ -188,7 +167,7 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 	if argCount, err = s.readInt(); err != nil {
 		return
 	}
-	cmd.Args = make([][]byte, argCount)
+	args := make([][]byte, argCount)
 	for i := 0; i < argCount; i++ {
 		// Read ( $<number of bytes of argument 1> CR LF )
 		err = s.skipByte('$')
@@ -203,8 +182,8 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 		}
 
 		// Read ( <argument data> CR LF )
-		cmd.Args[i] = make([]byte, argSize)
-		_, err = io.ReadFull(s, cmd.Args[i])
+		args[i] = make([]byte, argSize)
+		_, err = io.ReadFull(s, args[i])
 		if err != nil {
 			return
 		}
@@ -214,7 +193,7 @@ func (s *Session) ReadCommand() (cmd *Command, err error) {
 			return
 		}
 	}
-
+	cmd = NewCommand(args...)
 	return
 }
 
@@ -224,7 +203,7 @@ func (s *Session) replyStatus(status string) (err error) {
 	buf.WriteString("+")
 	buf.WriteString(status)
 	buf.WriteString(CRLF)
-	_, err = buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s)
 	return
 }
 
@@ -234,7 +213,7 @@ func (s *Session) replyError(errmsg string) (err error) {
 	buf.WriteString("-")
 	buf.WriteString(errmsg)
 	buf.WriteString(CRLF)
-	_, err = buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s)
 	return
 }
 
@@ -242,9 +221,9 @@ func (s *Session) replyError(errmsg string) (err error) {
 func (s *Session) replyInteger(i int) (err error) {
 	buf := bytes.Buffer{}
 	buf.WriteString(":")
-	buf.WriteString(strconv.Itoa(i))
+	buf.WriteString(itoa(i))
 	buf.WriteString(CRLF)
-	_, err = buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s)
 	return
 }
 
@@ -258,7 +237,7 @@ func (s *Session) replyBulk(bulk interface{}) (err error) {
 		isnil = ok && b == nil
 	}
 	if isnil {
-		_, err = s.conn.Write([]byte("$-1\r\n"))
+		_, err = s.Write([]byte("$-1\r\n"))
 		return
 	}
 	buf := bytes.Buffer{}
@@ -266,17 +245,17 @@ func (s *Session) replyBulk(bulk interface{}) (err error) {
 	switch bulk.(type) {
 	case []byte:
 		b := bulk.([]byte)
-		buf.WriteString(strconv.Itoa(len(b)))
+		buf.WriteString(itoa(len(b)))
 		buf.WriteString(CRLF)
 		buf.Write(b)
 	default:
 		b := []byte(bulk.(string))
-		buf.WriteString(strconv.Itoa(len(b)))
+		buf.WriteString(itoa(len(b)))
 		buf.WriteString(CRLF)
 		buf.Write(b)
 	}
 	buf.WriteString(CRLF)
-	_, err = buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s)
 	return
 }
 
@@ -284,18 +263,18 @@ func (s *Session) replyBulk(bulk interface{}) (err error) {
 func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 	// Null Multi Bulk Reply
 	if bulks == nil {
-		_, err = s.conn.Write([]byte("*-1\r\n"))
+		_, err = s.Write([]byte("*-1\r\n"))
 		return
 	}
 	bulkCount := len(bulks)
 	// Empty Multi Bulk Reply
 	if bulkCount == 0 {
-		_, err = s.conn.Write([]byte("*0\r\n"))
+		_, err = s.Write([]byte("*0\r\n"))
 		return
 	}
 	buf := bytes.Buffer{}
 	buf.WriteString("*")
-	buf.WriteString(strconv.Itoa(bulkCount))
+	buf.WriteString(itoa(bulkCount))
 	buf.WriteString(CRLF)
 	for i := 0; i < bulkCount; i++ {
 		bulk := bulks[i]
@@ -303,7 +282,7 @@ func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 		case string:
 			buf.WriteString("$")
 			b := []byte(bulk.(string))
-			buf.WriteString(strconv.Itoa(len(b)))
+			buf.WriteString(itoa(len(b)))
 			buf.WriteString(CRLF)
 			buf.Write(b)
 			buf.WriteString(CRLF)
@@ -314,14 +293,14 @@ func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 				buf.WriteString(CRLF)
 			} else {
 				buf.WriteString("$")
-				buf.WriteString(strconv.Itoa(len(b)))
+				buf.WriteString(itoa(len(b)))
 				buf.WriteString(CRLF)
 				buf.Write(b)
 				buf.WriteString(CRLF)
 			}
 		case int:
 			buf.WriteString(":")
-			buf.WriteString(strconv.Itoa(bulk.(int)))
+			buf.WriteString(itoa(bulk.(int)))
 			buf.WriteString(CRLF)
 		default:
 			// nil element
@@ -330,7 +309,7 @@ func (s *Session) replyMultiBulks(bulks []interface{}) (err error) {
 		}
 	}
 	// flush
-	_, err = buf.WriteTo(s.conn)
+	_, err = buf.WriteTo(s)
 	return
 }
 
@@ -409,36 +388,19 @@ func (s *Session) ReadInt64() (i int64, err error) {
 	return s.readInt64()
 }
 
+// 覆盖提供读buffer
 func (s *Session) Read(p []byte) (n int, err error) {
 	return s.rw.Read(p)
-}
-
-func (s *Session) Write(p []byte) (n int, err error) {
-	n, err = s.rw.Write(p)
-	if err == nil {
-		s.rw.Flush()
-	}
-	return
-}
-
-// Close conn
-func (s *Session) Close() error {
-	return s.conn.Close()
 }
 
 func (s *Session) ReadByte() (c byte, err error) {
 	return s.rw.ReadByte()
 }
 
-func (s *Session) ReadBytes(delim byte) (line []byte, err error) {
-	return s.rw.ReadBytes(delim)
-}
-
 // 获取字节而不移动游标
 func (s *Session) PeekByte() (c byte, err error) {
-	c, err = s.rw.ReadByte()
-	if err == nil {
-		err = s.rw.UnreadByte()
+	if b, e := s.rw.Peek(1); e == nil {
+		c = b[0]
 	}
 	return
 }
@@ -463,14 +425,6 @@ func (s *Session) ReadRDB(w io.Writer) (err error) {
 		w.Write([]byte{c})
 	}
 	return
-}
-
-func (s *Session) LocalAddr() net.Addr {
-	return s.conn.LocalAddr()
-}
-
-func (s *Session) RemoteAddr() net.Addr {
-	return s.conn.RemoteAddr()
 }
 
 func (s *Session) String() string {

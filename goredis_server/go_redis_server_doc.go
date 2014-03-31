@@ -37,6 +37,7 @@ doc_get(key, "name,sex,photos,setting.mute,version")
 import (
 	. "GoRedis/goredis"
 	"encoding/json"
+	"strings"
 )
 
 /*
@@ -69,7 +70,7 @@ func (server *GoRedisServer) OnDOC_SET(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnDOC_GET(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	fields := cmd.StringArgs()[2:]
+	fields := strings.Split(cmd.StringAtIndex(2), ",")
 	doc := server.levelRedis.GetDoc(key)
 	result := doc.Get(fields...)
 	if result == nil {

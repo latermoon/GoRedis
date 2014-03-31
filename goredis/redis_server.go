@@ -100,7 +100,7 @@ func (server *RedisServer) handleConnection(session *Session) {
 		// 处理
 		reply := server.handler.On(session, cmd)
 		if reply != nil {
-			err = session.Reply(reply)
+			err = session.WriteReply(reply)
 			if err != nil {
 				session.Close()
 				break

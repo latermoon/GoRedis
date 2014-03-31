@@ -9,35 +9,51 @@ import (
 	"strconv"
 )
 
-// Command
+// Command表示一个客户端指令
 type Command struct {
-	Args [][]byte
+	args  [][]byte
+	attrs map[string]interface{}
 }
 
 func NewCommand(args ...[]byte) (cmd *Command) {
-	cmd = &Command{}
-	cmd.Args = args
+	cmd = &Command{
+		args:  args,
+		attrs: make(map[string]interface{}),
+	}
 	return
 }
 
-// Name returns cmd.Args[0]
+func (cmd *Command) SetAttribute(name string, v interface{}) {
+	cmd.attrs[name] = v
+}
+
+func (cmd *Command) GetAttribute(name string) interface{} {
+	return cmd.attrs[name]
+}
+
+// 大写的指令名称
 func (cmd *Command) Name() string {
-	return string(cmd.Args[0])
+	return string(bytes.ToUpper(cmd.args[0]))
+}
+
+// 原始数据
+func (cmd *Command) Args() [][]byte {
+	return cmd.args
 }
 
 func (cmd *Command) StringAtIndex(i int) string {
-	if i >= len(cmd.Args) {
+	if i >= cmd.Len() {
 		return ""
 	}
-	return string(cmd.Args[i])
+	return string(cmd.args[i])
 }
 
 func (cmd *Command) ArgAtIndex(i int) (arg []byte, err error) {
-	if i >= len(cmd.Args) {
-		err = errors.New(fmt.Sprintf("out of range %d/%d", i, len(cmd.Args)))
+	if i >= cmd.Len() {
+		err = errors.New(fmt.Sprintf("out of range %d/%d", i, cmd.Len()))
 		return
 	}
-	arg = cmd.Args[i]
+	arg = cmd.args[i]
 	return
 }
 
@@ -58,25 +74,16 @@ func (cmd *Command) Int64AtIndex(i int) (n int64, err error) {
 }
 
 func (cmd *Command) FloatAtIndex(i int) (n float64, err error) {
-	if i >= len(cmd.Args) {
-		err = errors.New(fmt.Sprintf("out of range %d/%d", i, len(cmd.Args)))
+	if i >= cmd.Len() {
+		err = errors.New(fmt.Sprintf("out of range %d/%d", i, cmd.Len()))
 		return
 	}
-	n, err = strconv.ParseFloat(string(cmd.Args[i]), 64)
-	return
-}
-
-// 返回全部参数的字符串形式
-func (cmd *Command) StringArgs() (strs []string) {
-	strs = make([]string, len(cmd.Args))
-	for i, b := range cmd.Args {
-		strs[i] = string(b)
-	}
+	n, err = strconv.ParseFloat(string(cmd.args[i]), 64)
 	return
 }
 
 func (cmd *Command) Len() int {
-	return len(cmd.Args)
+	return len(cmd.args)
 }
 
 // Redis协议的Command数据
@@ -89,37 +96,23 @@ $<number of bytes of argument N> CR LF
 <argument data> CR LF
 */
 func (cmd *Command) Bytes() []byte {
-	// 对于少于10的数字，用下标直接返回字符串，避免strconv.Itoa，函数耗时能减少40%
-	var numlst = []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
 	buf := bytes.Buffer{}
 	buf.WriteByte('*')
-	argCount := len(cmd.Args)
-	//<number of arguments>
-	if argCount < 10 {
-		buf.WriteString(numlst[argCount])
-	} else {
-		buf.WriteString(strconv.Itoa(argCount))
-	}
+	argCount := cmd.Len()
+	buf.WriteString(itoa(argCount)) //<number of arguments>
 	buf.WriteString(CRLF)
 	for i := 0; i < argCount; i++ {
 		buf.WriteByte('$')
-		//<number of bytes of argument i>
-		argSize := len(cmd.Args[i])
-		if argSize < 10 {
-			buf.WriteString(numlst[argSize])
-		} else {
-			buf.WriteString(strconv.Itoa(argSize))
-		}
+		argSize := len(cmd.args[i])
+		buf.WriteString(itoa(argSize)) //<number of bytes of argument i>
 		buf.WriteString(CRLF)
-		buf.Write(cmd.Args[i]) //<argument data>
+		buf.Write(cmd.args[i]) //<argument data>
 		buf.WriteString(CRLF)
 	}
 	return buf.Bytes()
 }
 
 func ParseCommand(buf *bytes.Buffer) (*Command, error) {
-	cmd := &Command{}
-
 	// Read ( *<number of arguments> CR LF )
 	if c, err := buf.ReadByte(); c != '*' { // io.EOF
 		return nil, err
@@ -130,7 +123,7 @@ func ParseCommand(buf *bytes.Buffer) (*Command, error) {
 		return nil, err
 	}
 	argCount, _ := strconv.Atoi(string(line[:len(line)-2]))
-	cmd.Args = make([][]byte, argCount)
+	args := make([][]byte, argCount)
 	for i := 0; i < argCount; i++ {
 		// Read ( $<number of bytes of argument 1> CR LF )
 		if c, err := buf.ReadByte(); c != '$' {
@@ -143,8 +136,8 @@ func ParseCommand(buf *bytes.Buffer) (*Command, error) {
 		}
 		argSize, _ := strconv.Atoi(string(line[:len(line)-2]))
 		// Read ( <argument data> CR LF )
-		cmd.Args[i] = make([]byte, argSize)
-		n, e2 := buf.Read(cmd.Args[i])
+		args[i] = make([]byte, argSize)
+		n, e2 := buf.Read(args[i])
 		if n != argSize {
 			return nil, errors.New("argSize too short")
 		}
@@ -157,15 +150,17 @@ func ParseCommand(buf *bytes.Buffer) (*Command, error) {
 			return nil, err
 		}
 	}
-
+	cmd := NewCommand(args...)
 	return cmd, nil
 }
 
 func (cmd *Command) String() string {
 	buf := bytes.Buffer{}
-	for _, arg := range cmd.Args {
-		buf.Write(arg)
-		buf.WriteString(" ")
+	for i, count := 0, cmd.Len(); i < count; i++ {
+		if i > 0 {
+			buf.WriteString(" ")
+		}
+		buf.Write(cmd.args[i])
 	}
 	return buf.String()
 }

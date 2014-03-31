@@ -15,7 +15,7 @@ import (
 func (server *GoRedisServer) OnSYNC(session *Session, cmd *Command) (reply *Reply) {
 	stdlog.Printf("[S %s] %s\n", session.RemoteAddr(), cmd)
 
-	args := cmd.Args[1:]
+	args := cmd.Args()[1:]
 	if len(args) < 2 || len(args)%2 != 0 {
 		session.Close()
 		return

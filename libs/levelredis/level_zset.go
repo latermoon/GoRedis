@@ -4,9 +4,7 @@ package levelredis
 
 import (
 	"GoRedis/libs/gorocks"
-	"GoRedis/libs/stdlog"
 	"bytes"
-	"runtime/debug"
 	"strconv"
 	"sync"
 )
@@ -79,14 +77,18 @@ func (l *LevelZSet) scoreKeyPrefix() []byte {
 	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, "s", SEP)
 }
 
+func (l *LevelZSet) scoreKeyPrefixWith(scoreint int64) []byte {
+	var sign string // 正负数
+	if scoreint < 0 {
+		sign = "0"
+	} else {
+		sign = "1"
+	}
+	return joinStringBytes(ZSET_PREFIX, SEP_LEFT, l.key, SEP_RIGHT, "s", SEP, sign, string(Int64ToBytes(scoreint)))
+}
+
 // _z[user_rank]s#1378000907596#100428 = ""
 func (l *LevelZSet) splitScoreKey(scorekey []byte) (score, member []byte) {
-	defer func() {
-		if err := recover(); err != nil {
-			stdlog.Printf("splitScoreKey: %s", string(scorekey))
-			stdlog.Printf("error %s\n%s", err, string(debug.Stack()))
-		}
-	}()
 	pos2 := bytes.LastIndex(scorekey, []byte(SEP))
 	sepr := bytes.Index(scorekey, []byte(SEP_RIGHT))
 	pos1 := bytes.Index(scorekey[sepr:], []byte(SEP)) + sepr
@@ -110,12 +112,13 @@ func (l *LevelZSet) Add(scoreMembers ...[]byte) (n int) {
 			batch.Delete(l.scoreKey(member, oldscore))
 		} else {
 			l.totalCount++
+			// The number of elements added to the sorted sets, not including elements already existing for which the score was updated.
+			n++
 		}
 		// set member
 		batch.Put(memberkey, score)
 		// new score
 		batch.Put(l.scoreKey(member, score), nil)
-		n++
 	}
 	batch.Put(l.zsetKey(), l.zsetValue())
 	err := l.redis.WriteBatch(batch)
@@ -142,7 +145,7 @@ func (l *LevelZSet) IncrBy(member []byte, incr int64) (newscore []byte) {
 	score := l.score(member)
 	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
-	// stdlog.Println("zincrby", l.key, string(member), incr, BytesToInt64(score))
+
 	oldcount := l.totalCount
 	if score == nil {
 		newscore = Int64ToBytes(incr)
@@ -227,15 +230,15 @@ func (l *LevelZSet) Enumerate(fn func(i int, member, score []byte, quit *bool)) 
 	})
 }
 
-func (l *LevelZSet) RangeByScore(high2low bool, min, max []byte, offset, count int) (scoreMembers [][]byte) {
+func (l *LevelZSet) RangeByScore(high2low bool, min, max int64, offset, count int) (scoreMembers [][]byte) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	direction := IterForward
 	if high2low {
 		direction = IterBackward
 	}
-	min2 := joinBytes(l.scoreKeyPrefix(), min)
-	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
+	min2 := l.scoreKeyPrefixWith(min)
+	max2 := joinBytes(l.scoreKeyPrefixWith(max), []byte{MAXBYTE})
 	scoreMembers = make([][]byte, 0, 2)
 	l.redis.RangeEnumerate(min2, max2, direction, func(i int, key, value []byte, quit *bool) {
 		if i < offset { // skip
@@ -309,11 +312,11 @@ func (l *LevelZSet) RemoveByIndex(start, stop int) (n int) {
 	return
 }
 
-func (l *LevelZSet) RemoveByScore(min, max []byte) (n int) {
+func (l *LevelZSet) RemoveByScore(min, max int64) (n int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	min2 := joinBytes(l.scoreKeyPrefix(), min)
-	max2 := joinBytes(l.scoreKeyPrefix(), max, []byte{MAXBYTE})
+	min2 := l.scoreKeyPrefixWith(min)
+	max2 := joinBytes(l.scoreKeyPrefixWith(max), []byte{MAXBYTE})
 	batch := gorocks.NewWriteBatch()
 	defer batch.Close()
 	l.redis.RangeEnumerate(min2, max2, IterForward, func(i int, key, value []byte, quit *bool) {

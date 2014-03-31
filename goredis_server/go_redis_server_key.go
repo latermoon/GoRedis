@@ -19,7 +19,7 @@ func (server *GoRedisServer) OnKEYS(cmd *Command) (reply *Reply) {
 func (server *GoRedisServer) OnKEYSEARCH(cmd *Command) (reply *Reply) {
 	seekkey := []byte("")
 	if cmd.Len() > 1 {
-		seekkey = cmd.Args[1]
+		seekkey, _ = cmd.ArgAtIndex(1)
 	}
 
 	count := 10
@@ -70,12 +70,11 @@ func (server *GoRedisServer) OnKEYNEXT(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) keyEnumerate(cmd *Command, direction levelredis.IterDirection) (reply *Reply) {
-	seek := cmd.Args[1]
+	seek, _ := cmd.ArgAtIndex(1)
 	count := 1
 	withtype := false
 	withvalue := false
-	argcount := len(cmd.Args)
-	if argcount > 2 {
+	if cmd.Len() > 2 {
 		var err error
 		count, err = cmd.IntAtIndex(2)
 		if err != nil {
@@ -85,11 +84,11 @@ func (server *GoRedisServer) keyEnumerate(cmd *Command, direction levelredis.Ite
 			return ErrorReply("count range: 1 < count < 10000")
 		}
 	}
-	if argcount > 3 {
+	if cmd.Len() > 3 {
 		withtype = strings.ToUpper(cmd.StringAtIndex(3)) == "WITHTYPE"
 	}
 	// 必须withtype才能withvalue
-	if withtype && argcount > 4 {
+	if withtype && cmd.Len() > 4 {
 		withvalue = strings.ToUpper(cmd.StringAtIndex(4)) == "WITHVALUE"
 	}
 	// bulks初始大小
@@ -121,7 +120,7 @@ func (server *GoRedisServer) keyEnumerate(cmd *Command, direction levelredis.Ite
 func (server *GoRedisServer) OnRAW_KEYSEARCH(cmd *Command) (reply *Reply) {
 	seekkey := []byte("")
 	if cmd.Len() > 1 {
-		seekkey = cmd.Args[1]
+		seekkey, _ = cmd.ArgAtIndex(1)
 	}
 
 	count := 10
@@ -164,7 +163,8 @@ func (server *GoRedisServer) OnRAW_GET(cmd *Command) (reply *Reply) {
 
 // 操作原始内容 RAW_SET +[hash]name latermoon
 func (server *GoRedisServer) OnRAW_SET(cmd *Command) (reply *Reply) {
-	key, value := cmd.Args[1], cmd.Args[2]
+	key, _ := cmd.ArgAtIndex(1)
+	value, _ := cmd.ArgAtIndex(2)
 	err := server.levelRedis.RawSet(key, value)
 	if err != nil {
 		return ErrorReply(err)
@@ -189,7 +189,7 @@ func (server *GoRedisServer) OnEXPIRE(cmd *Command) (reply *Reply) {
 }
 
 func (server *GoRedisServer) OnDEL(cmd *Command) (reply *Reply) {
-	keys := cmd.Args[1:]
+	keys := cmd.Args()[1:]
 	n := server.levelRedis.Delete(keys...)
 	reply = IntegerReply(n)
 	return
