@@ -66,23 +66,29 @@ func (s *RemoteSession) secondTicker() {
 }
 
 // 发送指令到远程Redis，并返回结果
-func (s *RemoteSession) Invoke(session *Session, cmd *Command) (reply *Reply, err error) {
+func (s *RemoteSession) Send(session *Session, cmd *Command) (reply *Reply, err error) {
 	if !s.available {
 		err = errors.New("unavailable")
 		return
 	}
 	i := s.indexOf([]byte(session.RemoteAddr().String()))
-	s.counters.Get("total").Incr(1)
 	// lock
 	s.mus[i].Lock()
 	defer s.mus[i].Unlock()
+
+	s.counters.Get("total").Incr(1)
 	// redirect
 	err = s.sessions[i].WriteCommand(cmd)
 	if err == nil {
 		reply, err = s.sessions[i].ReadReply()
 	}
 	if err != nil {
-		s.available = false
+		s.counters.Get("error").Incr(1)
+		s.sessions[i].Close()
+		s.sessions[i], err = s.createSession() // reconnect
+		if err != nil {
+			s.available = false
+		}
 	}
 	return
 }
@@ -113,7 +119,7 @@ func (s *RemoteSession) Close() {
 
 func (s *RemoteSession) createSession() (session *Session, err error) {
 	var conn net.Conn
-	conn, err = net.Dial("tcp", s.host)
+	conn, err = net.DialTimeout("tcp", s.host, time.Millisecond*1000)
 	if err != nil {
 		return
 	}

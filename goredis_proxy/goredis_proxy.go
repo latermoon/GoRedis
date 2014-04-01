@@ -88,7 +88,7 @@ func (server *GoRedisProxy) On(session *Session, cmd *Command) (reply *Reply) {
 		// 写入主库
 		if server.master.Available() {
 			if server.options.CanWrite() {
-				reply, err = server.master.Invoke(session, cmd)
+				reply, err = server.master.Send(session, cmd)
 				session.SetAttribute(S_LAST_WRITE_KEY, key)
 			} else {
 				err = errors.New("reject write")
@@ -107,7 +107,7 @@ func (server *GoRedisProxy) On(session *Session, cmd *Command) (reply *Reply) {
 			remotes[0], remotes[1] = remotes[1], remotes[0]
 		}
 		for _, remote := range remotes {
-			reply, err = remote.Invoke(session, cmd)
+			reply, err = remote.Send(session, cmd)
 			session.SetAttribute(S_LAST_WRITE_KEY, "")
 			if err == nil {
 				break
@@ -132,6 +132,7 @@ func (server *GoRedisProxy) invokeCommand(session *Session, cmd *Command) (reply
 	case "PING":
 		return StatusReply("PONG")
 	}
+	// 禁止执行某些危险指令
 	if ignoreSync[cmdName] {
 		return ErrorReply("not support")
 	}
