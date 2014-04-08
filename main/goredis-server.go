@@ -28,6 +28,7 @@ func main() {
 	slaveof := flag.String("slaveof", "", "replication")
 	procs := flag.Int("procs", 8, "GOMAXPROCS")
 	repair := flag.Bool("repair", false, "repaire rocksdb")
+	logpath := flag.String("logpath", "/home/data", "config goredis log path and synclog path")
 	flag.Parse()
 
 	if *version {
@@ -39,7 +40,9 @@ func main() {
 
 	opt := goredis_server.NewOptions()
 	opt.SetBind(fmt.Sprintf("%s:%d", *host, *port))
-	opt.SetDirectory(dbHome(*port))
+	dbhome := dbHome(*port)
+	opt.SetDirectory(dbhome)
+
 	if len(*slaveof) > 0 {
 		h, p, e := splitHostPort(*slaveof)
 		if e != nil {
@@ -49,7 +52,7 @@ func main() {
 	}
 
 	// 重定向日志输出位置
-	redirectLogOutput(opt.Directory())
+	opt.SetLogDir(redirectLogOutput(*logpath, *port, dbhome))
 
 	// repair
 	if *repair {
@@ -96,21 +99,39 @@ func dbHome(port int) string {
 	return directory
 }
 
-// 将Stdout, Stderr重定向到指定文件
-func redirectLogOutput(directory string) {
+/**
+ * 将Stdout, Stderr重定向到指定文件
+ * 并返回当前日志路径
+ */
+func redirectLogOutput(directory string, port int, defdir string) string {
+
 	oldout := os.Stdout
-	var err error
-	os.Stdout, err = os.OpenFile(directory+"stdout.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
+
+	logpath := directory
+
+	loginfo, err := os.Stat(directory)
+	//如果没有就是用默认的即 dbhome
+	if os.IsNotExist(err) || !loginfo.IsDir() {
+		directory = defdir
+	}
+
+	logpath = fmt.Sprintf("%s/logs/%d/", logpath, port)
+	os.MkdirAll(logpath, os.ModePerm)
+
+	os.Stdout, err = os.OpenFile(logpath+"stdout.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
+
 	if err != nil {
 		panic(err)
 	}
 	// 同时输出到屏幕和文件
 	stdlog.SetOutput(io.MultiWriter(oldout, os.Stdout))
 
-	os.Stderr, err = os.OpenFile(directory+"stderr.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
+	os.Stderr, err = os.OpenFile(logpath+"stderr.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
+
+	return logpath
 }
 
 func splitHostPort(addr string) (host string, port int, err error) {
