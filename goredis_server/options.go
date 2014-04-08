@@ -6,7 +6,6 @@ type Options struct {
 	slaveofHost string
 	slaveofPort int
 	directory   string
-	logdir      string
 }
 
 func NewOptions() (o *Options) {
@@ -36,12 +35,4 @@ func (o *Options) SetDirectory(path string) {
 
 func (o *Options) Directory() string {
 	return o.directory
-}
-
-func (o *Options) LogDir() string {
-	return o.logdir
-}
-
-func (o *Options) SetLogDir(logdir string) {
-	o.logdir = logdir
 }
