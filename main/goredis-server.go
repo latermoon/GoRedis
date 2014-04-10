@@ -28,7 +28,8 @@ func main() {
 	slaveof := flag.String("slaveof", "", "replication")
 	procs := flag.Int("procs", 8, "GOMAXPROCS")
 	repair := flag.Bool("repair", false, "repaire rocksdb")
-	logpath := flag.String("logpath", "/home/data", "config goredis log path and synclog path")
+	datapath := flag.String("datapath", "/data", "config goredis data path default path [/data/goredis_${port}/]")
+	logpath := flag.String("logpath", "/home/logs/", "config goredis log path and synclog path ,default path [/home/logs/goredis_${port}]")
 	flag.Parse()
 
 	if *version {
@@ -40,7 +41,7 @@ func main() {
 
 	opt := goredis_server.NewOptions()
 	opt.SetBind(fmt.Sprintf("%s:%d", *host, *port))
-	dbhome := dbHome(*port)
+	dbhome := dbHome(*datapath, *port)
 	opt.SetDirectory(dbhome)
 
 	if len(*slaveof) > 0 {
@@ -52,7 +53,9 @@ func main() {
 	}
 
 	// 重定向日志输出位置
-	opt.SetLogDir(redirectLogOutput(*logpath, *port, dbhome))
+	logdir := redirectLogOutput(*logpath, *port)
+	opt.SetLogDir(logdir)
+	stdlog.Println("logdir:[" + logdir + "]\tdbhome:[" + dbhome + "]")
 
 	// repair
 	if *repair {
@@ -87,36 +90,39 @@ func init() {
 	})
 }
 
-// 主路径，默认在/data下创建，否则在/tmp下
-func dbHome(port int) string {
-	dbhome := "/data"
-	finfo, e1 := os.Stat(dbhome)
-	if os.IsNotExist(e1) || !finfo.IsDir() {
-		dbhome = "/tmp"
+/**
+ * 构建dbhome，使用datapath中的路径
+ */
+func dbHome(datapath string, port int) string {
+
+	dbhome := fmt.Sprintf("%s/goredis_%d/", datapath, port)
+
+	finfo, err := os.Stat(dbhome)
+	if os.IsNotExist(err) || !finfo.IsDir() {
+		os.MkdirAll(dbhome, os.ModePerm)
 	}
-	directory := fmt.Sprintf("%s/goredis_%d/", dbhome, port)
-	os.MkdirAll(directory, os.ModePerm)
-	return directory
+	return dbhome
 }
 
 /**
  * 将Stdout, Stderr重定向到指定文件
  * 并返回当前日志路径
  */
-func redirectLogOutput(directory string, port int, defdir string) string {
+func redirectLogOutput(directory string, port int) string {
 
 	oldout := os.Stdout
 
-	logpath := directory
+	logpath := fmt.Sprintf("%s/goredis_%d/", directory, port)
 
-	loginfo, err := os.Stat(directory)
-	//如果没有就是用默认的即 dbhome
+	loginfo, err := os.Stat(logpath)
+
+	/**
+	 * 如果logpath不存在
+	 * 则创建
+	 */
 	if os.IsNotExist(err) || !loginfo.IsDir() {
-		directory = defdir
+		os.MkdirAll(logpath, os.ModePerm)
 	}
-
-	logpath = fmt.Sprintf("%s/logs/%d/", logpath, port)
-	os.MkdirAll(logpath, os.ModePerm)
 
 	os.Stdout, err = os.OpenFile(logpath+"stdout.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
 

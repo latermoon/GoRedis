@@ -5,6 +5,12 @@ GoRedis release notes
 
 * [Feature] 实现基本功能
 
+
+**GoRedis 1.0.69** @2014.4.10
+* [Fix] 修正PrefixEnumerate时全部遍历没有quit
+* [ADD]	启动参数新增logpath、datapath用于自定义数据和Log路径
+
+
 **GoRedis 1.0.68** @2014.3.30
 
 * [Fix] 修正SADD返回值
