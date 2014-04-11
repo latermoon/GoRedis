@@ -1,6 +1,10 @@
 GoRedis release notes
 =====================
 
+**SlaveOf 1.0.4** @2014.4.11
+
+* [Feature] 支持配置dbpath
+
 **Proxy 1.0.4** @2014.3.30
 
 * [Feature] 实现基本功能

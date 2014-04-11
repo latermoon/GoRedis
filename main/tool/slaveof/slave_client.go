@@ -77,6 +77,10 @@ func (s *SlaveClient) SetPushRate(n int) {
 	s.pushrate = n
 }
 
+func (s *SlaveClient) SetDbPath(dbpath string) {
+	s.directory = dbpath
+}
+
 func (s *SlaveClient) Writer() io.Writer {
 	if s.destwriter == nil {
 		s.destwriter = ratelimit.NewRateLimiter(s.Dest(), s.pushrate)
