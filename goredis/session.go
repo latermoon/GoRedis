@@ -15,7 +15,7 @@ import (
 // Session继承了net.Conn，代表一个客户端会话
 // 提供各种标准的Reply方法, Status/Error/Integer/Bulk/MultiBulks
 // cmd, err := session.ReadCommand()
-// session.ReplyReply(StatusReply("OK"))
+// session.WriteReply(StatusReply("OK"))
 // 协议参考：http://redis.io/topics/protocol
 type Session struct {
 	net.Conn

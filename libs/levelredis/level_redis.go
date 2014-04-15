@@ -376,12 +376,22 @@ func (l *LevelRedis) Keys(prefix []byte, fn func(i int, key, keytype []byte, qui
 // 前缀扫描
 func (l *LevelRedis) PrefixEnumerate(prefix []byte, direction IterDirection, fn func(i int, key, value []byte, quit *bool)) {
 	min := prefix
+	/**
+	*
+	 */
 	max := append(prefix, MAXBYTE)
 	j := -1
 	l.RangeEnumerate(min, max, direction, func(i int, key, value []byte, quit *bool) {
 		if bytes.HasPrefix(key, prefix) {
 			j++
 			fn(j, key, value, quit)
+		} else {
+			/**
+			 * 根据leveldb 的 key有序，因此具有相同前缀的key必定是在一起的
+			 * 所以一旦碰见了没有该前缀的key那么就直接退出，结束遍历
+			 */
+
+			*quit = true
 		}
 	})
 	return
