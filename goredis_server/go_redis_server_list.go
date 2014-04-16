@@ -103,9 +103,8 @@ func (server *GoRedisServer) OnLTRIM(cmd *Command) (reply *Reply) {
 
 func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
-	lst := server.levelRedis.GetList(key)
-	start, e1 := cmd.IntAtIndex(2)
-	end, e2 := cmd.IntAtIndex(3)
+	start, e1 := cmd.Int64AtIndex(2)
+	end, e2 := cmd.Int64AtIndex(3)
 	if e1 != nil || e2 != nil {
 		return ErrorReply("bad start/end")
 	} else if start < 0 {
@@ -113,20 +112,16 @@ func (server *GoRedisServer) OnLRANGE(cmd *Command) (reply *Reply) {
 	} else if end != -1 && start > end {
 		return ErrorReply("start > end")
 	}
-	// 初始缓冲
-	buflen := end - start + 1
-	if end <= 0 || end > 100 {
-		buflen = 100
+
+	lst := server.levelRedis.GetList(key)
+	elems, err := lst.Range(start, end)
+	if err != nil {
+		return ErrorReply(err)
 	}
-	bulks := make([]interface{}, 0, buflen)
-	for i := start; end == -1 || i <= end; i++ {
-		elem, e2 := lst.Index(int64(i))
-		if e2 != nil {
-			return ErrorReply(e2)
-		} else if elem == nil {
-			break
-		}
-		bulks = append(bulks, elem.Value.([]byte))
+
+	bulks := make([]interface{}, len(elems))
+	for i := 0; i < len(elems); i++ {
+		bulks[i] = elems[i].Value
 	}
 	reply = MultiBulksReply(bulks)
 	return
