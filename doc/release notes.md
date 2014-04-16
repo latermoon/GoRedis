@@ -1,6 +1,12 @@
 GoRedis release notes
 =====================
 
+**GoRedis 1.0.70** @2014.4.16
+
+* [Feature] 优化LRANGE性能，从多次RAW_GET改为单次Enum
+* [Coding] 简化启动函数代码
+* [Fix] 恢复logpath默认路径为/data
+
 **SlaveOf 1.0.4** @2014.4.11
 
 * [Feature] 支持配置dbpath
@@ -11,6 +17,7 @@ GoRedis release notes
 
 
 **GoRedis 1.0.69** @2014.4.10
+
 * [Fix] 修正PrefixEnumerate时全部遍历没有quit
 * [ADD]	启动参数新增logpath、datapath用于自定义数据和Log路径
 

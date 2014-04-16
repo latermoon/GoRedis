@@ -27,10 +27,10 @@ func main() {
 	host := flag.String("h", "0.0.0.0", "server host")
 	port := flag.Int("p", 1602, "server port")
 	slaveof := flag.String("slaveof", "", "replication")
-	procs := flag.Int("procs", 8, "GOMAXPROCS")
+	procs := flag.Int("procs", 8, "GOMAXPROCS, CPU")
 	repair := flag.Bool("repair", false, "repair rocksdb")
 	dbpath := flag.String("dbpath", "/data/", "rocksdb path, recommend use SSD")
-	logpath := flag.String("logpath", "/home/logs/", "all logs, include synclog,aof")
+	logpath := flag.String("logpath", "/data/", "all logs, include synclog,aof")
 	flag.Parse()
 
 	if *version {
