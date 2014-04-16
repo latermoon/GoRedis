@@ -64,7 +64,7 @@ func (s *SlaveClient) Session() *Session {
 }
 
 func (s *SlaveClient) directory() string {
-	return s.server.directory + "sync_" + fmt.Sprint(s.session.RemoteAddr()) + "/"
+	return s.server.opt.LogPath() + "/sync_" + fmt.Sprint(s.session.RemoteAddr()) + "/"
 }
 
 func (s *SlaveClient) rdbfilename() string {

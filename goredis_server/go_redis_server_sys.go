@@ -20,7 +20,7 @@ func (server *GoRedisServer) OnPPROF(cmd *Command) (reply *Reply) {
 	action := cmd.StringAtIndex(1)
 	switch action {
 	case "mem":
-		f, err := os.Create(server.directory + "mem.prof")
+		f, err := os.Create(server.opt.LogPath() + "mem.prof")
 		if err != nil {
 			return ErrorReply(err)
 		}
