@@ -16,7 +16,6 @@ func (server *GoRedisServer) Init() (err error) {
 
 	server.initSignalNotify()
 
-	stdlog.Println("server init, version", VERSION, "...")
 	err = server.initLevelDB()
 	if err != nil {
 		return
@@ -27,17 +26,17 @@ func (server *GoRedisServer) Init() (err error) {
 	}
 	server.config = NewConfig(server.levelRedis, PREFIX+"config:")
 	// monitor
-	server.initCommandMonitor(server.opt.LogDir() + "/cmd.log")
+	server.initCommandMonitor(server.opt.LogPath() + "/cmd.log")
 	server.initCommandCounterLog("string", []string{"GET", "SET", "MGET", "MSET", "INCR", "DECR", "INCRBY", "DECRBY"})
 	server.initCommandCounterLog("hash", []string{"HGETALL", "HGET", "HSET", "HDEL", "HMGET", "HMSET", "HINCRBY", "HLEN"})
 	server.initCommandCounterLog("set", []string{"SADD", "SCARD", "SISMEMBER", "SMEMBERS", "SREM"})
 	server.initCommandCounterLog("list", []string{"LPUSH", "RPUSH", "LPOP", "RPOP", "LINDEX", "LLEN", "LRANGE", "LTRIM"})
 	server.initCommandCounterLog("zset", []string{"ZADD", "ZCARD", "ZSCORE", "ZINCRBY", "ZRANGE", "ZRANGEBYSCORE", "ZRANK", "ZREM", "ZREMRANGEBYRANK", "ZREMRANGEBYSCORE", "ZREVRANGE", "ZREVRANGEBYSCORE", "ZREVRANK"})
-	server.initSeqLog(server.opt.LogDir() + "/seq.log")
-	server.initLeveldbIOLog(server.opt.LogDir() + "/leveldb.io.log")
-	server.initLeveldbStatsLog(server.opt.LogDir() + "/leveldb.stats.log")
-	server.initExecLog(server.opt.LogDir() + "/exec.time.log")
-	server.initSlowlog(server.opt.LogDir() + "/slow.log")
+	server.initSeqLog(server.opt.LogPath() + "/seq.log")
+	server.initLeveldbIOLog(server.opt.LogPath() + "/leveldb.io.log")
+	server.initLeveldbStatsLog(server.opt.LogPath() + "/leveldb.stats.log")
+	server.initExecLog(server.opt.LogPath() + "/exec.time.log")
+	server.initSlowlog(server.opt.LogPath() + "/slow.log")
 	stdlog.Printf("init uid %s\n", server.UID())
 	server.initSlaveOf()
 	return
@@ -110,7 +109,7 @@ func (server *GoRedisServer) initLevelDB() (err error) {
 	env.SetBackgroundThreads(6)
 	env.SetHighPriorityBackgroundThreads(2)
 	opts.SetEnv(env)
-	db, e1 := levelredis.Open(server.directory+"/db0", opts)
+	db, e1 := levelredis.Open(server.opt.DBPath()+"/db0", opts)
 	if e1 != nil {
 		return e1
 	}
@@ -139,7 +138,7 @@ func (server *GoRedisServer) initSyncLog() error {
 	env.SetBackgroundThreads(2)
 	env.SetHighPriorityBackgroundThreads(1)
 	opts.SetEnv(env)
-	db, e1 := levelredis.Open(server.opt.LogDir()+"/synclog", opts)
+	db, e1 := levelredis.Open(server.opt.LogPath()+"/synclog", opts)
 	if e1 != nil {
 		return e1
 	}
@@ -288,7 +287,7 @@ func (server *GoRedisServer) initLeveldbStatsLog(path string) {
 }
 
 func (server *GoRedisServer) initCommandCounterLog(cate string, cmds []string) {
-	path := fmt.Sprintf("%s/cmd.%s.log", server.opt.LogDir(), cate)
+	path := fmt.Sprintf("%s/cmd.%s.log", server.opt.LogPath(), cate)
 	file, err := openfile(path)
 	if err != nil {
 		panic(err)

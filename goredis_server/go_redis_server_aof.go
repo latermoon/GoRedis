@@ -45,7 +45,7 @@ func (server *GoRedisServer) OnAOF(session *Session, cmd *Command) (reply *Reply
 
 func (server *GoRedisServer) aofStart() (err error) {
 	if server.aofwriter == nil {
-		filename := server.directory + "appendonly.aof"
+		filename := server.opt.LogPath() + "/appendonly.aof"
 		f, e := os.OpenFile(filename, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, os.ModePerm)
 		if e != nil {
 			return e

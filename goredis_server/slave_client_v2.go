@@ -34,7 +34,7 @@ func NewSlaveClientV2(server *GoRedisServer, session *Session) (s *SlaveClientV2
 }
 
 func (s *SlaveClientV2) initLog() error {
-	path := fmt.Sprintf("%s/sync_%s.log", s.server.directory, s.session.RemoteAddr())
+	path := fmt.Sprintf("%s/sync_%s.log", s.server.opt.LogPath(), s.session.RemoteAddr())
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		return err
@@ -56,8 +56,7 @@ func (s *SlaveClientV2) Session() *Session {
 
 func (s *SlaveClientV2) Sync() (err error) {
 	s.lastseq = s.masterSeq(s.session.RemoteAddr().String())
-	_, port := splitHostPort(s.server.opt.Bind())
-	args := formatByteSlice("SYNC", "UID", s.server.UID(), "PORT", port)
+	args := formatByteSlice("SYNC", "UID", s.server.UID(), "PORT", s.server.opt.Port())
 	if s.lastseq < 0 {
 		args = append(args, formatByteSlice("SNAP", "1")...)
 	} else {

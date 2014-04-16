@@ -2,11 +2,12 @@ package goredis_server
 
 // 运行配置
 type Options struct {
-	bind        string
+	host        string
+	port        int
+	dbpath      string
+	logpath     string
 	slaveofHost string
 	slaveofPort int
-	directory   string
-	logdir      string
 }
 
 func NewOptions() (o *Options) {
@@ -14,12 +15,36 @@ func NewOptions() (o *Options) {
 	return
 }
 
-func (o *Options) SetBind(host string) {
-	o.bind = host
+func (o *Options) SetHost(host string) {
+	o.host = host
 }
 
-func (o *Options) Bind() string {
-	return o.bind
+func (o *Options) Host() string {
+	return o.host
+}
+
+func (o *Options) SetPort(port int) {
+	o.port = port
+}
+
+func (o *Options) Port() int {
+	return o.port
+}
+
+func (o *Options) SetDBPath(dbpath string) {
+	o.dbpath = dbpath
+}
+
+func (o *Options) DBPath() string {
+	return o.dbpath
+}
+
+func (o *Options) SetLogPath(logpath string) {
+	o.logpath = logpath
+}
+
+func (o *Options) LogPath() string {
+	return o.logpath
 }
 
 func (o *Options) SetSlaveOf(host string, port int) {
@@ -28,20 +53,4 @@ func (o *Options) SetSlaveOf(host string, port int) {
 
 func (o *Options) SlaveOf() (host string, port int) {
 	return o.slaveofHost, o.slaveofPort
-}
-
-func (o *Options) SetDirectory(path string) {
-	o.directory = path
-}
-
-func (o *Options) Directory() string {
-	return o.directory
-}
-
-func (o *Options) LogDir() string {
-	return o.logdir
-}
-
-func (o *Options) SetLogDir(logdir string) {
-	o.logdir = logdir
 }

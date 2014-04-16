@@ -9,6 +9,7 @@ import (
 	"GoRedis/libs/uuid"
 	"container/list"
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"runtime/debug"
@@ -17,7 +18,7 @@ import (
 )
 
 // 版本号，每次更新都需要增加
-const VERSION = "1.0.69"
+const VERSION = "1.0.70"
 const PREFIX = "__goredis:"
 
 var (
@@ -36,7 +37,6 @@ type GoRedisServer struct {
 	RedisServer
 	// 数据源
 	opt        *Options // 选项
-	directory  string
 	levelRedis *levelredis.LevelRedis
 	config     *Config
 	// counters
@@ -82,8 +82,6 @@ func NewGoRedisServer(opt *Options) (server *GoRedisServer) {
 	server.slavemgr = NewSessionManager()
 	server.sessmgr = NewSessionManager()
 	server.info = NewInfo(server)
-	// default datasource
-	server.directory = opt.Directory()
 	// counter
 	server.counters = counter.NewCounters()
 	server.cmdCounters = counter.NewCounters()
@@ -93,8 +91,9 @@ func NewGoRedisServer(opt *Options) (server *GoRedisServer) {
 }
 
 func (server *GoRedisServer) Listen() error {
-	stdlog.Printf("listen %s\n", server.opt.Bind())
-	return server.RedisServer.Listen(server.opt.Bind())
+	addr := fmt.Sprintf("%s:%d", server.opt.Host(), server.opt.Port())
+	stdlog.Printf("listen %s\n", addr)
+	return server.RedisServer.Listen(addr)
 }
 
 func (server *GoRedisServer) UID() (uid string) {

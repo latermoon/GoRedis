@@ -6,6 +6,8 @@ package levelredis
 import (
 	"GoRedis/libs/gorocks"
 	"bytes"
+	"errors"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,7 +52,8 @@ func (l *LevelList) initCount() {
 	l.start, _ = strconv.ParseInt(pairs[0], 10, 64)
 	l.end, _ = strconv.ParseInt(pairs[1], 10, 64)
 	if !(l.end == -1 && l.start == 0) && l.end < l.start {
-		panic("bad list: " + l.entryKey)
+		os.Stderr.WriteString("bad list: " + l.entryKey)
+		l.start, l.end = 0, -1
 	}
 }
 
@@ -251,7 +254,39 @@ func (l *LevelList) TrimLeft(count uint) (n int) {
 	return
 }
 
-func (l *LevelList) Range(start, end int64) (e []*Element) {
+func (l *LevelList) Range(start, stop int64) (elems []*Element, err error) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	if start < 0 || (stop != -1 && start > stop) {
+		err = errors.New("bad start/stop")
+		return
+	}
+
+	min := l.idxKey(l.start + start)
+	var max []byte
+	if stop == -1 {
+		max = l.idxKey(l.end)
+		elems = make([]*Element, 0, 100)
+	} else {
+		max = l.idxKey(l.start + stop)
+		buflen := stop - start // 预分配
+		if buflen > 1000 {
+			buflen = 1000
+		}
+		elems = make([]*Element, 0, buflen)
+	}
+
+	keyPrefix := l.keyPrefix()
+	l.redis.RangeEnumerate(min, max, IterForward, func(i int, key, value []byte, quit *bool) {
+		if !bytes.HasPrefix(key, keyPrefix) {
+			*quit = true
+			return
+		}
+		e := &Element{Value: value}
+		elems = append(elems, e)
+	})
+
 	return
 }
 
@@ -274,6 +309,7 @@ func (l *LevelList) Index(i int64) (e *Element, err error) {
 func (l *LevelList) Enumerate(fn func(i int, value []byte, quit *bool)) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
+
 	l.redis.PrefixEnumerate(l.keyPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
 		fn(i, value, quit)
 	})

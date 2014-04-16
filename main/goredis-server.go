@@ -7,11 +7,11 @@ import (
 	"GoRedis/goredis_server"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -21,15 +21,16 @@ import (
 // go run goredis-server.go -h localhost -p 1602
 // go run goredis-server.go -procs 8 -p 17600
 // go run goredis-server.go -slaveof localhost:1603
+// go run goredis-server.go -dbpath /data/ -logpath /home/logs/
 func main() {
-	version := flag.Bool("v", false, "print goredis-server version")
-	host := flag.String("h", "", "server host")
+	version := flag.Bool("v", false, "print version")
+	host := flag.String("h", "0.0.0.0", "server host")
 	port := flag.Int("p", 1602, "server port")
 	slaveof := flag.String("slaveof", "", "replication")
-	procs := flag.Int("procs", 8, "GOMAXPROCS")
-	repair := flag.Bool("repair", false, "repaire rocksdb")
-	datapath := flag.String("datapath", "/data", "config goredis data path default path [/data/goredis_${port}/]")
-	logpath := flag.String("logpath", "/home/logs/", "config goredis log path and synclog path ,default path [/home/logs/goredis_${port}]")
+	procs := flag.Int("procs", 8, "GOMAXPROCS, CPU")
+	repair := flag.Bool("repair", false, "repair rocksdb")
+	dbpath := flag.String("dbpath", "/data/", "rocksdb path, recommend use SSD")
+	logpath := flag.String("logpath", "/data/", "all logs, include synclog,aof")
 	flag.Parse()
 
 	if *version {
@@ -37,33 +38,50 @@ func main() {
 		return
 	}
 
+	if !dirExist(*dbpath) {
+		stdlog.Println("-dbpath", *dbpath, "not exist")
+		return
+	}
+	if !dirExist(*logpath) {
+		stdlog.Println("-logpath", *logpath, "not exist")
+		return
+	}
+
 	runtime.GOMAXPROCS(*procs)
 
+	// Options
 	opt := goredis_server.NewOptions()
-	opt.SetBind(fmt.Sprintf("%s:%d", *host, *port))
-	dbhome := dbHome(*datapath, *port)
-	opt.SetDirectory(dbhome)
+	opt.SetHost(*host)
+	opt.SetPort(*port)
+	opt.SetDBPath(joinGoRedisPath(*dbpath, *port))
+	opt.SetLogPath(joinGoRedisPath(*logpath, *port))
+	// ensure
+	os.Mkdir(opt.DBPath(), os.ModePerm)
+	os.Mkdir(opt.LogPath(), os.ModePerm)
 
+	// split -slaveof host:port
 	if len(*slaveof) > 0 {
-		h, p, e := splitHostPort(*slaveof)
+		hostPort := strings.Split(*slaveof, ":")
+		if len(hostPort) != 2 {
+			panic("bad slaveof")
+		}
+		p, e := strconv.Atoi(hostPort[1])
 		if e != nil {
 			panic(e)
 		}
-		opt.SetSlaveOf(h, p)
+		opt.SetSlaveOf(hostPort[0], p)
 	}
 
 	// 重定向日志输出位置
-	logdir := redirectLogOutput(*logpath, *port)
-	opt.SetLogDir(logdir)
-	stdlog.Println("logdir:[" + logdir + "]\tdbhome:[" + dbhome + "]")
+	if err := redirectStdout(opt.LogPath()); err != nil {
+		panic(err)
+	}
 
 	// repair
 	if *repair {
-		dbhome := opt.Directory() + "db0"
-		finfo, e1 := os.Stat(dbhome)
-		if os.IsNotExist(e1) || !finfo.IsDir() {
+		dbhome := filepath.Join(opt.DBPath(), "db0")
+		if !dirExist(dbhome) {
 			stdlog.Println("db not exist")
-			return
 		} else {
 			stdlog.Println("start repair", dbhome)
 			levelredis.Repair(dbhome)
@@ -73,6 +91,10 @@ func main() {
 	}
 
 	stdlog.Println("========================================")
+	stdlog.Println("server init, version", goredis_server.VERSION, "...")
+	stdlog.Printf("dbpath:%s, logpath:%s\n", opt.DBPath(), opt.LogPath())
+
+	// GoRedis Server
 	server := goredis_server.NewGoRedisServer(opt)
 	if err := server.Init(); err != nil {
 		panic(err)
@@ -90,63 +112,33 @@ func init() {
 	})
 }
 
-/**
- * 构建dbhome，使用datapath中的路径
- */
-func dbHome(datapath string, port int) string {
-
-	dbhome := fmt.Sprintf("%s/goredis_%d/", datapath, port)
-
-	finfo, err := os.Stat(dbhome)
-	if os.IsNotExist(err) || !finfo.IsDir() {
-		os.MkdirAll(dbhome, os.ModePerm)
-	}
-	return dbhome
-}
-
-/**
- * 将Stdout, Stderr重定向到指定文件
- * 并返回当前日志路径
- */
-func redirectLogOutput(directory string, port int) string {
-
+// 将stdout, stderr重定向到指定文件
+func redirectStdout(logpath string) (err error) {
+	// stdout
 	oldout := os.Stdout
-
-	logpath := fmt.Sprintf("%s/goredis_%d/", directory, port)
-
-	loginfo, err := os.Stat(logpath)
-
-	/**
-	 * 如果logpath不存在
-	 * 则创建
-	 */
-	if os.IsNotExist(err) || !loginfo.IsDir() {
-		os.MkdirAll(logpath, os.ModePerm)
-	}
-
-	os.Stdout, err = os.OpenFile(logpath+"stdout.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
-
-	if err != nil {
-		panic(err)
-	}
-	// 同时输出到屏幕和文件
-	stdlog.SetOutput(io.MultiWriter(oldout, os.Stdout))
-
-	os.Stderr, err = os.OpenFile(logpath+"stderr.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm)
-	if err != nil {
-		panic(err)
-	}
-
-	return logpath
-}
-
-func splitHostPort(addr string) (host string, port int, err error) {
-	tmp := strings.Split(addr, ":")
-	if len(tmp) != 2 {
-		err = errors.New("bad addr:" + addr)
+	if os.Stdout, err = os.OpenFile(filepath.Join(logpath, "stdout.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm); err != nil {
 		return
 	}
-	host = tmp[0]
-	port, err = strconv.Atoi(tmp[1])
+	stdlog.SetOutput(io.MultiWriter(oldout, os.Stdout))
+
+	// stderr
+	if os.Stderr, err = os.OpenFile(filepath.Join(logpath, "stderr.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, os.ModePerm); err != nil {
+		return
+	}
 	return
+}
+
+// GoRedis文件夹路径，返回格式如：/data/goredis_1602/
+func joinGoRedisPath(path string, port int) string {
+	return filepath.Join(path, fmt.Sprintf("goredis_%d/", port))
+}
+
+// 检查目录是否存在
+func dirExist(dir string) bool {
+	info, err := os.Stat(dir)
+	if err == nil {
+		return info.IsDir()
+	} else {
+		return !os.IsNotExist(err) && info.IsDir()
+	}
 }
