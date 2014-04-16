@@ -7,6 +7,7 @@ import (
 	"GoRedis/libs/gorocks"
 	"bytes"
 	"errors"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,7 +52,8 @@ func (l *LevelList) initCount() {
 	l.start, _ = strconv.ParseInt(pairs[0], 10, 64)
 	l.end, _ = strconv.ParseInt(pairs[1], 10, 64)
 	if !(l.end == -1 && l.start == 0) && l.end < l.start {
-		panic("bad list: " + l.entryKey)
+		os.Stderr.WriteString("bad list: " + l.entryKey)
+		l.start, l.end = 0, -1
 	}
 }
 
