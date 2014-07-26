@@ -18,9 +18,15 @@
 
 	yum install hg
 
-### leveldb for golang
+### gorocks
 
-	yum install leveldb
-	
-	go get github.com/latermoon/levigo
+	yum install bzip2-devel
+
+### run
+
+/usr/lib64/libsnappy.so.1.1.4
+/usr/lib64/libstdc++.so.6.0.13
+/usr/lib64/libgflags.so.0.0.0
+
+
 

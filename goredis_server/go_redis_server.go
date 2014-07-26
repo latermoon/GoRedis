@@ -18,7 +18,7 @@ import (
 )
 
 // 版本号，每次更新都需要增加
-const VERSION = "1.0.70"
+const VERSION = "1.0.72"
 const PREFIX = "__goredis:"
 
 var (

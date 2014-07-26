@@ -4,7 +4,7 @@
 package main
 
 import (
-	"GoRedis/goredis_server"
+	"../goredis_server"
 	"GoRedis/libs/levelredis"
 	"GoRedis/libs/stdlog"
 	"flag"

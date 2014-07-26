@@ -1,6 +1,8 @@
 GoRedis
 =======
 
+*请注意：GoRedis处于beta阶段，为陌陌公司内部测试，请保持关注，等待1.0发布*
+
 ### RedisServer Implemented by Go
 #### 说明
 	1、使用rocksdb作为存储层的RedisServer，数据不消耗内存，保持较高性能的情况下，同时获得海量存储特性

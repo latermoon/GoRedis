@@ -4,25 +4,25 @@ brew install gflags
 
 wget https://codeload.github.com/facebook/rocksdb/zip/2.8.fb
 unzip rocksdb-2.8.fb.zip
-
-cd rocksdb-2.8.fb
-make release
-make shared_lib
-
-
-/Users/latermoon/Downloads/Software/rocksdb
-
-gorocks安装
-
 ln -s rocksdb-2.8.fb rocksdb
+
+# /Users/latermoon/Downloads/Software/rocksdb
+cd rocksdb
 
 export CGO_CFLAGS="-I/Users/latermoon/Downloads/Software/rocksdb/include/"
 export CGO_LDFLAGS="-L/Users/latermoon/Downloads/Software/rocksdb/ -lsnappy -lgflags -lz -lbz2"
 
+# make release
+make shared_lib
+
+# link
 cd /usr/local/lib
 ln -s /Users/latermoon/Downloads/Software/rocksdb/librocksdb.dylib
 
-rocksdb安装
+# 编译gorocks
+
+
+linux下rocksdb安装
 
 export CXX=/opt/rh/devtoolset-2/root/usr/bin/g++
 export CC=/opt/rh/devtoolset-2/root/usr/bin/gcc

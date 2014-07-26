@@ -1,6 +1,10 @@
 GoRedis release notes
 =====================
 
+**GoRedis 1.0.72** @2014.5.28
+
+* [Fix] 重要，修正HSET不更新问题
+
 **GoRedis 1.0.70** @2014.4.16
 
 * [Feature] 优化LRANGE性能，从多次RAW_GET改为单次Enum

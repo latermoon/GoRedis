@@ -99,11 +99,8 @@ func (l *LevelHash) Set(fieldVals ...[]byte) (n int) {
 	n = 0
 	for i := 0; i < len(fieldVals); i += 2 {
 		fieldkey := l.fieldKey(fieldVals[i])
-		val, _ := l.redis.RawGet(fieldkey)
-		if val == nil {
-			batch.Put(fieldkey, fieldVals[i+1])
-			n++
-		}
+		batch.Put(fieldkey, fieldVals[i+1])
+		n++
 	}
 	if n > 0 {
 		batch.Put(l.infoKey(), l.infoValue())

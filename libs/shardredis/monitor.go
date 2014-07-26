@@ -1,4 +1,4 @@
-package redis_tool
+package shardredis
 
 import (
 	. "GoRedis/goredis"

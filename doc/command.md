@@ -13,7 +13,7 @@ key_next用于扫描整个数据库，key顺序排序，使用上一次key_next�
 实例：
 
 	key_next '' 100 从开始扫描100条数据
-	key_next 'user:100422:profile' 100 从指定的key开始想下扫描100条数据
+	key_next 'user:100422:profile' 100 从指定的key开始向下扫描100条数据
 	key_next '' 100 withtype 同时返回key类型，返回结果key,type,key,type,...
 	key_next '' 100 withtype withvalue，同时返回key类型和key值，返回结果key,type,value,key,type,value,...
 

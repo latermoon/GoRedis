@@ -65,6 +65,19 @@ func (server *GoRedisServer) OnHMSET(cmd *Command) (reply *Reply) {
 	return
 }
 
+func (server *GoRedisServer) OnHEXISTS(cmd *Command) (reply *Reply) {
+	key := cmd.StringAtIndex(1)
+	field, _ := cmd.ArgAtIndex(2)
+	hash := server.levelRedis.GetHash(key)
+	val := hash.Get(field)
+	if val == nil {
+		reply = IntegerReply(0)
+	} else {
+		reply = IntegerReply(1)
+	}
+	return
+}
+
 func (server *GoRedisServer) OnHLEN(cmd *Command) (reply *Reply) {
 	key := cmd.StringAtIndex(1)
 	hash := server.levelRedis.GetHash(key)

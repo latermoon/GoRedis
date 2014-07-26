@@ -2,7 +2,7 @@
 
 GoRedis和GoRedis之间可以实现一主多从或一从多主，同时同步过程使用带版本号的AOF保障断线后增量同步。
 
-GoRedis可以作为一个或多个Redis的从库，但暂时不可以作为Redis的主库（计划中）。
+GoRedis可以作为一个或多个Redis的从库，但暂时不可以作为Redis的主库。
 
 
 ### 配置方式

@@ -5,11 +5,17 @@ import (
 	"fmt"
 )
 
-/*
-
-*/
-
 func main() {
+	fmt.Println("...")
+	pool := RedisPool("localhost:6379")
+	conn := pool.Get()
+	defer conn.Close()
+	reply, err := conn.Do("SET", "name", "ko")
+	fmt.Println(reply, err)
+
+}
+
+func main2() {
 	fmt.Println("start")
 
 	shard0 := &Shard{}

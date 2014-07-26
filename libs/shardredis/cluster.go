@@ -1,8 +1,8 @@
 package shardredis
 
 import (
+	"GoRedis/libs/redigo/redis"
 	"errors"
-	"github.com/latermoon/redigo/redis"
 	"strconv"
 )
 
