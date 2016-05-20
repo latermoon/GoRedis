@@ -16,24 +16,24 @@ package rocks
 因此对于hash、set这种很少取count的数据，放弃hlen、scard的性能（但也可以提供1000以内的枚举统计）,来提高hset/sadd的性能
 
 string
-	+[name]string = "latermoon"
+	+name,s = "latermoon"
 hash
-	+[info]hash = ""
-	_h[info]name = "latermoon"
-	_h[info]age = "27"
-	_h[info]sex = "M"
+	+info,h = ""
+	h[info]name = "latermoon"
+	h[info]age = "27"
+	h[info]sex = "M"
 list
-	+[list]list = "0,3"
-	_l[list]#0 = "a"
-	_l[list]#1 = "b"
-	_l[list]#2 = "c"
-	_l[list]#3 = "d"
+	+list,l = "0,3"
+	l[list]0 = "a"
+	l[list]1 = "b"
+	l[list]2 = "c"
+	l[list]3 = "d"
 zset
-	+[user_rank]zset = "3"
-	_z[user_rank]m#100422 = "-2"
-	_z[user_rank]m#100423 = "1"
-	_z[user_rank]m#300000 = "2"
-	_z[user_rank]s#-2#100422 = ""
-	_z[user_rank]s#1#100423 = ""
-	_z[user_rank]s#2#300000 = ""
+	+user_rank,z = "3"
+	z[user_rank]m#100422 = "-2"
+	z[user_rank]m#100423 = "1"
+	z[user_rank]m#300000 = "2"
+	z[user_rank]s#-2#100422 = ""
+	z[user_rank]s#1#100423 = ""
+	z[user_rank]s#2#300000 = ""
 */

@@ -4,34 +4,61 @@ import (
 	"github.com/facebookgo/ensure"
 	"github.com/tecbot/gorocksdb"
 	"io/ioutil"
+	"log"
+	"math"
 	"testing"
 )
 
 func TestOpenDB(t *testing.T) {
-	db := New(newTestDB(t))
+	db := New(newRocksDB(t))
 	defer db.Close()
+}
+
+func TestDBEnum(t *testing.T) {
+	db := New(newRocksDB(t))
+	defer db.Close()
+
+	db.RangeEnumerate([]byte{0}, []byte{math.MaxUint8}, IterForward, func(i int, key, value []byte, quit *bool) {
+		log.Println(i, string(key), string(value))
+	})
 }
 
 func TestDBGetSet(t *testing.T) {
-	db := New(newTestDB(t))
+	db := New(newRocksDB(t))
 	defer db.Close()
 
 	var (
-		key   = []byte("name")
-		value = []byte("latermoon")
+		givenKey   = []byte("name")
+		givenValue = []byte("latermoon")
 	)
 
-	ensure.Nil(t, db.RawSet(key, value))
+	ensure.Nil(t, db.Set(givenKey, givenValue))
 
-	value, err := db.RawGet(key)
+	value, err := db.Get(givenKey)
 	ensure.Nil(t, err)
-	ensure.DeepEqual(t, value, value)
+	ensure.DeepEqual(t, value, givenValue)
+}
 
-	ensure.Nil(t, db.RawDelete(key))
+func TestDBRaw(t *testing.T) {
+	db := New(newRocksDB(t))
+	defer db.Close()
+
+	var (
+		givenKey   = []byte("name")
+		givenValue = []byte("latermoon")
+	)
+
+	ensure.Nil(t, db.RawSet(givenKey, givenValue))
+
+	value, err := db.RawGet(givenKey)
+	ensure.Nil(t, err)
+	ensure.DeepEqual(t, value, givenValue)
+
+	ensure.Nil(t, db.RawDelete(givenKey))
 
 }
 
-func newTestDB(t *testing.T) *gorocksdb.DB {
+func newRocksDB(t *testing.T) *gorocksdb.DB {
 	dir, err := ioutil.TempDir("", "rocks")
 	ensure.Nil(t, err)
 
