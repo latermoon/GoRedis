@@ -130,8 +130,9 @@ func (h *HashElement) drop() error {
 
 	if err := h.db.WriteBatch(batch); err != nil {
 		h.db = nil // make sure not invoked by others
+		return err
 	}
-	return err
+	return nil
 }
 
 // +key,h
