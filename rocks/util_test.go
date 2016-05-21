@@ -5,12 +5,10 @@ import (
 	"testing"
 )
 
-func TestIntAndBytes(t *testing.T) {
-	t.Log(Int64ToBytes(-2560))
-	t.Log(Int64ToBytes(-256))
-	t.Log(Int64ToBytes(-1))
-	t.Log(Int64ToBytes(0))
-	t.Log(Int64ToBytes(1))
-	t.Log(Int64ToBytes(256))
-	t.Log("math.MaxInt64:", math.MaxInt64)
+func ScanAll(t *testing.T, db *DB) {
+	min := []byte{0}
+	max := []byte{math.MaxUint8}
+	db.RangeEnumerate(min, max, IterForward, func(i int, key, value []byte, quit *bool) {
+		t.Log(i, string(key), string(value))
+	})
 }

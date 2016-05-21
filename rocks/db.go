@@ -22,11 +22,16 @@ func New(rdb *gorocksdb.DB) *DB {
 	db := &DB{rdb: rdb}
 	db.wo = gorocksdb.NewDefaultWriteOptions()
 	db.ro = gorocksdb.NewDefaultReadOptions()
+	db.RawSet([]byte{MAXBYTE}, nil) // for Enumerator seek to last
 	return db
 }
 
 func (d *DB) Hash(key []byte) *HashElement {
 	return NewHashElement(d, key)
+}
+
+func (d *DB) List(key []byte) *ListElement {
+	return NewListElement(d, key)
 }
 
 func (d *DB) Delete(key []byte) error {
