@@ -24,7 +24,23 @@ const (
 	HASH               = 'h'
 	LIST               = 'l'
 	ZSET               = 'z'
+	NONE               = '0'
 )
+
+func (e ElementType) String() string {
+	switch byte(e) {
+	case 's':
+		return "string"
+	case 'h':
+		return "hash"
+	case 'l':
+		return "list"
+	case 'z':
+		return "sortedset"
+	default:
+		return "none"
+	}
+}
 
 type IterDirection int
 

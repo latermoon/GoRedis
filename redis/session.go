@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strconv"
 	"sync"
 )
@@ -13,15 +14,15 @@ import (
 // session.WriteReply(reply)
 // session.Write(reply.Bytes())
 type Session struct {
-	io.ReadWriteCloser
+	net.Conn
 	rd    *bufio.Reader
 	rlock sync.Mutex
 }
 
-func NewSession(conn io.ReadWriteCloser) *Session {
+func NewSession(conn net.Conn) *Session {
 	return &Session{
-		ReadWriteCloser: conn,
-		rd:              bufio.NewReader(conn),
+		Conn: conn,
+		rd:   bufio.NewReader(conn),
 	}
 }
 

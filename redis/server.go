@@ -1,95 +1,76 @@
 package redis
 
 import (
-	"io"
+	"errors"
+	"fmt"
 	"log"
 	"net"
-	"reflect"
-	"strings"
 )
 
-// redis.Register(&server.GoRedisServer{})
+// handler = &server.GoRedisServer{}
 // lis, err := net.Listen("tcp", "localhost:6380")
 // if err != nil {
 //     panic(err)
 // }
-// redis.Serve(lis)
+// redis.Serve(lis, handler)
 
-func Register(recv interface{}) { DefaultServer.Register(recv) }
+func Register(handler ServerHandler) { DefaultServer.Register(handler) }
 
-func Serve(lis net.Listener) { DefaultServer.Serve(lis) }
+func Serve(lis net.Listener) error { return DefaultServer.Serve(lis) }
 
 var DefaultServer = NewServer()
 
-type ReplyWriter interface {
-	WriteReply(Reply) (int, error)
-}
-
-type HandlerFunc func(ReplyWriter, Command)
-
-func (f HandlerFunc) Serve(r ReplyWriter, c Command) {
-	f(r, c)
+type ServerHandler interface {
+	SessionOpened(*Session)
+	SessoinClosed(*Session, error)
+	RecvCommand(*Session, Command)
 }
 
 type Server struct {
-	handlers map[string]HandlerFunc
+	handler ServerHandler
 }
 
 func NewServer() *Server {
-	s := &Server{}
-	s.handlers = make(map[string]HandlerFunc)
-	return s
+	return &Server{}
 }
 
-func (s *Server) Register(recv interface{}) {
-	objval := reflect.ValueOf(recv)
-	objtyp := reflect.TypeOf(recv)
-	// log.Println("reflect", objtyp, objval, objval.NumMethod())
-	for i := 0; i < objtyp.NumMethod(); i++ {
-		name := objtyp.Method(i).Name
-		if len(name) > 2 && strings.HasPrefix(name, "On") {
-			s.registerHandler(name[2:], objval.Method(i))
-		}
-	}
+func (s *Server) Register(handler ServerHandler) {
+	s.handler = handler
 }
 
-func (s *Server) registerHandler(name string, method reflect.Value) {
-	name = strings.ToUpper(name)
-	s.handlers[name] = HandlerFunc(func(r ReplyWriter, c Command) {
-		in := []reflect.Value{reflect.ValueOf(r), reflect.ValueOf(c)}
-		method.Call(in)
-	})
-}
-
-func (s *Server) Serve(lis net.Listener) {
+func (s *Server) Serve(lis net.Listener) error {
 	for {
 		conn, err := lis.Accept()
 		if err != nil {
 			log.Println("redis.Serve: accept:", err.Error())
-			return
+			return err
 		}
-		go s.ServeConn(conn)
+		go s.ServeSession(NewSession(conn))
 	}
+
+	return nil
 }
 
-func (s *Server) ServeConn(conn io.ReadWriteCloser) {
-	session := NewSession(conn)
-	defer session.Close()
+func (s *Server) ServeSession(session *Session) {
+	defer func() {
+		session.Close()
+		if v := recover(); v != nil {
+			err, ok := v.(error)
+			if !ok {
+				err = errors.New(fmt.Sprint(v))
+			}
+			s.handler.SessoinClosed(session, err)
+		}
+		s.handler.SessoinClosed(session, nil)
+	}()
+
+	s.handler.SessionOpened(session)
 
 	for {
 		cmd, err := session.ReadCommand()
 		if err != nil {
 			break
 		}
-
-		name := strings.ToUpper(string(cmd[0]))
-		handler, ok := s.handlers[name]
-
-		if !ok {
-			session.Write(ErrorReply("Handler Not Found").Bytes())
-		} else {
-			handler.Serve(session, cmd)
-		}
-
+		s.handler.RecvCommand(session, cmd)
 	}
 }

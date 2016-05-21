@@ -14,6 +14,19 @@ func TestOpenDB(t *testing.T) {
 	defer db.Close()
 }
 
+func TestDBTypeOf(t *testing.T) {
+	db := New(newRocksDB(t))
+	defer db.Close()
+
+	db.Set([]byte("name"), []byte("latermoon"))
+	e := db.TypeOf([]byte("name"))
+	ensure.True(t, e == STRING)
+
+	e = db.TypeOf([]byte("age"))
+	ensure.True(t, e == NONE)
+
+}
+
 func TestDBEnum(t *testing.T) {
 	db := New(newRocksDB(t))
 	defer db.Close()
