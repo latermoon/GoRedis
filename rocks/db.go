@@ -5,13 +5,7 @@ import (
 	"github.com/tecbot/gorocksdb"
 )
 
-type IterDirection int
-
-const (
-	IterForward IterDirection = iota
-	IterBackward
-)
-
+// rocks.DB provide "RedisLike's" rocksdb operators
 type DB struct {
 	rdb *gorocksdb.DB
 	wo  *gorocksdb.WriteOptions

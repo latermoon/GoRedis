@@ -52,5 +52,7 @@ func TestList(t *testing.T) {
 	ensure.Nil(t, err)
 	ensure.True(t, val == nil)
 
-	// ScanAll(t, db)
+	l.RPush([]byte("1"), []byte("2"), []byte("3"), []byte("4"))
+	l.drop()
+	ScanAll(t, db)
 }

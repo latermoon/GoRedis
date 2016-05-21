@@ -139,6 +139,25 @@ func (l *ListElement) pop(left bool) ([]byte, error) {
 	}
 }
 
+func (l *ListElement) drop() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	batch := gorocksdb.NewWriteBatch()
+	defer batch.Destroy()
+
+	l.db.PrefixEnumerate(l.keyPrefix(), IterForward, func(i int, key, value []byte, quit *bool) {
+		batch.Delete(copyBytes(key))
+	})
+	batch.Delete(l.rawKey())
+
+	err := l.db.WriteBatch(batch)
+	if err == nil {
+		l.db = nil
+	}
+	return err
+}
+
 func (l *ListElement) Len() int64 {
 	l.mu.RLock()
 	defer l.mu.RUnlock()

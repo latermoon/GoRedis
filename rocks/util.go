@@ -26,6 +26,13 @@ const (
 	ZSET               = 'z'
 )
 
+type IterDirection int
+
+const (
+	IterForward IterDirection = iota
+	IterBackward
+)
+
 // 字节最大范围
 const MAXBYTE byte = math.MaxUint8
 

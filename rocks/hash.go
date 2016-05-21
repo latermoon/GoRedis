@@ -128,11 +128,11 @@ func (h *HashElement) drop() error {
 	})
 	batch.Delete(h.rawKey())
 
-	if err := h.db.WriteBatch(batch); err != nil {
+	err := h.db.WriteBatch(batch)
+	if err == nil {
 		h.db = nil // make sure not invoked by others
-		return err
 	}
-	return nil
+	return err
 }
 
 // +key,h
