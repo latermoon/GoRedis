@@ -208,6 +208,6 @@ func (l *ListElement) indexKey(i int64) []byte {
 
 // split l[key]index into index
 func (l *ListElement) indexInKey(key []byte) int64 {
-	idxbuf := bytes.TrimLeft(key, string(l.keyPrefix()))
+	idxbuf := bytes.TrimPrefix(key, l.keyPrefix())
 	return BytesToInt64(idxbuf[1:]) // skip sign "0/1"
 }

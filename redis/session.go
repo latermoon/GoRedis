@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"strconv"
-	"sync"
 )
 
 // cmd, err := session.ReadCommand()
@@ -15,8 +14,7 @@ import (
 // session.Write(reply.Bytes())
 type Session struct {
 	net.Conn
-	rd    *bufio.Reader
-	rlock sync.Mutex
+	rd *bufio.Reader
 }
 
 func NewSession(conn net.Conn) *Session {
@@ -27,8 +25,6 @@ func NewSession(conn net.Conn) *Session {
 }
 
 func (s *Session) ReadCommand() (Command, error) {
-	s.rlock.Lock()
-	defer s.rlock.Unlock()
 	// Read ( *<number of arguments> CR LF )
 	if err := s.skipByte('*'); err != nil { // io.EOF
 		return nil, err

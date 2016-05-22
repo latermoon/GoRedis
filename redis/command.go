@@ -23,14 +23,6 @@ func (c Command) Bytes() []byte {
 	return buf.Bytes()
 }
 
-func (c Command) Size() int {
-	sum := 0
-	for i := 0; i < len(c); i++ {
-		sum += len(c[i])
-	}
-	return sum
-}
-
 func (c Command) String() string {
 	arr := make([]string, len(c))
 	for i := range c {

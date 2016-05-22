@@ -20,11 +20,11 @@ var (
 type ElementType byte
 
 const (
-	STRING ElementType = 's'
-	HASH               = 'h'
-	LIST               = 'l'
-	ZSET               = 'z'
-	NONE               = '0'
+	STRING    ElementType = 's'
+	HASH                  = 'h'
+	LIST                  = 'l'
+	SORTEDSET             = 'z'
+	NONE                  = '0'
 )
 
 func (e ElementType) String() string {
@@ -49,8 +49,11 @@ const (
 	IterBackward
 )
 
-// 字节最大范围
-const MAXBYTE byte = math.MaxUint8
+// 字节范围
+const (
+	MINBYTE byte = 0
+	MAXBYTE byte = math.MaxUint8
+)
 
 func rawKey(key []byte, t ElementType) []byte {
 	return bytes.Join([][]byte{KEY, key, SEP, []byte{byte(t)}}, nil)

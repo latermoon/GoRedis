@@ -37,6 +37,8 @@ func (d *DB) objFromCache(key []byte, e ElementType) interface{} {
 			obj = NewHashElement(d, key)
 		case LIST:
 			obj = NewListElement(d, key)
+		case SORTEDSET:
+			obj = NewSortedSetElement(d, key)
 		}
 		d.caches.Add(skey, obj)
 	}
@@ -49,6 +51,10 @@ func (d *DB) Hash(key []byte) *HashElement {
 
 func (d *DB) List(key []byte) *ListElement {
 	return d.objFromCache(key, LIST).(*ListElement)
+}
+
+func (d *DB) SortedSet(key []byte) *SortedSetElement {
+	return d.objFromCache(key, SORTEDSET).(*SortedSetElement)
 }
 
 func (d *DB) Delete(key []byte) error {
