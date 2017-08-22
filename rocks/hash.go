@@ -152,6 +152,6 @@ func (h *HashElement) fieldPrefix() []byte {
 
 // split h[key]field into field
 func (h *HashElement) fieldInKey(fieldKey []byte) []byte {
-	right := bytes.Index(fieldKey, EOK)
-	return fieldKey[right+1:]
+	right := len([]byte{HASH})+len(SOK)+len(h.key)+len(EOK)
+	return fieldKey[right-1:]
 }
